@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memory Duel Online</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app setup-mode" id="app">
+    <div class="ambient ambient-1"></div>
+    <div class="ambient ambient-2"></div>
+    <div class="ambient ambient-3"></div>
+
+    <header class="topbar">
+      <div class="player-card" id="player1Panel">
+        <div class="player-topline">
+          <span class="player-label" id="player1NameLabel">Играч 1</span>
+          <span class="turn-pill" id="player1Turn">На ход</span>
+        </div>
+        <div class="player-score" id="player1Score">0</div>
+        <div class="player-subtext" id="player1Subtext">Готов за игра</div>
+      </div>
+
+      <div class="center-console">
+        <div class="title-wrap">
+          <p class="eyebrow">MEMORY DUEL V7</p>
+          <h1>Локална и истинска онлайн игра</h1>
+          <p class="subtitle">Локален режим без вход, игра срещу компютър и онлайн стаи с код.</p>
+        </div>
+
+        <section class="auth-panel hidden" id="authPanel">
+          <div class="auth-head">
+            <div>
+              <h2>Профил</h2>
+              <p id="authStatusText">Влез или се регистрирай, за да отключиш онлайн режима.</p>
+            </div>
+            <div class="auth-badges">
+              <span class="meta-chip" id="backendChip">Backend: не е свързан</span>
+              <span class="meta-chip" id="sessionChip">Сесия: гост</span>
+            </div>
+          </div>
+
+          <div class="auth-tabs">
+            <button class="tab-btn active" id="loginTab" type="button">Вход</button>
+            <button class="tab-btn" id="registerTab" type="button">Регистрация</button>
+          </div>
+
+          <div class="auth-form active" id="loginForm">
+            <div class="auth-grid two-col">
+              <label class="setup-field">
+                <span>Имейл</span>
+                <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+              </label>
+              <label class="setup-field">
+                <span>Парола</span>
+                <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" />
+              </label>
+            </div>
+            <div class="auth-actions">
+              <button class="btn btn-primary" id="loginButton" type="button">Вход</button>
+              <button class="btn btn-secondary" id="logoutButton" type="button">Изход</button>
+            </div>
+          </div>
+
+          <div class="auth-form" id="registerForm">
+            <div class="auth-grid register-grid">
+              <label class="setup-field">
+                <span>Потребителско име</span>
+                <input id="registerUsername" type="text" maxlength="24" placeholder="player123" autocomplete="username" />
+              </label>
+              <label class="setup-field">
+                <span>Име</span>
+                <input id="registerFirstName" type="text" maxlength="24" placeholder="Иван" autocomplete="given-name" />
+              </label>
+              <label class="setup-field">
+                <span>Фамилия</span>
+                <input id="registerLastName" type="text" maxlength="24" placeholder="Иванов" autocomplete="family-name" />
+              </label>
+              <label class="setup-field">
+                <span>Имейл</span>
+                <input id="registerEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+              </label>
+              <label class="setup-field full-span">
+                <span>Парола</span>
+                <input id="registerPassword" type="password" placeholder="Минимум 6 символа" autocomplete="new-password" />
+              </label>
+            </div>
+            <div class="auth-actions">
+              <button class="btn btn-primary" id="registerButton" type="button">Регистрация</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="player-setup-grid">
+          <label class="setup-field" id="player1NameField">
+            <span>Име на играч 1</span>
+            <input id="player1NameInput" type="text" maxlength="18" placeholder="Играч 1" autocomplete="off" />
+          </label>
+          <label class="setup-field" id="player2NameField">
+            <span>Име на играч 2</span>
+            <input id="player2NameInput" type="text" maxlength="18" placeholder="Играч 2" autocomplete="off" />
+          </label>
+        </div>
+
+        <div class="mode-selector" id="modeSelector"></div>
+        <div class="difficulty-selector hidden" id="difficultySelector"></div>
+        <div class="theme-selector" id="themeSelector"></div>
+        <div class="count-selector" id="countSelector"></div>
+
+        <section class="online-lobby hidden" id="onlineLobby">
+          <div class="lobby-head">
+            <h3>Онлайн стая</h3>
+            <span class="meta-chip highlight" id="roomCodeChip">Код: —</span>
+          </div>
+          <div class="auth-grid two-col">
+            <button class="btn btn-primary" id="createRoomButton" type="button">Създай стая</button>
+            <label class="setup-field compact-field">
+              <span>Влез с код</span>
+              <div class="inline-field">
+                <input id="joinRoomInput" type="text" maxlength="6" placeholder="ABC123" autocomplete="off" />
+                <button class="btn btn-secondary" id="joinRoomButton" type="button">Влез</button>
+              </div>
+            </label>
+          </div>
+          <div class="lobby-meta">
+            <div class="meta-chip" id="roomStatusChip">Стая: няма</div>
+            <div class="meta-chip" id="roomPlayersChip">Играчите: 0/2</div>
+            <div class="meta-chip" id="onlineTurnChip">Ход: —</div>
+          </div>
+          <div class="auth-actions">
+            <button class="btn btn-secondary" id="leaveRoomButton" type="button">Напусни стая</button>
+            <button class="btn btn-primary" id="startOnlineButton" type="button" disabled>Старт онлайн</button>
+          </div>
+        </section>
+
+        <div class="control-row">
+          <button class="btn btn-primary" id="startButton" disabled>Старт</button>
+          <button class="btn btn-secondary" id="newRoundButton">Смени тема</button>
+        </div>
+
+        <div class="status-banner" id="statusBanner">Избери тема, режим и брой карти. За онлайн влез в профила си и създай или отвори стая.</div>
+
+        <div class="hud-row">
+          <div class="meta-chip" id="selectedThemeChip">Тема: няма</div>
+          <div class="meta-chip" id="gameModeChip">Режим: Локално</div>
+          <div class="meta-chip" id="cardCountChip">Карти: 20</div>
+          <div class="meta-chip" id="pairsLeftChip">Оставащи двойки: 0</div>
+          <div class="meta-chip highlight" id="turnChip">Ред: Играч 1</div>
+        </div>
+      </div>
+
+      <div class="player-card" id="player2Panel">
+        <div class="player-topline">
+          <span class="player-label" id="player2NameLabel">Играч 2</span>
+          <span class="turn-pill" id="player2Turn">Изчаква</span>
+        </div>
+        <div class="player-score" id="player2Score">0</div>
+        <div class="player-subtext" id="player2Subtext">Ще атакува след грешка</div>
+      </div>
+    </header>
+
+    <main class="game-shell">
+      <section class="board-panel">
+        <div class="board-frame">
+          <div class="empty-state" id="emptyState">
+            <div>
+              <div class="empty-icon">✦</div>
+              <h2>Играй локално или онлайн</h2>
+              <p>Локално — започваш веднага. Срещу компютър — избираш трудност. Онлайн — влизаш в профила си, създаваш стая или се присъединяваш с код.</p>
+            </div>
+          </div>
+          <section class="memory-board" id="gameBoard" aria-label="Memory board"></section>
+        </div>
+      </section>
+    </main>
+
+    <div class="result-modal hidden" id="resultModal">
+      <div class="result-card">
+        <p class="eyebrow">Край на рунда</p>
+        <h2 id="resultTitle">Победител</h2>
+        <p id="resultSummary"></p>
+        <div class="result-actions">
+          <button class="btn btn-primary" id="playAgainButton">Играй пак</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="scripts.js"></script>
+</body>
+</html>
