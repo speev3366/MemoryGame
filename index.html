@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Duel Online</title>
+  <title>Memory Duel Online V7.2.1</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -24,7 +24,7 @@
 
       <div class="center-console">
         <div class="title-wrap">
-          <p class="eyebrow">MEMORY DUEL V7</p>
+          <p class="eyebrow">MEMORY DUEL V7.2.1</p>
           <h1>Локална и истинска онлайн игра</h1>
           <p class="subtitle">Локален режим без вход, игра срещу компютър и онлайн стаи с код.</p>
         </div>
@@ -32,7 +32,7 @@
         <section class="auth-panel hidden" id="authPanel">
           <div class="auth-head">
             <div>
-              <h2>Профил</h2>
+              <h2>Профил и онлайн достъп</h2>
               <p id="authStatusText">Влез или се регистрирай, за да отключиш онлайн режима.</p>
             </div>
             <div class="auth-badges">
@@ -46,50 +46,102 @@
             <button class="tab-btn" id="registerTab" type="button">Регистрация</button>
           </div>
 
-          <div class="auth-form active" id="loginForm">
+          <form class="auth-form active" id="loginForm" novalidate>
             <div class="auth-grid two-col">
-              <label class="setup-field">
+              <label class="setup-field" id="loginEmailField">
                 <span>Имейл</span>
-                <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+                <input id="loginEmail" type="email" inputmode="email" required placeholder="you@example.com" autocomplete="email" />
+                <small class="field-error" id="loginEmailError"></small>
               </label>
-              <label class="setup-field">
+              <label class="setup-field" id="loginPasswordField">
                 <span>Парола</span>
-                <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" />
+                <input id="loginPassword" type="password" required minlength="8" placeholder="••••••••" autocomplete="current-password" />
+                <small class="field-error" id="loginPasswordError"></small>
               </label>
             </div>
+            <div class="auth-feedback" id="loginFeedback"></div>
             <div class="auth-actions">
-              <button class="btn btn-primary" id="loginButton" type="button">Вход</button>
+              <button class="btn btn-primary" id="loginButton" type="submit">Вход</button>
               <button class="btn btn-secondary" id="logoutButton" type="button">Изход</button>
             </div>
-          </div>
+          </form>
 
-          <div class="auth-form" id="registerForm">
+          <form class="auth-form" id="registerForm" novalidate>
             <div class="auth-grid register-grid">
-              <label class="setup-field">
+              <label class="setup-field" id="registerUsernameField">
                 <span>Потребителско име</span>
-                <input id="registerUsername" type="text" maxlength="24" placeholder="player123" autocomplete="username" />
+                <input id="registerUsername" type="text" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" placeholder="player123" autocomplete="username" />
+                <small class="field-error" id="registerUsernameError"></small>
               </label>
-              <label class="setup-field">
+              <label class="setup-field" id="registerFirstNameField">
                 <span>Име</span>
-                <input id="registerFirstName" type="text" maxlength="24" placeholder="Иван" autocomplete="given-name" />
+                <input id="registerFirstName" type="text" required minlength="2" maxlength="24" placeholder="Иван" autocomplete="given-name" />
+                <small class="field-error" id="registerFirstNameError"></small>
               </label>
-              <label class="setup-field">
+              <label class="setup-field" id="registerLastNameField">
                 <span>Фамилия</span>
-                <input id="registerLastName" type="text" maxlength="24" placeholder="Иванов" autocomplete="family-name" />
+                <input id="registerLastName" type="text" required minlength="2" maxlength="24" placeholder="Иванов" autocomplete="family-name" />
+                <small class="field-error" id="registerLastNameError"></small>
               </label>
-              <label class="setup-field">
+              <label class="setup-field" id="registerEmailField">
                 <span>Имейл</span>
-                <input id="registerEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+                <input id="registerEmail" type="email" inputmode="email" required placeholder="you@example.com" autocomplete="email" />
+                <small class="field-error" id="registerEmailError"></small>
               </label>
-              <label class="setup-field full-span">
+              <label class="setup-field full-span" id="registerPasswordField">
                 <span>Парола</span>
-                <input id="registerPassword" type="password" placeholder="Минимум 6 символа" autocomplete="new-password" />
+                <input id="registerPassword" type="password" required minlength="8" placeholder="Минимум 8 символа, буква и цифра" autocomplete="new-password" />
+                <small class="field-error" id="registerPasswordError"></small>
               </label>
             </div>
+            <div class="auth-feedback" id="registerFeedback"></div>
             <div class="auth-actions">
-              <button class="btn btn-primary" id="registerButton" type="button">Регистрация</button>
+              <button class="btn btn-primary" id="registerButton" type="submit">Регистрация</button>
             </div>
-          </div>
+          </form>
+
+          <section class="profile-panel hidden" id="profilePanel">
+            <div class="profile-head">
+              <div>
+                <h3>Моят профил</h3>
+                <p>Историята на мачовете се пази в базата и се показва само за влезлия потребител.</p>
+              </div>
+              <div class="profile-actions">
+                <button class="btn btn-secondary btn-small" id="refreshHistoryButton" type="button">Опресни история</button>
+                <button class="btn btn-secondary btn-small" id="profileLogoutButton" type="button">Изход</button>
+              </div>
+            </div>
+
+            <div class="profile-summary-grid">
+              <article class="profile-card-lite">
+                <span class="summary-label">Име</span>
+                <strong id="profileFullName">—</strong>
+                <span class="summary-subtext" id="profileUsername">@—</span>
+              </article>
+              <article class="profile-card-lite">
+                <span class="summary-label">Имейл</span>
+                <strong id="profileEmail">—</strong>
+                <span class="summary-subtext" id="profileCreatedAt">Създаден профил: —</span>
+              </article>
+              <article class="profile-stat-card">
+                <span class="summary-label">Общо игри</span>
+                <strong id="profileTotalGames">0</strong>
+                <span class="summary-subtext" id="profileWinRate">Победи: 0%</span>
+              </article>
+              <article class="profile-stat-card">
+                <span class="summary-label">Победи</span>
+                <strong id="profileWins">0</strong>
+                <span class="summary-subtext" id="profileModeBreakdown">Онлайн 0 • AI 0 • Локално 0</span>
+              </article>
+            </div>
+
+            <div class="history-head">
+              <h4>Последни игри</h4>
+              <span class="meta-chip" id="historyCountChip">0 мача</span>
+            </div>
+            <div class="history-feedback" id="historyFeedback">Историята ще се появи след първия завършен мач с активен профил.</div>
+            <div class="match-history-list" id="matchHistoryList"></div>
+          </section>
         </section>
 
         <div class="player-setup-grid">
@@ -115,12 +167,13 @@
           </div>
           <div class="auth-grid two-col">
             <button class="btn btn-primary" id="createRoomButton" type="button">Създай стая</button>
-            <label class="setup-field compact-field">
+            <label class="setup-field compact-field" id="joinRoomField">
               <span>Влез с код</span>
               <div class="inline-field">
                 <input id="joinRoomInput" type="text" maxlength="6" placeholder="ABC123" autocomplete="off" />
                 <button class="btn btn-secondary" id="joinRoomButton" type="button">Влез</button>
               </div>
+              <small class="field-error" id="joinRoomError"></small>
             </label>
           </div>
           <div class="lobby-meta">

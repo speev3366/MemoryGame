@@ -52,6 +52,41 @@ const roomStatusChip = document.getElementById('roomStatusChip');
 const roomPlayersChip = document.getElementById('roomPlayersChip');
 const onlineTurnChip = document.getElementById('onlineTurnChip');
 
+const loginEmailField = document.getElementById('loginEmailField');
+const loginPasswordField = document.getElementById('loginPasswordField');
+const registerUsernameField = document.getElementById('registerUsernameField');
+const registerFirstNameField = document.getElementById('registerFirstNameField');
+const registerLastNameField = document.getElementById('registerLastNameField');
+const registerEmailField = document.getElementById('registerEmailField');
+const registerPasswordField = document.getElementById('registerPasswordField');
+const joinRoomField = document.getElementById('joinRoomField');
+
+const loginEmailError = document.getElementById('loginEmailError');
+const loginPasswordError = document.getElementById('loginPasswordError');
+const registerUsernameError = document.getElementById('registerUsernameError');
+const registerFirstNameError = document.getElementById('registerFirstNameError');
+const registerLastNameError = document.getElementById('registerLastNameError');
+const registerEmailError = document.getElementById('registerEmailError');
+const registerPasswordError = document.getElementById('registerPasswordError');
+const joinRoomError = document.getElementById('joinRoomError');
+const loginFeedback = document.getElementById('loginFeedback');
+const registerFeedback = document.getElementById('registerFeedback');
+
+const profilePanel = document.getElementById('profilePanel');
+const refreshHistoryButton = document.getElementById('refreshHistoryButton');
+const profileLogoutButton = document.getElementById('profileLogoutButton');
+const profileFullName = document.getElementById('profileFullName');
+const profileUsername = document.getElementById('profileUsername');
+const profileEmail = document.getElementById('profileEmail');
+const profileCreatedAt = document.getElementById('profileCreatedAt');
+const profileTotalGames = document.getElementById('profileTotalGames');
+const profileWinRate = document.getElementById('profileWinRate');
+const profileWins = document.getElementById('profileWins');
+const profileModeBreakdown = document.getElementById('profileModeBreakdown');
+const historyCountChip = document.getElementById('historyCountChip');
+const historyFeedback = document.getElementById('historyFeedback');
+const matchHistoryList = document.getElementById('matchHistoryList');
+
 const playerPanels = {
   1: document.getElementById('player1Panel'),
   2: document.getElementById('player2Panel')
@@ -272,7 +307,9 @@ const state = {
     client: null,
     enabled: false,
     user: null,
-    profile: null
+    profile: null,
+    history: [],
+    historyLoaded: false
   },
   online: {
     room: null,
@@ -295,6 +332,357 @@ function shuffle(array) {
 function sanitizeName(value, fallback) {
   const normalized = (value || '').replace(/\s+/g, ' ').trim();
   return normalized.slice(0, 18) || fallback;
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('bg-BG', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+}
+
+function getAuthRedirectUrl() {
+  return `${window.location.origin}${window.location.pathname}`;
+}
+
+function setFieldError(field, errorEl, message = '') {
+  if (!field || !errorEl) return;
+  field.classList.toggle('has-error', Boolean(message));
+  errorEl.textContent = message;
+}
+
+function clearAllValidation() {
+  [
+    [loginEmailField, loginEmailError],
+    [loginPasswordField, loginPasswordError],
+    [registerUsernameField, registerUsernameError],
+    [registerFirstNameField, registerFirstNameError],
+    [registerLastNameField, registerLastNameError],
+    [registerEmailField, registerEmailError],
+    [registerPasswordField, registerPasswordError],
+    [joinRoomField, joinRoomError]
+  ].forEach(([field, errorEl]) => setFieldError(field, errorEl, ''));
+}
+
+function showFeedback(target, message = '', type = '') {
+  if (!target) return;
+  target.textContent = message;
+  target.classList.remove('is-error', 'is-success');
+  if (type) target.classList.add(type === 'error' ? 'is-error' : 'is-success');
+}
+
+function friendlyAuthError(error) {
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || 'Неочаквана грешка.');
+  const normalized = message.toLowerCase();
+
+  if (code === 'anonymous_provider_disabled') return 'Не бяха подадени валидни данни за регистрация. Попълни всички полета и опитай отново.';
+  if (code === 'email_exists') return 'Вече има профил с този имейл.';
+  if (code === 'email_address_invalid') return 'Имейлът не е валиден.';
+  if (code === 'weak_password') return 'Паролата е твърде слаба.';
+  if (code === 'validation_failed') return 'Провери полетата и опитай отново.';
+  if (normalized.includes('invalid login credentials')) return 'Невалиден имейл или парола.';
+  if (normalized.includes('email not confirmed')) return 'Потвърди имейла си и опитай отново.';
+  if (normalized.includes('user already registered')) return 'Вече има профил с този имейл.';
+  if (normalized.includes('password should be at least')) return 'Паролата е твърде кратка.';
+  if (normalized.includes('duplicate key value')) return 'Това потребителско име вече се използва.';
+  if (normalized.includes('anonymous sign-ins are disabled')) return 'Регистрацията е подала невалидни или празни данни. Обнови страницата и попълни полетата наново.';
+  if (normalized.includes('network')) return 'Проблем с връзката. Опитай отново.';
+  return message;
+}
+
+function validateEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function validateName(value) {
+  return /^[\p{L}][\p{L}\s'-]{1,23}$/u.test(value);
+}
+
+function validateUsername(value) {
+  return /^[a-zA-Z0-9_]{3,24}$/.test(value);
+}
+
+function validatePassword(value) {
+  return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(value);
+}
+
+
+function getLoginValues() {
+  return {
+    email: loginEmail.value.trim(),
+    password: loginPassword.value
+  };
+}
+
+function getRegisterValues() {
+  return {
+    username: registerUsername.value.trim(),
+    firstName: registerFirstName.value.trim(),
+    lastName: registerLastName.value.trim(),
+    email: registerEmail.value.trim(),
+    password: registerPassword.value
+  };
+}
+
+function focusFirstInvalidField(pairs) {
+  const found = pairs.find(([field]) => field?.classList?.contains('has-error'));
+  const input = found?.[0]?.querySelector?.('input');
+  if (input) input.focus();
+}
+
+function validateLoginForm() {
+  clearAllValidation();
+  let valid = true;
+  const { email, password } = getLoginValues();
+
+  if (!email) {
+    setFieldError(loginEmailField, loginEmailError, 'Въведи имейл.');
+    valid = false;
+  } else if (!validateEmail(email)) {
+    setFieldError(loginEmailField, loginEmailError, 'Имейлът не е валиден.');
+    valid = false;
+  }
+
+  if (!password) {
+    setFieldError(loginPasswordField, loginPasswordError, 'Въведи парола.');
+    valid = false;
+  }
+
+  return valid;
+}
+
+function validateRegisterForm() {
+  clearAllValidation();
+  let valid = true;
+  const { username, firstName, lastName, email, password } = getRegisterValues();
+
+  if (!username) {
+    setFieldError(registerUsernameField, registerUsernameError, 'Въведи потребителско име.');
+    valid = false;
+  } else if (!validateUsername(username)) {
+    setFieldError(registerUsernameField, registerUsernameError, 'Използвай 3–24 символа: букви, цифри или _.');
+    valid = false;
+  }
+
+  if (!firstName) {
+    setFieldError(registerFirstNameField, registerFirstNameError, 'Въведи име.');
+    valid = false;
+  } else if (!validateName(firstName)) {
+    setFieldError(registerFirstNameField, registerFirstNameError, 'Името трябва да е 2–24 букви.');
+    valid = false;
+  }
+
+  if (!lastName) {
+    setFieldError(registerLastNameField, registerLastNameError, 'Въведи фамилия.');
+    valid = false;
+  } else if (!validateName(lastName)) {
+    setFieldError(registerLastNameField, registerLastNameError, 'Фамилията трябва да е 2–24 букви.');
+    valid = false;
+  }
+
+  if (!email) {
+    setFieldError(registerEmailField, registerEmailError, 'Въведи имейл.');
+    valid = false;
+  } else if (!validateEmail(email)) {
+    setFieldError(registerEmailField, registerEmailError, 'Имейлът не е валиден.');
+    valid = false;
+  }
+
+  if (!password) {
+    setFieldError(registerPasswordField, registerPasswordError, 'Въведи парола.');
+    valid = false;
+  } else if (!validatePassword(password)) {
+    setFieldError(registerPasswordField, registerPasswordError, 'Минимум 8 символа, поне 1 буква и 1 цифра.');
+    valid = false;
+  }
+
+  return valid;
+}
+
+function validateJoinRoomCode() {
+  setFieldError(joinRoomField, joinRoomError, '');
+  const code = joinRoomInput.value.trim().toUpperCase();
+  if (!code) {
+    setFieldError(joinRoomField, joinRoomError, 'Въведи код на стая.');
+    return false;
+  }
+  if (!/^[A-Z0-9]{6}$/.test(code)) {
+    setFieldError(joinRoomField, joinRoomError, 'Кодът трябва да е 6 символа.');
+    return false;
+  }
+  return true;
+}
+
+function getPlayerStatsFromHistory(userId) {
+  const history = state.auth.history || [];
+  const totalGames = history.length;
+  const wins = history.filter((match) => match.winner_user_id === userId).length;
+  const onlineGames = history.filter((match) => match.mode === 'online').length;
+  const computerGames = history.filter((match) => match.mode === 'computer').length;
+  const localGames = history.filter((match) => match.mode === 'local').length;
+  return {
+    totalGames,
+    wins,
+    winRate: totalGames ? Math.round((wins / totalGames) * 100) : 0,
+    onlineGames,
+    computerGames,
+    localGames
+  };
+}
+
+function renderProfilePanel() {
+  const loggedIn = Boolean(state.auth.user);
+  const visible = loggedIn && isOnlineMode();
+  profilePanel.classList.toggle('hidden', !visible);
+  if (!loggedIn) {
+    matchHistoryList.innerHTML = '';
+    historyCountChip.textContent = '0 мача';
+    showFeedback(historyFeedback, 'Историята ще се появи след първия завършен мач с активен профил.', '');
+    return;
+  }
+  if (!visible) return;
+
+  const profile = state.auth.profile || {};
+  profileFullName.textContent = profile.full_name || profile.username || state.auth.user.email || '—';
+  profileUsername.textContent = profile.username ? `@${profile.username}` : '@—';
+  profileEmail.textContent = profile.email || state.auth.user.email || '—';
+  profileCreatedAt.textContent = `Създаден профил: ${formatDateTime(profile.created_at || state.auth.user.created_at)}`;
+
+  const stats = getPlayerStatsFromHistory(state.auth.user.id);
+  profileTotalGames.textContent = String(stats.totalGames);
+  profileWinRate.textContent = `Победи: ${stats.winRate}%`;
+  profileWins.textContent = String(stats.wins);
+  profileModeBreakdown.textContent = `Онлайн ${stats.onlineGames} • AI ${stats.computerGames} • Локално ${stats.localGames}`;
+  historyCountChip.textContent = `${stats.totalGames} ${stats.totalGames === 1 ? 'мач' : 'мача'}`;
+
+  if (!state.auth.historyLoaded) {
+    matchHistoryList.innerHTML = '';
+    if (!historyFeedback.textContent) {
+      showFeedback(historyFeedback, 'Зареждаме историята на мачовете...', '');
+    }
+    return;
+  }
+
+  if (!state.auth.history.length) {
+    matchHistoryList.innerHTML = '';
+    if (!historyFeedback.classList.contains('is-error')) {
+      showFeedback(historyFeedback, 'Все още няма записани мачове за този профил.', '');
+    }
+    return;
+  }
+
+  if (!historyFeedback.classList.contains('is-error')) {
+    showFeedback(historyFeedback, `Показани са последните ${state.auth.history.length} мача.`, 'success');
+  }
+  matchHistoryList.innerHTML = state.auth.history.map((match) => {
+    const amPlayer1 = match.player1_user_id === state.auth.user.id;
+    const myScore = amPlayer1 ? match.player1_score : match.player2_score;
+    const opponentScore = amPlayer1 ? match.player2_score : match.player1_score;
+    const opponentName = amPlayer1 ? match.player2_name : match.player1_name;
+    const resultClass = match.winner_user_id === state.auth.user.id ? 'win' : (match.winner_slot === 0 || match.winner_user_id === null ? 'draw' : 'loss');
+    const resultText = resultClass === 'win' ? 'Победа' : (resultClass === 'loss' ? 'Загуба' : 'Равенство');
+    const modeText = match.mode === 'online' ? 'Онлайн' : match.mode === 'computer' ? 'Срещу компютър' : 'Локално';
+    const themeName = THEMES[match.theme_key]?.name || match.theme_key;
+    return `
+      <article class="match-history-item">
+        <div class="match-history-top">
+          <div>
+            <div class="match-history-title">${escapeHtml(modeText)} • ${escapeHtml(themeName)}</div>
+            <div class="match-history-subtitle">Срещу ${escapeHtml(opponentName || 'Играч 2')}</div>
+          </div>
+          <span class="result-tag ${resultClass}">${resultText}</span>
+        </div>
+        <div class="match-history-bottom">
+          <div class="match-history-meta">Резултат: ${myScore} : ${opponentScore} • ${match.card_count} карти</div>
+          <div class="match-history-meta">${formatDateTime(match.finished_at || match.created_at)}</div>
+        </div>
+      </article>`;
+  }).join('');
+}
+
+async function loadMatchHistory() {
+  if (!state.auth.client || !state.auth.user) {
+    state.auth.history = [];
+    state.auth.historyLoaded = false;
+    renderProfilePanel();
+    return;
+  }
+
+  state.auth.historyLoaded = false;
+  showFeedback(historyFeedback, 'Зареждаме историята на мачовете...', '');
+  renderProfilePanel();
+
+  const { data, error } = await state.auth.client
+    .from('match_history')
+    .select('*')
+    .or(`player1_user_id.eq.${state.auth.user.id},player2_user_id.eq.${state.auth.user.id},created_by.eq.${state.auth.user.id}`)
+    .order('finished_at', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    state.auth.history = [];
+    state.auth.historyLoaded = false;
+    renderProfilePanel();
+    showFeedback(historyFeedback, 'Таблицата за история още не е налична. Пусни новия SQL migration файл.', 'error');
+    return;
+  }
+
+  state.auth.history = data || [];
+  state.auth.historyLoaded = true;
+  renderProfilePanel();
+}
+
+async function saveMatchToHistory(source) {
+  if (!state.auth.client || !state.auth.user) return;
+
+  const payload = {
+    created_by: state.auth.user.id,
+    room_id: source.room_id || null,
+    mode: source.mode,
+    theme_key: source.theme_key,
+    card_count: source.card_count,
+    player1_user_id: source.player1_user_id || null,
+    player1_name: source.player1_name,
+    player2_user_id: source.player2_user_id || null,
+    player2_name: source.player2_name,
+    player1_score: source.player1_score,
+    player2_score: source.player2_score,
+    winner_slot: source.winner_slot,
+    winner_user_id: source.winner_user_id || null,
+    finished_at: new Date().toISOString()
+  };
+
+  const query = state.auth.client.from('match_history');
+  let result;
+  if (source.room_id) {
+    result = await query.upsert(payload, { onConflict: 'room_id' });
+  } else {
+    result = await query.insert(payload);
+  }
+
+  if (result.error) {
+    console.error('History save failed', result.error);
+    showFeedback(historyFeedback, 'Мачът приключи, но записът в историята не успя.', 'error');
+    return;
+  }
+
+  await loadMatchHistory();
 }
 
 function getPlayerName(player) {
@@ -1537,6 +1925,9 @@ function endGame() {
 
 
 function setAuthTab(tab) {
+  clearAllValidation();
+  showFeedback(loginFeedback, '');
+  showFeedback(registerFeedback, '');
   loginTab.classList.toggle('active', tab === 'login');
   registerTab.classList.toggle('active', tab === 'register');
   loginForm.classList.toggle('active', tab === 'login');
@@ -1554,6 +1945,7 @@ async function initAuth() {
   if (!cfg.enabled || !window.supabase) {
     backendChip.textContent = 'Backend: няма Supabase';
     state.auth.enabled = false;
+    renderProfilePanel();
     updateAuthUi();
     return;
   }
@@ -1566,20 +1958,26 @@ async function initAuth() {
   state.auth.user = data.session?.user || null;
   if (state.auth.user) {
     await loadProfile();
+    await loadMatchHistory();
   }
 
   state.auth.client.auth.onAuthStateChange(async (_event, session) => {
     state.auth.user = session?.user || null;
     if (state.auth.user) {
       await loadProfile();
+      await loadMatchHistory();
     } else {
       state.auth.profile = null;
+      state.auth.history = [];
+      state.auth.historyLoaded = false;
       if (state.online.room) await leaveRoom();
     }
+    renderProfilePanel();
     updateAuthUi();
     updateHud();
   });
 
+  renderProfilePanel();
   updateAuthUi();
 }
 
@@ -1607,6 +2005,7 @@ async function loadProfile() {
   } else {
     state.auth.profile = data;
   }
+  renderProfilePanel();
 }
 
 function getDisplayName() {
@@ -1621,11 +2020,16 @@ function updateAuthUi() {
   authStatusText.textContent = !state.auth.enabled
     ? 'Добави ключовете си в supabase-config.js и пусни SQL схемата, за да активираш онлайн режима.'
     : loggedIn
-      ? `Влязъл си като ${getDisplayName()}. Онлайн режимът е активен.`
+      ? `Влязъл си като ${getDisplayName()}. Онлайн режимът е активен и историята на мачовете се пази.`
       : 'Влез или се регистрирай, за да отключиш онлайн режима.';
 
   authPanel.classList.toggle('hidden', !isOnlineMode());
   onlineLobby.classList.toggle('hidden', !isOnlineMode() || !loggedIn);
+  profilePanel.classList.toggle('hidden', !isOnlineMode() || !loggedIn);
+  loginTab.classList.toggle('hidden', loggedIn);
+  registerTab.classList.toggle('hidden', loggedIn);
+  loginForm.classList.toggle('hidden', loggedIn);
+  registerForm.classList.toggle('hidden', loggedIn);
   startButton.disabled = !state.selectedTheme || isOnlineMode();
   if (isOnlineMode()) {
     roomCodeChip.textContent = `Код: ${state.online.room?.code || '—'}`;
@@ -1636,6 +2040,7 @@ function updateAuthUi() {
     onlineTurnChip.textContent = `Ход: ${room?.current_player_slot ? getPlayerName(room.current_player_slot) : '—'}`;
     startOnlineButton.disabled = !(loggedIn && room && room.host_user_id === state.auth.user?.id && room.guest_user_id && room.status === 'waiting');
   }
+  renderProfilePanel();
 }
 
 function generateRoomCode() {
@@ -1653,50 +2058,99 @@ function myRoomSlot() {
   return null;
 }
 
-async function registerUser() {
+async function registerUser(event) {
+  event?.preventDefault?.();
   if (!state.auth.enabled) {
     updateHud('Онлайн регистрацията изисква Supabase конфигурация в supabase-config.js.');
     return;
   }
 
+  const values = getRegisterValues();
+  const valid = validateRegisterForm();
+  if (!valid || !values.username || !values.firstName || !values.lastName || !values.email || !values.password) {
+    showFeedback(registerFeedback, 'Попълни коректно всички полета за регистрация.', 'error');
+    focusFirstInvalidField([
+      [registerUsernameField],
+      [registerFirstNameField],
+      [registerLastNameField],
+      [registerEmailField],
+      [registerPasswordField]
+    ]);
+    return;
+  }
+
+  registerButton.disabled = true;
+  showFeedback(registerFeedback, 'Създаваме профила ти...', '');
+
   const payload = {
-    email: registerEmail.value.trim(),
-    password: registerPassword.value,
+    email: values.email,
+    password: values.password,
     options: {
+      emailRedirectTo: getAuthRedirectUrl(),
       data: {
-        username: registerUsername.value.trim(),
-        first_name: registerFirstName.value.trim(),
-        last_name: registerLastName.value.trim()
+        username: values.username,
+        first_name: values.firstName,
+        last_name: values.lastName
       }
     }
   };
 
-  const { error } = await state.auth.client.auth.signUp(payload);
+  const { data, error } = await state.auth.client.auth.signUp(payload);
+  registerButton.disabled = false;
   if (error) {
-    updateHud(`Грешка при регистрация: ${error.message}`);
+    const friendly = friendlyAuthError(error);
+    showFeedback(registerFeedback, `Грешка при регистрация: ${friendly}`, 'error');
+    updateHud(`Грешка при регистрация: ${friendly}`);
     return;
   }
 
-  updateHud('Регистрацията е успешна. Ако Supabase иска потвърждение по имейл, отвори писмото и после влез.');
-  setAuthTab('login');
+  if (data.session?.user) {
+    player1NameInput.value = values.firstName || values.username;
+    showFeedback(registerFeedback, 'Регистрацията е успешна и профилът е активен.', 'success');
+    updateHud('Успешна регистрация. Онлайн режимът е активен.');
+  } else {
+    showFeedback(registerFeedback, 'Профилът е създаден. Провери имейла си за потвърждение, ако Supabase го изисква.', 'success');
+    updateHud('Регистрацията е успешна. Ако Supabase иска потвърждение по имейл, отвори писмото и после влез.');
+    setAuthTab('login');
+  }
 }
 
-async function loginUser() {
+async function loginUser(event) {
+  event?.preventDefault?.();
   if (!state.auth.enabled) {
     updateHud('Онлайн входът изисква Supabase конфигурация в supabase-config.js.');
     return;
   }
 
-  const { error } = await state.auth.client.auth.signInWithPassword({
-    email: loginEmail.value.trim(),
-    password: loginPassword.value
-  });
-
-  if (error) {
-    updateHud(`Грешка при вход: ${error.message}`);
+  const values = getLoginValues();
+  const valid = validateLoginForm();
+  if (!valid || !values.email || !values.password) {
+    showFeedback(loginFeedback, 'Попълни имейл и парола.', 'error');
+    focusFirstInvalidField([
+      [loginEmailField],
+      [loginPasswordField]
+    ]);
     return;
   }
 
+  loginButton.disabled = true;
+  showFeedback(loginFeedback, 'Проверяваме данните...', '');
+
+  const { error } = await state.auth.client.auth.signInWithPassword({
+    email: values.email,
+    password: values.password
+  });
+
+  loginButton.disabled = false;
+  if (error) {
+    const friendly = friendlyAuthError(error);
+    showFeedback(loginFeedback, `Грешка при вход: ${friendly}`, 'error');
+    updateHud(`Грешка при вход: ${friendly}`);
+    return;
+  }
+
+  player1NameInput.value = sanitizeName(state.auth.profile?.first_name || state.auth.profile?.username || values.email.split('@')[0], 'Играч 1');
+  showFeedback(loginFeedback, 'Успешен вход.', 'success');
   updateHud('Успешен вход. Вече можеш да играеш онлайн.');
 }
 
@@ -1704,6 +2158,8 @@ async function logoutUser() {
   if (!state.auth.client) return;
   await leaveRoom();
   await state.auth.client.auth.signOut();
+  showFeedback(loginFeedback, '');
+  showFeedback(registerFeedback, '');
   updateHud('Излязохте от профила.');
 }
 
@@ -1735,6 +2191,7 @@ async function createRoom() {
     updateHud('За създаване на онлайн стая трябва да си влязъл.');
     return;
   }
+  setFieldError(joinRoomField, joinRoomError, '');
   if (!state.selectedTheme) {
     updateHud('Първо избери тема.');
     return;
@@ -1775,15 +2232,20 @@ async function joinRoom() {
     updateHud('За присъединяване към стая трябва да си влязъл.');
     return;
   }
+  if (!validateJoinRoomCode()) {
+    updateHud('Въведи валиден 6-символен код на стая.');
+    return;
+  }
   const code = joinRoomInput.value.trim().toUpperCase();
-  if (!code) return;
 
   const { data: room, error } = await state.auth.client.from('rooms').select('*').eq('code', code).maybeSingle();
   if (error || !room) {
+    setFieldError(joinRoomField, joinRoomError, 'Няма намерена стая с този код.');
     updateHud('Няма намерена стая с този код.');
     return;
   }
   if (room.guest_user_id && room.guest_user_id !== state.auth.user.id) {
+    setFieldError(joinRoomField, joinRoomError, 'Тази стая вече е пълна.');
     updateHud('Тази стая вече е пълна.');
     return;
   }
@@ -1791,6 +2253,7 @@ async function joinRoom() {
   const patch = room.guest_user_id ? {} : { guest_user_id: state.auth.user.id, guest_name: getDisplayName() };
   const { data, error: updateError } = await state.auth.client.from('rooms').update(patch).eq('id', room.id).select().single();
   if (updateError) {
+    setFieldError(joinRoomField, joinRoomError, 'Неуспешно присъединяване.');
     updateHud(`Не успях да се включа: ${updateError.message}`);
     return;
   }
@@ -1803,6 +2266,7 @@ async function joinRoom() {
   renderCountSelector();
   await subscribeToRoom(data.id);
   syncFromOnlineRoom();
+  setFieldError(joinRoomField, joinRoomError, '');
   updateHud(`Свързан си към стая ${data.code}.`);
 }
 
@@ -1982,6 +2446,23 @@ function endOnlineGame() {
   resultModal.classList.remove('hidden');
   updatePlayerPanels();
   updateAuthUi();
+
+  if (state.auth.user && room.host_user_id === state.auth.user.id) {
+    saveMatchToHistory({
+      room_id: room.id,
+      mode: 'online',
+      theme_key: room.selected_theme,
+      card_count: room.selected_card_count,
+      player1_user_id: room.host_user_id,
+      player1_name: room.host_name || getPlayerName(1),
+      player2_user_id: room.guest_user_id,
+      player2_name: room.guest_name || getPlayerName(2),
+      player1_score: state.scores[1],
+      player2_score: state.scores[2],
+      winner_slot: winner,
+      winner_user_id: winner === 1 ? room.host_user_id : winner === 2 ? room.guest_user_id : null
+    });
+  }
 }
 
 player1NameInput.addEventListener('input', () => {
@@ -2030,13 +2511,34 @@ updateHud();
 setAuthTab('login');
 loginTab.addEventListener('click', () => setAuthTab('login'));
 registerTab.addEventListener('click', () => setAuthTab('register'));
-loginButton.addEventListener('click', loginUser);
-registerButton.addEventListener('click', registerUser);
+loginForm.addEventListener('submit', loginUser);
+registerForm.addEventListener('submit', registerUser);
 logoutButton.addEventListener('click', logoutUser);
+profileLogoutButton.addEventListener('click', logoutUser);
+refreshHistoryButton.addEventListener('click', loadMatchHistory);
 createRoomButton.addEventListener('click', createRoom);
 joinRoomButton.addEventListener('click', joinRoom);
 leaveRoomButton.addEventListener('click', leaveRoom);
 startOnlineButton.addEventListener('click', startOnlineMatch);
-joinRoomInput.addEventListener('input', () => { joinRoomInput.value = joinRoomInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6); });
+joinRoomInput.addEventListener('input', () => {
+  joinRoomInput.value = joinRoomInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  if (joinRoomInput.value) setFieldError(joinRoomField, joinRoomError, '');
+});
+[
+  [loginEmail, loginEmailField, loginEmailError],
+  [loginPassword, loginPasswordField, loginPasswordError],
+  [registerUsername, registerUsernameField, registerUsernameError],
+  [registerFirstName, registerFirstNameField, registerFirstNameError],
+  [registerLastName, registerLastNameField, registerLastNameError],
+  [registerEmail, registerEmailField, registerEmailError],
+  [registerPassword, registerPasswordField, registerPasswordError]
+].forEach(([input, field, errorEl]) => {
+  input.addEventListener('input', () => {
+    if (input.value.trim()) setFieldError(field, errorEl, '');
+  });
+});
+joinRoomInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') joinRoom();
+});
 initAuth();
 updateAuthUi();
