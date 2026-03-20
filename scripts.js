@@ -556,7 +556,9 @@ function toggleProfilePanel(force) {
   state.ui.profileOpen = typeof force === 'boolean' ? force : !state.ui.profileOpen;
   authPanel.classList.toggle('hidden', !state.ui.profileOpen);
   profileButton?.setAttribute('aria-expanded', state.ui.profileOpen ? 'true' : 'false');
+  app.classList.toggle('auth-open', state.ui.profileOpen);
 }
+
 
 function setRoomAccess(accessType) {
   state.online.accessType = ROOM_ACCESS_OPTIONS[accessType] ? accessType : 'public';
@@ -948,8 +950,10 @@ function getModeName() {
 function setAppMode(mode) {
   app.classList.toggle('setup-mode', mode === 'setup');
   app.classList.toggle('game-mode', mode === 'game');
+  if (mode === 'game') toggleProfilePanel(false);
   newRoundButton.textContent = 'Смени тема';
 }
+
 
 function getGapForCount(count) {
   if (count >= 40) return window.innerWidth <= 820 ? 4 : 6;
