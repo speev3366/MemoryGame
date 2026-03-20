@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Duel Online V7.2.1</title>
+  <title>Memory Duel Online V7.3</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -23,10 +23,19 @@
       </div>
 
       <div class="center-console">
-        <div class="title-wrap">
-          <p class="eyebrow">MEMORY DUEL V7.2.1</p>
-          <h1>Локална и истинска онлайн игра</h1>
-          <p class="subtitle">Локален режим без вход, игра срещу компютър и онлайн стаи с код.</p>
+        <div class="title-bar">
+          <div class="title-wrap">
+            <p class="eyebrow">MEMORY DUEL V7.3</p>
+            <h1>Локална, AI и истинска онлайн игра</h1>
+            <p class="subtitle">Гост режим за локална игра, профил с история и waiting room с публични, защитени и invite стаи.</p>
+          </div>
+          <button class="profile-button" id="profileButton" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="authPanel">
+            <span class="profile-button-icon">👤</span>
+            <span class="profile-button-texts">
+              <strong id="profileButtonTitle">Профил</strong>
+              <small id="profileButtonSubtext">Вход / регистрация</small>
+            </span>
+          </button>
         </div>
 
         <section class="auth-panel hidden" id="authPanel">
@@ -38,7 +47,16 @@
             <div class="auth-badges">
               <span class="meta-chip" id="backendChip">Backend: не е свързан</span>
               <span class="meta-chip" id="sessionChip">Сесия: гост</span>
+              <button class="icon-dismiss" id="closeAuthPanelButton" type="button" aria-label="Затвори">✕</button>
             </div>
+          </div>
+
+          <div class="guest-banner" id="guestBanner">
+            <div>
+              <strong>Играй като гост</strong>
+              <p>Ще генерираме локално име от типа <span id="guestPreview">GuestMemory123456</span>. Гостите не се записват в базата и нямат достъп до онлайн стаи.</p>
+            </div>
+            <button class="btn btn-secondary btn-small" id="continueGuestButton" type="button">Продължи като гост</button>
           </div>
 
           <div class="auth-tabs">
@@ -59,6 +77,10 @@
                 <small class="field-error" id="loginPasswordError"></small>
               </label>
             </div>
+            <label class="remember-row">
+              <input id="rememberMeCheckbox" type="checkbox" checked />
+              <span>Запомни ме на това устройство</span>
+            </label>
             <div class="auth-feedback" id="loginFeedback"></div>
             <div class="auth-actions">
               <button class="btn btn-primary" id="loginButton" type="submit">Вход</button>
@@ -162,9 +184,25 @@
 
         <section class="online-lobby hidden" id="onlineLobby">
           <div class="lobby-head">
-            <h3>Онлайн стая</h3>
+            <div>
+              <h3>Waiting room / онлайн лоби</h3>
+              <p class="lobby-subtitle">Създай публична, защитена или invite стая. Вторият играч може да я намери в лобито, с код или с покана.</p>
+            </div>
             <span class="meta-chip highlight" id="roomCodeChip">Код: —</span>
           </div>
+
+          <div class="lobby-create-grid">
+            <label class="setup-field compact-field">
+              <span>Достъп до стаята</span>
+              <div class="room-access-selector" id="roomAccessSelector"></div>
+            </label>
+            <label class="setup-field compact-field hidden" id="roomPasswordField">
+              <span>Парола за стая</span>
+              <input id="roomPasswordInput" type="password" maxlength="32" placeholder="Минимум 4 символа" autocomplete="new-password" />
+              <small class="field-error" id="roomPasswordError"></small>
+            </label>
+          </div>
+
           <div class="auth-grid two-col">
             <button class="btn btn-primary" id="createRoomButton" type="button">Създай стая</button>
             <label class="setup-field compact-field" id="joinRoomField">
@@ -176,15 +214,54 @@
               <small class="field-error" id="joinRoomError"></small>
             </label>
           </div>
+
+          <div class="password-join-row hidden" id="joinPasswordRow">
+            <label class="setup-field compact-field" id="joinPasswordField">
+              <span>Парола за избраната стая</span>
+              <div class="inline-field">
+                <input id="joinPasswordInput" type="password" maxlength="32" placeholder="Въведи парола" autocomplete="current-password" />
+                <button class="btn btn-secondary" id="joinPasswordConfirmButton" type="button">Потвърди</button>
+              </div>
+              <small class="field-error" id="joinPasswordError"></small>
+            </label>
+          </div>
+
+          <div class="invite-card hidden" id="inviteCard">
+            <div>
+              <strong>Линк за покана</strong>
+              <p>Сподели този линк с конкретен опонент. Invite стаите не се показват в публичния списък.</p>
+            </div>
+            <div class="inline-field">
+              <input id="inviteLinkInput" type="text" readonly />
+              <button class="btn btn-secondary" id="copyInviteButton" type="button">Копирай</button>
+            </div>
+          </div>
+
+          <div class="invite-join-banner hidden" id="inviteJoinBanner">
+            <div>
+              <strong>Открита покана</strong>
+              <p id="inviteJoinText">Линкът съдържа валидна покана за стая.</p>
+            </div>
+            <button class="btn btn-primary btn-small" id="joinInviteButton" type="button">Влез с поканата</button>
+          </div>
+
           <div class="lobby-meta">
             <div class="meta-chip" id="roomStatusChip">Стая: няма</div>
             <div class="meta-chip" id="roomPlayersChip">Играчите: 0/2</div>
             <div class="meta-chip" id="onlineTurnChip">Ход: —</div>
           </div>
+
           <div class="auth-actions">
             <button class="btn btn-secondary" id="leaveRoomButton" type="button">Напусни стая</button>
             <button class="btn btn-primary" id="startOnlineButton" type="button" disabled>Старт онлайн</button>
           </div>
+
+          <div class="lobby-list-head">
+            <h4>Свободни стаи</h4>
+            <button class="btn btn-secondary btn-small" id="refreshRoomsButton" type="button">Опресни</button>
+          </div>
+          <div class="history-feedback" id="roomListFeedback">Лобито ще покаже стаите, когато си влязъл и е избран онлайн режим.</div>
+          <div class="room-list" id="roomList"></div>
         </section>
 
         <div class="control-row">

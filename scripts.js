@@ -27,6 +27,13 @@ const authPanel = document.getElementById('authPanel');
 const authStatusText = document.getElementById('authStatusText');
 const backendChip = document.getElementById('backendChip');
 const sessionChip = document.getElementById('sessionChip');
+const profileButton = document.getElementById('profileButton');
+const profileButtonTitle = document.getElementById('profileButtonTitle');
+const profileButtonSubtext = document.getElementById('profileButtonSubtext');
+const closeAuthPanelButton = document.getElementById('closeAuthPanelButton');
+const continueGuestButton = document.getElementById('continueGuestButton');
+const guestBanner = document.getElementById('guestBanner');
+const guestPreview = document.getElementById('guestPreview');
 const loginTab = document.getElementById('loginTab');
 const registerTab = document.getElementById('registerTab');
 const loginForm = document.getElementById('loginForm');
@@ -41,6 +48,7 @@ const registerPassword = document.getElementById('registerPassword');
 const loginButton = document.getElementById('loginButton');
 const registerButton = document.getElementById('registerButton');
 const logoutButton = document.getElementById('logoutButton');
+const rememberMeCheckbox = document.getElementById('rememberMeCheckbox');
 const onlineLobby = document.getElementById('onlineLobby');
 const createRoomButton = document.getElementById('createRoomButton');
 const joinRoomInput = document.getElementById('joinRoomInput');
@@ -51,6 +59,24 @@ const roomCodeChip = document.getElementById('roomCodeChip');
 const roomStatusChip = document.getElementById('roomStatusChip');
 const roomPlayersChip = document.getElementById('roomPlayersChip');
 const onlineTurnChip = document.getElementById('onlineTurnChip');
+const roomAccessSelector = document.getElementById('roomAccessSelector');
+const roomPasswordField = document.getElementById('roomPasswordField');
+const roomPasswordInput = document.getElementById('roomPasswordInput');
+const roomPasswordError = document.getElementById('roomPasswordError');
+const joinPasswordRow = document.getElementById('joinPasswordRow');
+const joinPasswordField = document.getElementById('joinPasswordField');
+const joinPasswordInput = document.getElementById('joinPasswordInput');
+const joinPasswordError = document.getElementById('joinPasswordError');
+const joinPasswordConfirmButton = document.getElementById('joinPasswordConfirmButton');
+const inviteCard = document.getElementById('inviteCard');
+const inviteLinkInput = document.getElementById('inviteLinkInput');
+const copyInviteButton = document.getElementById('copyInviteButton');
+const inviteJoinBanner = document.getElementById('inviteJoinBanner');
+const inviteJoinText = document.getElementById('inviteJoinText');
+const joinInviteButton = document.getElementById('joinInviteButton');
+const refreshRoomsButton = document.getElementById('refreshRoomsButton');
+const roomList = document.getElementById('roomList');
+const roomListFeedback = document.getElementById('roomListFeedback');
 
 const loginEmailField = document.getElementById('loginEmailField');
 const loginPasswordField = document.getElementById('loginPasswordField');
@@ -113,6 +139,11 @@ const nameEls = {
 };
 
 const COUNT_OPTIONS = [20, 30, 40];
+const ROOM_ACCESS_OPTIONS = {
+  public: { name: 'Свободно', badge: 'Open', description: 'Видима стая в лобито без парола.' },
+  password: { name: 'С парола', badge: 'Lock', description: 'Видима в лобито, но влизането иска парола.' },
+  invite: { name: 'С линк', badge: 'Invite', description: 'Скрита стая, достъпна само чрез покана.' }
+};
 
 const MODE_OPTIONS = {
   local: {
@@ -309,12 +340,25 @@ const state = {
     user: null,
     profile: null,
     history: [],
-    historyLoaded: false
+    historyLoaded: false,
+    rememberMe: localStorage.getItem('memory_duel_remember_me') !== '0'
+  },
+  guest: {
+    active: false,
+    name1: '',
+    name2: ''
+  },
+  ui: {
+    profileOpen: false,
+    pendingProtectedRoomId: null,
+    inviteToken: null
   },
   online: {
     room: null,
     channel: null,
-    pendingTimeout: null
+    pendingTimeout: null,
+    publicRooms: [],
+    accessType: 'public'
   },
   aiTurnTimeout: null
 };
@@ -332,6 +376,90 @@ function shuffle(array) {
 function sanitizeName(value, fallback) {
   const normalized = (value || '').replace(/\s+/g, ' ').trim();
   return normalized.slice(0, 18) || fallback;
+}
+
+function randomDigits(length = 6) {
+  let output = '';
+  for (let i = 0; i < length; i += 1) output += Math.floor(Math.random() * 10);
+  return output;
+}
+
+function createGuestName() {
+  return `GuestMemory${randomDigits(6)}`;
+}
+
+function persistGuestState() {
+  localStorage.setItem('memory_duel_guest_state', JSON.stringify(state.guest));
+}
+
+function loadGuestState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('memory_duel_guest_state') || '{}');
+    if (raw && typeof raw === 'object') {
+      state.guest.active = Boolean(raw.active);
+      state.guest.name1 = sanitizeName(raw.name1, '');
+      state.guest.name2 = sanitizeName(raw.name2, '');
+    }
+  } catch (error) {
+    console.warn('Guest state could not be loaded', error);
+  }
+}
+
+function ensureGuestNames(force = false) {
+  if (!state.guest.active && !force) return;
+  state.guest.active = true;
+  if (!state.guest.name1 || force) state.guest.name1 = createGuestName();
+  if (!isComputerMode() && (!state.guest.name2 || force)) state.guest.name2 = createGuestName();
+  if (!player1NameInput.value.trim() || force) player1NameInput.value = state.guest.name1;
+  if (!isComputerMode() && (!player2NameInput.value.trim() || force)) player2NameInput.value = state.guest.name2;
+  persistGuestState();
+}
+
+function continueAsGuest(force = false) {
+  ensureGuestNames(force);
+  refreshPlayerNames();
+  updatePlayerPanels();
+  updateAuthUi();
+  updateHud('Локалният гост режим е активен. Гостите не се пазят в базата и не могат да отварят онлайн стаи.');
+  toggleProfilePanel(false);
+}
+
+function clearGuestState() {
+  state.guest = { active: false, name1: '', name2: '' };
+  localStorage.removeItem('memory_duel_guest_state');
+}
+
+function getAdaptiveAuthStorage() {
+  return {
+    getItem(key) {
+      return sessionStorage.getItem(key) || localStorage.getItem(key);
+    },
+    setItem(key, value) {
+      const remember = Boolean(state.auth.rememberMe);
+      if (remember) {
+        localStorage.setItem(key, value);
+        sessionStorage.removeItem(key);
+      } else {
+        sessionStorage.setItem(key, value);
+        localStorage.removeItem(key);
+      }
+    },
+    removeItem(key) {
+      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
+    }
+  };
+}
+
+function syncRememberMeUi() {
+  if (rememberMeCheckbox) rememberMeCheckbox.checked = Boolean(state.auth.rememberMe);
+}
+
+function getInviteUrl(token) {
+  if (!token) return '';
+  const url = new URL(window.location.href);
+  url.searchParams.set('invite', token);
+  return url.toString();
 }
 
 function escapeHtml(value) {
@@ -375,7 +503,9 @@ function clearAllValidation() {
     [registerLastNameField, registerLastNameError],
     [registerEmailField, registerEmailError],
     [registerPasswordField, registerPasswordError],
-    [joinRoomField, joinRoomError]
+    [joinRoomField, joinRoomError],
+    [roomPasswordField, roomPasswordError],
+    [joinPasswordField, joinPasswordError]
   ].forEach(([field, errorEl]) => setFieldError(field, errorEl, ''));
 }
 
@@ -422,6 +552,81 @@ function validatePassword(value) {
   return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(value);
 }
 
+function toggleProfilePanel(force) {
+  state.ui.profileOpen = typeof force === 'boolean' ? force : !state.ui.profileOpen;
+  authPanel.classList.toggle('hidden', !state.ui.profileOpen);
+  profileButton?.setAttribute('aria-expanded', state.ui.profileOpen ? 'true' : 'false');
+}
+
+function setRoomAccess(accessType) {
+  state.online.accessType = ROOM_ACCESS_OPTIONS[accessType] ? accessType : 'public';
+  renderRoomAccessSelector();
+  roomPasswordField.classList.toggle('hidden', state.online.accessType !== 'password');
+  if (state.online.accessType !== 'password') {
+    roomPasswordInput.value = '';
+    setFieldError(roomPasswordField, roomPasswordError, '');
+  }
+}
+
+function renderRoomAccessSelector() {
+  roomAccessSelector.innerHTML = Object.entries(ROOM_ACCESS_OPTIONS).map(([key, option]) => `
+    <button class="room-access-option ${state.online.accessType === key ? 'selected' : ''}" data-access="${key}" type="button">
+      <span>${option.badge}</span>
+      <strong>${option.name}</strong>
+    </button>
+  `).join('');
+
+  roomAccessSelector.querySelectorAll('.room-access-option').forEach((button) => {
+    button.addEventListener('click', () => setRoomAccess(button.dataset.access));
+  });
+}
+
+function renderRoomList() {
+  if (!roomList) return;
+  if (!state.auth.user) {
+    roomList.innerHTML = '';
+    showFeedback(roomListFeedback, 'Влез в профила си, за да виждаш отворените онлайн стаи.', '');
+    return;
+  }
+  if (!state.online.publicRooms.length) {
+    roomList.innerHTML = '';
+    showFeedback(roomListFeedback, 'В момента няма свободни стаи. Създай първата.', '');
+    return;
+  }
+  showFeedback(roomListFeedback, `Намерени са ${state.online.publicRooms.length} свободни стаи.`, 'success');
+  roomList.innerHTML = state.online.publicRooms.map((room) => `
+    <article class="room-row">
+      <div class="room-row-top">
+        <div>
+          <div class="room-row-title">${escapeHtml(room.host_name || 'Домакин')}</div>
+          <div class="room-row-meta">Код ${escapeHtml(room.code)} • ${escapeHtml(THEMES[room.selected_theme]?.name || room.selected_theme)} • ${room.selected_card_count} карти</div>
+        </div>
+        <span class="room-state-pill ${room.access_type || 'public'}">${ROOM_ACCESS_OPTIONS[room.access_type || 'public']?.name || 'Свободно'}</span>
+      </div>
+      <div class="room-row-bottom">
+        <div class="room-row-meta">${room.access_type === 'password' ? '🔐 Изисква парола' : room.access_type === 'invite' ? '🔗 Само с линк' : '🌐 Отворена за всеки'} • Създадена ${formatDateTime(room.created_at)}</div>
+        <button class="btn btn-secondary btn-small room-join-btn" data-room-id="${room.id}" data-access="${room.access_type || 'public'}" data-code="${room.code}" type="button">${room.access_type === 'password' ? 'Въведи парола' : 'Влез'} </button>
+      </div>
+    </article>
+  `).join('');
+
+  roomList.querySelectorAll('.room-join-btn').forEach((button) => {
+    button.addEventListener('click', () => handleListedRoomJoin(button.dataset.roomId, button.dataset.access, button.dataset.code));
+  });
+}
+
+function updateProfileLauncher() {
+  const loggedIn = Boolean(state.auth.user);
+  const sessionLabel = loggedIn ? getDisplayName() : (state.guest.active ? state.guest.name1 || 'Гост' : 'Вход / регистрация');
+  profileButtonTitle.textContent = loggedIn ? sessionLabel : 'Профил';
+  profileButtonSubtext.textContent = loggedIn ? 'Онлайн активен' : (state.guest.active ? 'Гост режим (локален)' : 'Отключи онлайн режим');
+  profileButton.classList.toggle('logged', loggedIn);
+}
+
+function resolveInviteTokenFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  state.ui.inviteToken = params.get('invite') || null;
+}
 
 function getLoginValues() {
   return {
@@ -548,7 +753,7 @@ function getPlayerStatsFromHistory(userId) {
 
 function renderProfilePanel() {
   const loggedIn = Boolean(state.auth.user);
-  const visible = loggedIn && isOnlineMode();
+  const visible = loggedIn;
   profilePanel.classList.toggle('hidden', !visible);
   if (!loggedIn) {
     matchHistoryList.innerHTML = '';
@@ -707,21 +912,25 @@ function getModeDisplayName() {
 
 function updatePlayerInputUi() {
   const computerMode = isComputerMode();
-  player2NameField.classList.toggle('hidden-field', computerMode);
-  player2NameInput.disabled = computerMode;
+  const onlineMode = isOnlineMode();
+  player2NameField.classList.toggle('hidden-field', computerMode || onlineMode);
+  player2NameInput.disabled = computerMode || onlineMode;
   if (computerMode) {
     player2NameInput.value = 'Компютър';
     player2NameInput.placeholder = 'Компютър';
+  } else if (onlineMode) {
+    player2NameInput.placeholder = 'Ще се попълни от стаята';
   } else if (!player2NameInput.value.trim()) {
     player2NameInput.placeholder = 'Играч 2';
   }
   difficultySelector.classList.toggle('hidden', !computerMode);
-  authPanel.classList.toggle('hidden', !isOnlineMode());
 }
 
 function refreshPlayerNames() {
-  state.playerNames[1] = sanitizeName(player1NameInput.value, 'Играч 1');
-  state.playerNames[2] = isComputerMode() ? 'Компютър' : sanitizeName(player2NameInput.value, 'Играч 2');
+  if (!state.auth.user && state.guest.active) ensureGuestNames(false);
+
+  state.playerNames[1] = sanitizeName(player1NameInput.value, state.guest.active ? state.guest.name1 || 'Играч 1' : 'Играч 1');
+  state.playerNames[2] = isComputerMode() ? 'Компютър' : sanitizeName(player2NameInput.value, state.guest.active ? state.guest.name2 || 'Играч 2' : 'Играч 2');
 
   if (state.playMode === 'online' && state.online.room) {
     state.playerNames[1] = sanitizeName(state.online.room.host_name || state.playerNames[1], 'Играч 1');
@@ -834,18 +1043,30 @@ function renderCountSelector() {
 
 
 function renderModeSelector() {
+  const onlineUnlocked = Boolean(state.auth.user);
   modeSelector.innerHTML = Object.entries(MODE_OPTIONS)
-    .map(([key, mode]) => `
-      <button class="mode-option ${state.playMode === key ? 'selected' : ''}" data-mode="${key}" type="button">
+    .map(([key, mode]) => {
+      const locked = key === 'online' && !onlineUnlocked;
+      return `
+      <button class="mode-option ${state.playMode === key ? 'selected' : ''} ${locked ? 'locked' : ''}" data-mode="${key}" ${locked ? 'data-tooltip="Онлайн режимът иска профил. Влез или се регистрирай от иконата горе вдясно. Като гост можеш да продължиш локално."' : ''} type="button">
         <span class="mode-badge">${mode.badge}</span>
         <strong>${mode.name}</strong>
         <p>${mode.description}</p>
       </button>
-    `)
+    `;
+    })
     .join('');
 
   document.querySelectorAll('.mode-option').forEach((button) => {
-    button.addEventListener('click', () => selectPlayMode(button.dataset.mode));
+    button.addEventListener('click', () => {
+      const requested = button.dataset.mode;
+      if (requested === 'online' && !state.auth.user) {
+        toggleProfilePanel(true);
+        updateHud('Онлайн режимът е заключен. Влез в профила си или продължи локално като гост.');
+        return;
+      }
+      selectPlayMode(requested);
+    });
   });
 }
 
@@ -883,10 +1104,10 @@ function updateHud(message) {
   }
 
   if (!state.selectedTheme) {
-    statusBanner.textContent = 'Въведи име, избери режим, тема и брой карти. Онлайн режимът иска вход едва след като го избереш.';
+    statusBanner.textContent = 'Въведи име, избери режим, тема и брой карти. Онлайн режимът се отключва от профила горе вдясно.';
   } else if (!state.started) {
     if (state.playMode === 'online') {
-      statusBanner.textContent = state.auth.enabled ? `Онлайн режим: избери тема и брой карти, после влез, създай стая или се присъедини с код.` : 'Онлайн режимът изисква Supabase конфигурация в supabase-config.js.';
+      statusBanner.textContent = state.auth.enabled ? `Онлайн режим: избери тема и брой карти, създай стая, присъедини се от waiting room-а или използвай invite линк.` : 'Онлайн режимът изисква Supabase конфигурация в supabase-config.js.';
     } else if (isComputerMode()) {
       statusBanner.textContent = `Играч: ${getPlayerName(1)} • Срещу: Компютър • Трудност: ${AI_OPTIONS[state.aiDifficulty].name} • Тема: ${THEMES[state.selectedTheme].name} • ${state.selectedCardCount} карти.`;
     } else {
@@ -906,9 +1127,18 @@ function selectTheme(themeKey) {
 }
 
 function selectPlayMode(modeKey) {
+  if (modeKey === 'online' && !state.auth.user) {
+    toggleProfilePanel(true);
+    updateHud('Онлайн режимът е активен само за влезли потребители.');
+    return;
+  }
+
   state.playMode = MODE_OPTIONS[modeKey] ? modeKey : 'local';
   if (!isOnlineMode()) {
     onlineLobby.classList.add('hidden');
+  }
+  if (!state.auth.user && state.playMode !== 'online' && state.guest.active) {
+    ensureGuestNames(false);
   }
   renderModeSelector();
   renderDifficultySelector();
@@ -1909,11 +2139,14 @@ function endGame() {
   state.started = false;
   state.gameOver = true;
   let title = 'Равенство';
+  let winnerSlot = 0;
 
   if (state.scores[1] > state.scores[2]) {
     title = `Победител: ${getPlayerName(1)}`;
+    winnerSlot = 1;
   } else if (state.scores[2] > state.scores[1]) {
     title = `Победител: ${getPlayerName(2)}`;
+    winnerSlot = 2;
   }
 
   resultTitle.textContent = title;
@@ -1921,6 +2154,22 @@ function endGame() {
   updatePlayerPanels();
   updateHud('Рундът приключи. Можеш да натиснеш „Играй пак“ или „Смени тема“.');
   resultModal.classList.remove('hidden');
+
+  if (state.auth.user && state.playMode !== 'online') {
+    saveMatchToHistory({
+      mode: state.playMode === 'computer' ? 'computer' : 'local',
+      theme_key: state.selectedTheme,
+      card_count: state.selectedCardCount,
+      player1_user_id: state.auth.user.id,
+      player1_name: getPlayerName(1),
+      player2_user_id: null,
+      player2_name: getPlayerName(2),
+      player1_score: state.scores[1],
+      player2_score: state.scores[2],
+      winner_slot: winnerSlot,
+      winner_user_id: winnerSlot === 1 ? state.auth.user.id : null
+    });
+  }
 }
 
 
@@ -1941,6 +2190,11 @@ function getSupabaseConfig() {
 }
 
 async function initAuth() {
+  syncRememberMeUi();
+  resolveInviteTokenFromUrl();
+  loadGuestState();
+  if (!state.auth.user && state.guest.active) ensureGuestNames(false);
+
   const cfg = getSupabaseConfig();
   if (!cfg.enabled || !window.supabase) {
     backendChip.textContent = 'Backend: няма Supabase';
@@ -1950,30 +2204,44 @@ async function initAuth() {
     return;
   }
 
-  state.auth.client = window.supabase.createClient(cfg.url, cfg.key);
+  state.auth.client = window.supabase.createClient(cfg.url, cfg.key, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: getAdaptiveAuthStorage()
+    }
+  });
   state.auth.enabled = true;
   backendChip.textContent = 'Backend: Supabase';
 
   const { data } = await state.auth.client.auth.getSession();
   state.auth.user = data.session?.user || null;
   if (state.auth.user) {
+    clearGuestState();
     await loadProfile();
     await loadMatchHistory();
+    await loadLobbyRooms();
   }
 
   state.auth.client.auth.onAuthStateChange(async (_event, session) => {
     state.auth.user = session?.user || null;
     if (state.auth.user) {
+      clearGuestState();
       await loadProfile();
       await loadMatchHistory();
+      await loadLobbyRooms();
     } else {
       state.auth.profile = null;
       state.auth.history = [];
       state.auth.historyLoaded = false;
+      state.online.publicRooms = [];
       if (state.online.room) await leaveRoom();
+      if (state.playMode === 'online') state.playMode = 'local';
     }
     renderProfilePanel();
     updateAuthUi();
+    renderModeSelector();
     updateHud();
   });
 
@@ -2016,31 +2284,43 @@ function getDisplayName() {
 
 function updateAuthUi() {
   const loggedIn = Boolean(state.auth.user);
-  sessionChip.textContent = `Сесия: ${loggedIn ? 'влязъл' : 'гост'}`;
+  const sessionLabel = loggedIn ? 'влязъл' : (state.guest.active ? 'гост' : 'няма');
+  sessionChip.textContent = `Сесия: ${sessionLabel}`;
   authStatusText.textContent = !state.auth.enabled
     ? 'Добави ключовете си в supabase-config.js и пусни SQL схемата, за да активираш онлайн режима.'
     : loggedIn
-      ? `Влязъл си като ${getDisplayName()}. Онлайн режимът е активен и историята на мачовете се пази.`
-      : 'Влез или се регистрирай, за да отключиш онлайн режима.';
+      ? `Влязъл си като ${getDisplayName()}. Онлайн режимът е активен, waiting room-ът е отключен и историята се пази.`
+      : 'Влез или се регистрирай, за да отключиш онлайн режима. Като гост можеш да продължиш локално.';
 
-  authPanel.classList.toggle('hidden', !isOnlineMode());
+  guestPreview.textContent = createGuestName();
+  guestBanner.classList.toggle('hidden', loggedIn);
   onlineLobby.classList.toggle('hidden', !isOnlineMode() || !loggedIn);
-  profilePanel.classList.toggle('hidden', !isOnlineMode() || !loggedIn);
+  profilePanel.classList.toggle('hidden', !loggedIn);
   loginTab.classList.toggle('hidden', loggedIn);
   registerTab.classList.toggle('hidden', loggedIn);
   loginForm.classList.toggle('hidden', loggedIn);
   registerForm.classList.toggle('hidden', loggedIn);
+  logoutButton.classList.toggle('hidden', !loggedIn);
+  profileButton.classList.toggle('logged', loggedIn);
+  updateProfileLauncher();
+  renderModeSelector();
   startButton.disabled = !state.selectedTheme || isOnlineMode();
-  if (isOnlineMode()) {
-    roomCodeChip.textContent = `Код: ${state.online.room?.code || '—'}`;
-    roomStatusChip.textContent = `Стая: ${state.online.room ? state.online.room.status : 'няма'}`;
-    const room = state.online.room;
-    const count = room ? 1 + (room.guest_user_id ? 1 : 0) : 0;
-    roomPlayersChip.textContent = `Играчите: ${count}/2`;
-    onlineTurnChip.textContent = `Ход: ${room?.current_player_slot ? getPlayerName(room.current_player_slot) : '—'}`;
-    startOnlineButton.disabled = !(loggedIn && room && room.host_user_id === state.auth.user?.id && room.guest_user_id && room.status === 'waiting');
-  }
+
+  const room = state.online.room;
+  roomCodeChip.textContent = `Код: ${room?.code || '—'}`;
+  roomStatusChip.textContent = `Стая: ${room ? room.status : 'няма'}`;
+  const count = room ? 1 + (room.guest_user_id ? 1 : 0) : 0;
+  roomPlayersChip.textContent = `Играчите: ${count}/2`;
+  onlineTurnChip.textContent = `Ход: ${room?.current_player_slot ? getPlayerName(room.current_player_slot) : '—'}`;
+  startOnlineButton.disabled = !(loggedIn && room && room.host_user_id === state.auth.user?.id && room.guest_user_id && room.status === 'waiting');
+
+  inviteCard.classList.toggle('hidden', !(room && room.access_type === 'invite' && room.invite_token));
+  inviteLinkInput.value = room?.invite_token ? getInviteUrl(room.invite_token) : '';
+  inviteJoinBanner.classList.toggle('hidden', !state.ui.inviteToken || loggedIn && room && room.invite_token === state.ui.inviteToken);
+  if (state.ui.inviteToken) inviteJoinText.textContent = loggedIn ? 'В линка има валидна покана. Натисни, за да влезеш в стаята.' : 'Поканата е валидна. Първо влез в профила си, после натисни бутона.';
+
   renderProfilePanel();
+  renderRoomList();
 }
 
 function generateRoomCode() {
@@ -2069,13 +2349,7 @@ async function registerUser(event) {
   const valid = validateRegisterForm();
   if (!valid || !values.username || !values.firstName || !values.lastName || !values.email || !values.password) {
     showFeedback(registerFeedback, 'Попълни коректно всички полета за регистрация.', 'error');
-    focusFirstInvalidField([
-      [registerUsernameField],
-      [registerFirstNameField],
-      [registerLastNameField],
-      [registerEmailField],
-      [registerPasswordField]
-    ]);
+    focusFirstInvalidField([[registerUsernameField],[registerFirstNameField],[registerLastNameField],[registerEmailField],[registerPasswordField]]);
     return;
   }
 
@@ -2087,11 +2361,7 @@ async function registerUser(event) {
     password: values.password,
     options: {
       emailRedirectTo: getAuthRedirectUrl(),
-      data: {
-        username: values.username,
-        first_name: values.firstName,
-        last_name: values.lastName
-      }
+      data: { username: values.username, first_name: values.firstName, last_name: values.lastName }
     }
   };
 
@@ -2104,15 +2374,20 @@ async function registerUser(event) {
     return;
   }
 
-  if (data.session?.user) {
-    player1NameInput.value = values.firstName || values.username;
-    showFeedback(registerFeedback, 'Регистрацията е успешна и профилът е активен.', 'success');
-    updateHud('Успешна регистрация. Онлайн режимът е активен.');
-  } else {
-    showFeedback(registerFeedback, 'Профилът е създаден. Провери имейла си за потвърждение, ако Supabase го изисква.', 'success');
-    updateHud('Регистрацията е успешна. Ако Supabase иска потвърждение по имейл, отвори писмото и после влез.');
-    setAuthTab('login');
+  if (!data.session?.user) {
+    const fallback = await state.auth.client.auth.signInWithPassword({ email: values.email, password: values.password });
+    if (fallback.error) {
+      showFeedback(registerFeedback, 'Профилът е създаден, но автоматичният вход не успя. Влез ръчно от таб „Вход“.', 'success');
+      setAuthTab('login');
+      updateHud('Регистрацията е успешна. Влез от таб „Вход“.');
+      return;
+    }
   }
+
+  player1NameInput.value = sanitizeName(values.firstName || values.username, 'Играч 1');
+  showFeedback(registerFeedback, 'Регистрацията е успешна и профилът беше влязъл автоматично.', 'success');
+  toggleProfilePanel(false);
+  updateHud('Успешна регистрация. Онлайн режимът е отключен.');
 }
 
 async function loginUser(event) {
@@ -2126,12 +2401,12 @@ async function loginUser(event) {
   const valid = validateLoginForm();
   if (!valid || !values.email || !values.password) {
     showFeedback(loginFeedback, 'Попълни имейл и парола.', 'error');
-    focusFirstInvalidField([
-      [loginEmailField],
-      [loginPasswordField]
-    ]);
+    focusFirstInvalidField([[loginEmailField],[loginPasswordField]]);
     return;
   }
+
+  state.auth.rememberMe = Boolean(rememberMeCheckbox.checked);
+  localStorage.setItem('memory_duel_remember_me', state.auth.rememberMe ? '1' : '0');
 
   loginButton.disabled = true;
   showFeedback(loginFeedback, 'Проверяваме данните...', '');
@@ -2150,6 +2425,7 @@ async function loginUser(event) {
   }
 
   player1NameInput.value = sanitizeName(state.auth.profile?.first_name || state.auth.profile?.username || values.email.split('@')[0], 'Играч 1');
+  toggleProfilePanel(false);
   showFeedback(loginFeedback, 'Успешен вход.', 'success');
   updateHud('Успешен вход. Вече можеш да играеш онлайн.');
 }
@@ -2160,7 +2436,9 @@ async function logoutUser() {
   await state.auth.client.auth.signOut();
   showFeedback(loginFeedback, '');
   showFeedback(registerFeedback, '');
-  updateHud('Излязохте от профила.');
+  state.ui.profileOpen = false;
+  if (state.playMode === 'online') state.playMode = 'local';
+  updateHud('Излязохте от профила. Онлайн режимът е заключен.');
 }
 
 async function subscribeToRoom(roomId) {
@@ -2171,60 +2449,149 @@ async function subscribeToRoom(roomId) {
 
   state.online.channel = state.auth.client
     .channel(`room-${roomId}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, (payload) => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, async (payload) => {
       if (payload.eventType === 'DELETE') {
         state.online.room = null;
+        await loadLobbyRooms();
         updateAuthUi();
         resetRoundState();
         updateHud('Стаята беше изтрита.');
         return;
       }
       state.online.room = payload.new;
+      await loadLobbyRooms();
       syncFromOnlineRoom();
     });
 
   await state.online.channel.subscribe();
 }
 
+async function loadLobbyRooms() {
+  if (!state.auth.client || !state.auth.user) {
+    state.online.publicRooms = [];
+    renderRoomList();
+    return;
+  }
+
+  const { data, error } = await state.auth.client
+    .from('rooms')
+    .select('*')
+    .eq('status', 'waiting')
+    .is('guest_user_id', null)
+    .in('access_type', ['public', 'password'])
+    .neq('host_user_id', state.auth.user.id)
+    .order('created_at', { ascending: false })
+    .limit(16);
+
+  if (error) {
+    state.online.publicRooms = [];
+    showFeedback(roomListFeedback, `Лобито не се зареди: ${error.message}`, 'error');
+    renderRoomList();
+    return;
+  }
+
+  state.online.publicRooms = data || [];
+  renderRoomList();
+}
+
 async function createRoom() {
   if (!state.auth.enabled || !state.auth.user) {
     updateHud('За създаване на онлайн стая трябва да си влязъл.');
+    toggleProfilePanel(true);
     return;
   }
-  setFieldError(joinRoomField, joinRoomError, '');
+  clearAllValidation();
   if (!state.selectedTheme) {
     updateHud('Първо избери тема.');
     return;
   }
+  if (state.online.accessType === 'password' && roomPasswordInput.value.trim().length < 4) {
+    setFieldError(roomPasswordField, roomPasswordError, 'Паролата трябва да е минимум 4 символа.');
+    updateHud('Добави парола от поне 4 символа.');
+    return;
+  }
 
-  const room = {
-    code: generateRoomCode(),
-    host_user_id: state.auth.user.id,
-    host_name: getDisplayName(),
-    guest_user_id: null,
-    guest_name: null,
-    status: 'waiting',
-    selected_theme: state.selectedTheme,
-    selected_card_count: state.selectedCardCount,
-    current_player_slot: 1,
-    scores: { '1': 0, '2': 0 },
-    deck: [],
-    flipped_indices: [],
-    matched_indices: [],
-    lock_board: false,
-    winner_slot: null
+  createRoomButton.disabled = true;
+  const payload = {
+    p_code: generateRoomCode(),
+    p_host_name: getDisplayName(),
+    p_selected_theme: state.selectedTheme,
+    p_selected_card_count: state.selectedCardCount,
+    p_access_type: state.online.accessType,
+    p_plain_password: state.online.accessType === 'password' ? roomPasswordInput.value.trim() : null
   };
 
-  const { data, error } = await state.auth.client.from('rooms').insert(room).select().single();
-  if (error) {
-    updateHud(`Не успях да създам стая: ${error.message}`);
+  const { data, error } = await state.auth.client.rpc('create_room_secure', payload);
+  createRoomButton.disabled = false;
+  if (error || !data) {
+    updateHud(`Не успях да създам стая: ${error?.message || 'неочаквана грешка'}`);
     return;
   }
 
   state.online.room = data;
+  roomPasswordInput.value = '';
   await subscribeToRoom(data.id);
+  await loadLobbyRooms();
   updateAuthUi();
-  updateHud(`Стаята е създадена. Изпрати код ${data.code} на другия играч.`);
+  updateHud(data.access_type === 'invite' ? 'Invite стаята е създадена. Копирай линка и го изпрати на опонента.' : `Стаята е създадена. Изпрати код ${data.code} на другия играч.`);
+}
+
+async function joinRoomByRecord(room) {
+  if (!room) return;
+  if (room.guest_user_id && room.guest_user_id !== state.auth.user.id) {
+    updateHud('Тази стая вече е пълна.');
+    return;
+  }
+
+  let data = null;
+  let error = null;
+  if ((room.access_type || 'public') === 'password') {
+    const password = joinPasswordInput.value.trim();
+    if (password.length < 4) {
+      setFieldError(joinPasswordField, joinPasswordError, 'Въведи валидна парола.');
+      return;
+    }
+    ({ data, error } = await state.auth.client.rpc('join_room_with_password', { p_room_id: room.id, p_plain_password: password, p_guest_name: getDisplayName() }));
+  } else {
+    ({ data, error } = await state.auth.client.rpc('join_room_public', { p_room_id: room.id, p_guest_name: getDisplayName() }));
+  }
+
+  if (error || !data) {
+    const msg = error?.message || 'Неуспешно присъединяване.';
+    setFieldError(joinRoomField, joinRoomError, msg);
+    showFeedback(roomListFeedback, msg, 'error');
+    updateHud(msg);
+    return;
+  }
+
+  joinPasswordInput.value = '';
+  joinPasswordRow.classList.add('hidden');
+  state.ui.pendingProtectedRoomId = null;
+  state.online.room = data;
+  state.selectedTheme = data.selected_theme;
+  state.selectedCardCount = data.selected_card_count;
+  applyThemePalette(state.selectedTheme);
+  renderThemeSelector();
+  renderCountSelector();
+  await subscribeToRoom(data.id);
+  await loadLobbyRooms();
+  syncFromOnlineRoom();
+  setFieldError(joinRoomField, joinRoomError, '');
+  updateHud(`Свързан си към стая ${data.code}.`);
+}
+
+async function handleListedRoomJoin(roomId, accessType, roomCode = '') {
+  const room = state.online.publicRooms.find((item) => item.id === roomId) || null;
+  if (accessType === 'password') {
+    state.ui.pendingProtectedRoomId = roomId;
+    joinPasswordRow.classList.remove('hidden');
+    joinPasswordInput.focus();
+    joinRoomInput.value = roomCode || joinRoomInput.value;
+    setFieldError(joinPasswordField, joinPasswordError, '');
+    updateHud('Тази стая е защитена. Въведи паролата и потвърди.');
+    return;
+  }
+  await joinRoomByRecord(room);
 }
 
 async function joinRoom() {
@@ -2244,30 +2611,56 @@ async function joinRoom() {
     updateHud('Няма намерена стая с този код.');
     return;
   }
-  if (room.guest_user_id && room.guest_user_id !== state.auth.user.id) {
-    setFieldError(joinRoomField, joinRoomError, 'Тази стая вече е пълна.');
-    updateHud('Тази стая вече е пълна.');
+
+  if ((room.access_type || 'public') === 'invite') {
+    setFieldError(joinRoomField, joinRoomError, 'Тази стая приема само вход чрез invite линк.');
+    updateHud('Тази стая приема само вход чрез invite линк.');
+    return;
+  }
+  if ((room.access_type || 'public') === 'password') {
+    state.ui.pendingProtectedRoomId = room.id;
+    if (!state.online.publicRooms.some((item) => item.id === room.id)) state.online.publicRooms.unshift(room);
+    joinPasswordRow.classList.remove('hidden');
+    joinPasswordInput.focus();
+    setFieldError(joinPasswordField, joinPasswordError, '');
+    updateHud('Тази стая е защитена. Въведи паролата и потвърди.');
     return;
   }
 
-  const patch = room.guest_user_id ? {} : { guest_user_id: state.auth.user.id, guest_name: getDisplayName() };
-  const { data, error: updateError } = await state.auth.client.from('rooms').update(patch).eq('id', room.id).select().single();
-  if (updateError) {
-    setFieldError(joinRoomField, joinRoomError, 'Неуспешно присъединяване.');
-    updateHud(`Не успях да се включа: ${updateError.message}`);
+  await joinRoomByRecord(room);
+}
+
+async function joinInviteFromToken() {
+  if (!state.auth.enabled || !state.auth.user || !state.ui.inviteToken) {
+    updateHud('Поканата изисква да си влязъл в профила си.');
+    return;
+  }
+
+  const { data, error } = await state.auth.client.rpc('join_room_with_invite', { p_invite_token: state.ui.inviteToken, p_guest_name: getDisplayName() });
+  if (error || !data) {
+    updateHud(`Не успях да използвам поканата: ${error?.message || 'неочаквана грешка'}`);
     return;
   }
 
   state.online.room = data;
   state.selectedTheme = data.selected_theme;
   state.selectedCardCount = data.selected_card_count;
-  applyThemePalette(state.selectedTheme);
-  renderThemeSelector();
-  renderCountSelector();
   await subscribeToRoom(data.id);
+  await loadLobbyRooms();
   syncFromOnlineRoom();
-  setFieldError(joinRoomField, joinRoomError, '');
-  updateHud(`Свързан си към стая ${data.code}.`);
+  updateHud(`Влезе в invite стаята ${data.code}.`);
+}
+
+async function copyInviteLink() {
+  if (!inviteLinkInput.value) return;
+  try {
+    await navigator.clipboard.writeText(inviteLinkInput.value);
+    updateHud('Линкът за покана е копиран.');
+  } catch (error) {
+    inviteLinkInput.select();
+    document.execCommand('copy');
+    updateHud('Линкът за покана е копиран.');
+  }
 }
 
 async function leaveRoom() {
@@ -2289,6 +2682,7 @@ async function leaveRoom() {
   }
 
   state.online.room = null;
+  await loadLobbyRooms();
   updateAuthUi();
 }
 
@@ -2500,15 +2894,24 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
+loadGuestState();
+syncRememberMeUi();
 refreshPlayerNames();
 renderModeSelector();
 renderDifficultySelector();
 renderThemeSelector();
 renderCountSelector();
+renderRoomAccessSelector();
+setRoomAccess(state.online.accessType);
 updatePlayerInputUi();
 updatePlayerPanels();
+updateProfileLauncher();
 updateHud();
 setAuthTab('login');
+
+profileButton.addEventListener('click', () => toggleProfilePanel());
+closeAuthPanelButton.addEventListener('click', () => toggleProfilePanel(false));
+continueGuestButton.addEventListener('click', () => continueAsGuest(false));
 loginTab.addEventListener('click', () => setAuthTab('login'));
 registerTab.addEventListener('click', () => setAuthTab('register'));
 loginForm.addEventListener('submit', loginUser);
@@ -2520,10 +2923,21 @@ createRoomButton.addEventListener('click', createRoom);
 joinRoomButton.addEventListener('click', joinRoom);
 leaveRoomButton.addEventListener('click', leaveRoom);
 startOnlineButton.addEventListener('click', startOnlineMatch);
+refreshRoomsButton.addEventListener('click', loadLobbyRooms);
+copyInviteButton.addEventListener('click', copyInviteLink);
+joinInviteButton.addEventListener('click', joinInviteFromToken);
+joinPasswordConfirmButton.addEventListener('click', async () => {
+  if (!state.ui.pendingProtectedRoomId) return;
+  const room = state.online.publicRooms.find((item) => item.id === state.ui.pendingProtectedRoomId)
+    || (state.online.room && state.online.room.id === state.ui.pendingProtectedRoomId ? state.online.room : null);
+  await joinRoomByRecord(room);
+});
+
 joinRoomInput.addEventListener('input', () => {
   joinRoomInput.value = joinRoomInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
   if (joinRoomInput.value) setFieldError(joinRoomField, joinRoomError, '');
 });
+
 [
   [loginEmail, loginEmailField, loginEmailError],
   [loginPassword, loginPasswordField, loginPasswordError],
@@ -2531,14 +2945,32 @@ joinRoomInput.addEventListener('input', () => {
   [registerFirstName, registerFirstNameField, registerFirstNameError],
   [registerLastName, registerLastNameField, registerLastNameError],
   [registerEmail, registerEmailField, registerEmailError],
-  [registerPassword, registerPasswordField, registerPasswordError]
+  [registerPassword, registerPasswordField, registerPasswordError],
+  [roomPasswordInput, roomPasswordField, roomPasswordError],
+  [joinPasswordInput, joinPasswordField, joinPasswordError]
 ].forEach(([input, field, errorEl]) => {
   input.addEventListener('input', () => {
     if (input.value.trim()) setFieldError(field, errorEl, '');
   });
 });
+
 joinRoomInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') joinRoom();
 });
+joinPasswordInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') joinPasswordConfirmButton.click();
+});
+rememberMeCheckbox.addEventListener('change', () => {
+  state.auth.rememberMe = Boolean(rememberMeCheckbox.checked);
+  localStorage.setItem('memory_duel_remember_me', state.auth.rememberMe ? '1' : '0');
+});
+
+document.addEventListener('click', (event) => {
+  if (authPanel.classList.contains('hidden')) return;
+  const insidePanel = authPanel.contains(event.target);
+  const insideButton = profileButton.contains(event.target);
+  if (!insidePanel && !insideButton) toggleProfilePanel(false);
+});
+
 initAuth();
 updateAuthUi();

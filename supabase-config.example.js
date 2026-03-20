@@ -1,2 +1,2 @@
-window.SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
-window.SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+window.SUPABASE_URL = 'https://opmhslzcetlfxsymiuuc.supabase.co';
+window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wbWhzbHpjZXRsZnhzeW1pdXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMDk0OTgsImV4cCI6MjA4OTU4NTQ5OH0.XCZNf866m_VWK6_GM75EY2yJUp0UiQoUKYyWiFCrUg8';
