@@ -2193,9 +2193,9 @@ function setAuthTab(tab) {
   clearAllValidation();
   showFeedback(loginFeedback, '');
   showFeedback(registerFeedback, '');
-  const stacked = !state.auth.user;
-  loginTab.classList.toggle('active', tab === 'login');
-  registerTab.classList.toggle('active', tab === 'register');
+  const stacked = !state.auth.user || !loginTab || !registerTab;
+  loginTab?.classList.toggle('active', !stacked && tab === 'login');
+  registerTab?.classList.toggle('active', !stacked && tab === 'register');
   loginForm.classList.toggle('active', stacked || tab === 'login');
   registerForm.classList.toggle('active', stacked || tab === 'register');
 }
@@ -2314,8 +2314,8 @@ function updateAuthUi() {
   onlineLobby.classList.toggle('hidden', !isOnlineMode() || !loggedIn);
   profilePanel.classList.toggle('hidden', !loggedIn);
   authPanel.classList.toggle('guest-auth', !loggedIn);
-  loginTab.classList.toggle('hidden', true);
-  registerTab.classList.toggle('hidden', true);
+  loginTab?.classList.toggle('hidden', true);
+  registerTab?.classList.toggle('hidden', true);
   loginForm.classList.toggle('hidden', loggedIn);
   registerForm.classList.toggle('hidden', loggedIn);
   loginForm.classList.toggle('active', !loggedIn);
@@ -2936,8 +2936,8 @@ setAuthTab('login');
 profileButton.addEventListener('click', () => toggleProfilePanel());
 closeAuthPanelButton.addEventListener('click', () => toggleProfilePanel(false));
 continueGuestButton.addEventListener('click', () => continueAsGuest(false));
-loginTab.addEventListener('click', () => setAuthTab('login'));
-registerTab.addEventListener('click', () => setAuthTab('register'));
+loginTab?.addEventListener('click', () => setAuthTab('login'));
+registerTab?.addEventListener('click', () => setAuthTab('register'));
 loginForm.addEventListener('submit', loginUser);
 registerForm.addEventListener('submit', registerUser);
 logoutButton.addEventListener('click', logoutUser);
