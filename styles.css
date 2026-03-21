@@ -1032,3 +1032,94 @@ button { font: inherit; }
     right: 10px;
   }
 }
+
+
+/* ==== V7.3.7 online page + profile polish ==== */
+.icon-dismiss {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(255,255,255,0.92);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  line-height: 1;
+  box-shadow: none;
+}
+.icon-dismiss:hover { background: rgba(255,255,255,0.08); }
+.auth-badges { position: relative; padding-right: 28px; }
+.auth-badges .icon-dismiss { position: absolute; top: -2px; right: -4px; }
+.auth-backdrop {
+  background: rgba(3, 7, 14, 0.28);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+.mode-option.locked { overflow: hidden; }
+.mode-option.locked .mode-preview {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.mode-option.locked .mode-preview.hidden { display: none; }
+.mode-preview p { margin: 0; font-size: 0.78rem; color: var(--muted); }
+.mode-preview-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #8dd7ff;
+  font-weight: 800;
+  padding: 0;
+  cursor: pointer;
+}
+.mode-preview-link:hover { color: #c7efff; text-decoration: underline; }
+.online-lobby { display: none; }
+.app.online-lobby-mode .online-lobby {
+  display: grid !important;
+  position: fixed;
+  inset: 14px;
+  z-index: 44;
+  max-height: none;
+  height: calc(100dvh - 28px);
+  overflow: auto;
+  padding: 24px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(8,16,31,0.98), rgba(4,9,18,0.98));
+  box-shadow: 0 34px 90px rgba(0,0,0,0.56);
+}
+.app.online-lobby-mode .player-setup-grid,
+.app.online-lobby-mode .mode-selector,
+.app.online-lobby-mode .difficulty-selector,
+.app.online-lobby-mode .theme-selector,
+.app.online-lobby-mode .count-selector,
+.app.online-lobby-mode .control-row,
+.app.online-lobby-mode .status-banner,
+.app.online-lobby-mode .hud-row {
+  visibility: hidden;
+  pointer-events: none;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+.app.online-lobby-mode .center-console { position: relative; }
+.app.online-lobby-mode .profile-button { display: none; }
+.lobby-head-actions { display: inline-flex; align-items: center; gap: 10px; }
+.lobby-dismiss { width: 34px; height: 34px; font-size: 1.15rem; }
+.online-lobby .lobby-head { align-items: flex-start; }
+.online-lobby .lobby-subtitle { margin: 6px 0 0; color: var(--muted); max-width: 72ch; }
+@media (max-width: 900px) {
+  .app.online-lobby-mode .online-lobby { inset: 8px; height: calc(100dvh - 16px); padding: 18px; }
+}

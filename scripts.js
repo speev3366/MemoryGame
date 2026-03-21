@@ -32,6 +32,7 @@ const profileButton = document.getElementById('profileButton');
 const profileButtonTitle = document.getElementById('profileButtonTitle');
 const profileButtonSubtext = document.getElementById('profileButtonSubtext');
 const closeAuthPanelButton = document.getElementById('closeAuthPanelButton');
+const closeOnlineLobbyButton = document.getElementById('closeOnlineLobbyButton');
 const continueGuestButton = document.getElementById('continueGuestButton');
 const guestBanner = document.getElementById('guestBanner');
 const guestPreview = document.getElementById('guestPreview');
@@ -352,7 +353,9 @@ const state = {
   ui: {
     profileOpen: false,
     pendingProtectedRoomId: null,
-    inviteToken: null
+    inviteToken: null,
+    onlinePreviewVisible: false,
+    onlineLobbyOpen: false
   },
   online: {
     room: null,
@@ -421,6 +424,11 @@ function continueAsGuest(force = false) {
   refreshPlayerNames();
   updatePlayerPanels();
   updateAuthUi();
+  state.ui.onlinePreviewVisible = false;
+  state.ui.onlineLobbyOpen = false;
+  app.classList.remove('online-lobby-mode');
+  if (state.playMode === 'online') state.playMode = 'local';
+  renderModeSelector();
   updateHud('Локалният гост режим е активен. Гостите не се пазят в базата и не могат да отварят онлайн стаи.');
   toggleProfilePanel(false);
 }
@@ -568,6 +576,36 @@ function toggleProfilePanel(force) {
   app.classList.toggle('auth-open', state.ui.profileOpen);
 }
 
+
+
+function setOnlineLobbyOpen(force) {
+  const open = Boolean(force) && isOnlineMode() && Boolean(state.auth.user) && !state.started;
+  state.ui.onlineLobbyOpen = open;
+  app.classList.toggle('online-lobby-mode', open);
+  onlineLobby.classList.toggle('hidden', !open);
+  if (open) toggleProfilePanel(false);
+}
+
+function exitOnlineLobby() {
+  state.ui.onlineLobbyOpen = false;
+  app.classList.remove('online-lobby-mode');
+  onlineLobby.classList.add('hidden');
+  if (state.playMode === 'online' && !state.started) {
+    state.playMode = 'local';
+    renderModeSelector();
+    updatePlayerInputUi();
+    updatePlayerPanels();
+    updateAuthUi();
+    updateHud('Върна се към началния екран.');
+  }
+}
+
+function openProfileFromPreview() {
+  state.ui.onlinePreviewVisible = true;
+  renderModeSelector();
+  toggleProfilePanel(true);
+  updateHud('Онлайн режимът иска профил. Влез, регистрирай се или продължи локално като гост.');
+}
 
 function setRoomAccess(accessType) {
   state.online.accessType = ROOM_ACCESS_OPTIONS[accessType] ? accessType : 'public';
@@ -962,7 +1000,10 @@ function setAppMode(mode) {
   app.classList.remove('auth-open');
   authBackdrop?.classList.add('hidden');
   profileButton.classList.toggle('hidden', mode === 'game');
-  if (mode === 'game') toggleProfilePanel(false);
+  if (mode === 'game') {
+    toggleProfilePanel(false);
+    setOnlineLobbyOpen(false);
+  }
   newRoundButton.textContent = 'Смени тема';
 }
 
@@ -1063,22 +1104,31 @@ function renderModeSelector() {
   modeSelector.innerHTML = Object.entries(MODE_OPTIONS)
     .map(([key, mode]) => {
       const locked = key === 'online' && !onlineUnlocked;
+      const showPreview = locked && state.ui.onlinePreviewVisible;
       return `
-      <button class="mode-option ${state.playMode === key ? 'selected' : ''} ${locked ? 'locked' : ''}" data-mode="${key}" ${locked ? 'data-tooltip="Онлайн режимът иска профил. Влез или се регистрирай от иконата горе вдясно. Като гост можеш да продължиш локално."' : ''} type="button">
+      <button class="mode-option ${state.playMode === key ? 'selected' : ''} ${locked ? 'locked' : ''}" data-mode="${key}" type="button">
         <span class="mode-badge">${mode.badge}</span>
         <strong>${mode.name}</strong>
         <p>${mode.description}</p>
+        ${locked ? `<div class="mode-preview ${showPreview ? '' : 'hidden'}"><p>Онлайн режимът изисква профил.</p><button class="mode-preview-link" data-open-profile="true" type="button">Отвори профила</button></div>` : ''}
       </button>
     `;
     })
     .join('');
 
   document.querySelectorAll('.mode-option').forEach((button) => {
-    button.addEventListener('click', () => {
+    button.addEventListener('click', (event) => {
       const requested = button.dataset.mode;
+      if (event.target.closest('[data-open-profile="true"]')) {
+        event.preventDefault();
+        event.stopPropagation();
+        openProfileFromPreview();
+        return;
+      }
       if (requested === 'online' && !state.auth.user) {
-        toggleProfilePanel(true);
-        updateHud('Онлайн режимът е заключен. Влез в профила си или продължи локално като гост.');
+        state.ui.onlinePreviewVisible = true;
+        renderModeSelector();
+        updateHud('Онлайн режимът е заключен. Отвори профила от линка в картата или продължи локално като гост.');
         return;
       }
       selectPlayMode(requested);
@@ -1144,14 +1194,19 @@ function selectTheme(themeKey) {
 
 function selectPlayMode(modeKey) {
   if (modeKey === 'online' && !state.auth.user) {
-    toggleProfilePanel(true);
+    state.ui.onlinePreviewVisible = true;
+    renderModeSelector();
     updateHud('Онлайн режимът е активен само за влезли потребители.');
     return;
   }
 
   state.playMode = MODE_OPTIONS[modeKey] ? modeKey : 'local';
   if (!isOnlineMode()) {
+    state.ui.onlineLobbyOpen = false;
+    app.classList.remove('online-lobby-mode');
     onlineLobby.classList.add('hidden');
+  } else {
+    state.ui.onlinePreviewVisible = false;
   }
   if (!state.auth.user && state.playMode !== 'online' && state.guest.active) {
     ensureGuestNames(false);
@@ -1162,7 +1217,12 @@ function selectPlayMode(modeKey) {
   refreshPlayerNames();
   updatePlayerPanels();
   updateAuthUi();
-  updateHud();
+  if (isOnlineMode() && state.auth.user) {
+    setOnlineLobbyOpen(true);
+    updateHud('Онлайн лобито е отворено. Тук създаваш или намираш стая.');
+  } else {
+    updateHud();
+  }
 }
 
 function selectCardCount(count) {
@@ -2254,6 +2314,8 @@ async function initAuth() {
       state.auth.historyLoaded = false;
       state.online.publicRooms = [];
       if (state.online.room) await leaveRoom();
+      state.ui.onlineLobbyOpen = false;
+      app.classList.remove('online-lobby-mode');
       if (state.playMode === 'online') state.playMode = 'local';
     }
     renderProfilePanel();
@@ -2311,7 +2373,8 @@ function updateAuthUi() {
 
   guestPreview.textContent = createGuestName();
   guestBanner.classList.toggle('hidden', loggedIn);
-  onlineLobby.classList.toggle('hidden', !isOnlineMode() || !loggedIn);
+  onlineLobby.classList.toggle('hidden', !(isOnlineMode() && loggedIn && state.ui.onlineLobbyOpen));
+  app.classList.toggle('online-lobby-mode', Boolean(isOnlineMode() && loggedIn && state.ui.onlineLobbyOpen && !state.started));
   profilePanel.classList.toggle('hidden', !loggedIn);
   authPanel.classList.toggle('guest-auth', !loggedIn);
   loginTab?.classList.toggle('hidden', true);
@@ -2461,6 +2524,8 @@ async function logoutUser() {
   state.ui.profileOpen = false;
   authBackdrop?.classList.add('hidden');
   app.classList.remove('auth-open');
+  state.ui.onlineLobbyOpen = false;
+  app.classList.remove('online-lobby-mode');
   if (state.playMode === 'online') state.playMode = 'local';
   updateHud('Излязохте от профила. Онлайн режимът е заключен.');
 }
@@ -2935,6 +3000,7 @@ setAuthTab('login');
 
 profileButton.addEventListener('click', () => toggleProfilePanel());
 closeAuthPanelButton.addEventListener('click', () => toggleProfilePanel(false));
+closeOnlineLobbyButton?.addEventListener('click', () => exitOnlineLobby());
 continueGuestButton.addEventListener('click', () => continueAsGuest(false));
 loginTab?.addEventListener('click', () => setAuthTab('login'));
 registerTab?.addEventListener('click', () => setAuthTab('register'));
