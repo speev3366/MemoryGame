@@ -909,3 +909,28 @@ button { font: inherit; }
 .app.game-mode .auth-panel {
   display: none !important;
 }
+
+
+/* ==== V7.3.4 overlay fix ==== */
+.app.auth-open::before,
+.app.auth-open::after,
+.app::before,
+.app::after {
+  pointer-events: none;
+}
+.app.auth-open::after {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.auth-panel {
+  isolation: isolate;
+  background: #07111f !important;
+}
+.profile-button.hidden,
+.auth-panel.hidden {
+  display: none !important;
+}
