@@ -1166,13 +1166,13 @@ function renderModeSelector() {
   modeSelector.innerHTML = Object.entries(MODE_OPTIONS)
     .map(([key, mode]) => {
       const locked = key === 'online' && !onlineUnlocked;
-      const showPreview = locked && state.ui.onlinePreviewVisible;
+      const showPreview = locked && state.ui.onlinePreviewVisible && !state.ui.inviteToken;
       return `
       <button class="mode-option ${state.playMode === key ? 'selected' : ''} ${locked ? 'locked' : ''}" data-mode="${key}" type="button">
         <span class="mode-badge">${mode.badge}</span>
         <strong>${mode.name}</strong>
         <p>${mode.description}</p>
-        ${locked ? `<div class="mode-preview ${showPreview ? '' : 'hidden'}"><p>Онлайн режимът изисква профил.</p><button class="mode-preview-link" data-open-profile="true" type="button">Отвори профила</button></div>` : ''}
+        ${locked && !state.ui.inviteToken ? `<div class="mode-preview ${showPreview ? '' : 'hidden'}"><p>Онлайн режимът изисква профил.</p><span class="mode-preview-link" data-open-profile="true" role="button" tabindex="0">Отвори профила</span></div>` : ''}
       </button>
     `;
     })
@@ -1194,6 +1194,14 @@ function renderModeSelector() {
         return;
       }
       selectPlayMode(requested);
+    });
+  });
+  document.querySelectorAll('.mode-preview-link').forEach((link) => {
+    link.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openProfileFromPreview();
+      }
     });
   });
 }
@@ -2388,13 +2396,14 @@ async function initAuth() {
 
   if (state.ui.inviteToken) {
     state.playMode = 'online';
-    state.ui.onlinePreviewVisible = true;
+    state.ui.onlinePreviewVisible = false;
     renderModeSelector();
     setOnlineLobbyOpen(true);
     if (state.auth.user) {
       updateHud('Поканата е валидна. Натисни бутона, за да влезеш в стаята.');
     } else {
-      updateHud('Поканата е валидна. Влез в профила си или използвай гост режима от поканата.');
+      toggleProfilePanel(true);
+      updateHud('Поканата е валидна. Влез в профила си, регистрирай се или използвай временен гост вход.');
     }
   }
 
@@ -2462,12 +2471,15 @@ function updateAuthUi() {
     ? 'Добави ключовете си в supabase-config.js и пусни SQL схемата, за да активираш онлайн режима.'
     : loggedIn
       ? `Влязъл си като ${getDisplayName()}. Онлайн режимът е активен, waiting room-ът е отключен и историята се пази.`
-      : 'Влез или се регистрирай, за да отключиш онлайн режима. Като гост можеш да продължиш локално.';
+      : state.ui.inviteToken
+        ? 'Поканата е разпозната. Влез в профила си, регистрирай се или използвай временен гост вход, за да приемеш поканата.'
+        : 'Влез или се регистрирай, за да отключиш онлайн режима. Като гост можеш да продължиш локално.';
 
   guestPreview.textContent = createGuestName();
   guestBanner.classList.toggle('hidden', loggedIn);
-  onlineLobby.classList.toggle('hidden', !(isOnlineMode() && loggedIn && state.ui.onlineLobbyOpen));
-  const lobbyVisible = Boolean(isOnlineMode() && loggedIn && state.ui.onlineLobbyOpen && !state.started);
+  const inviteLobbyAllowed = Boolean(state.ui.inviteToken && state.ui.onlineLobbyOpen && !state.started);
+  const lobbyVisible = Boolean(isOnlineMode() && state.ui.onlineLobbyOpen && !state.started && (loggedIn || inviteLobbyAllowed));
+  onlineLobby.classList.toggle('hidden', !lobbyVisible);
   app.classList.toggle('online-lobby-mode', lobbyVisible);
   document.body.classList.toggle('lobby-open', lobbyVisible);
   profilePanel.classList.toggle('hidden', !loggedIn);
@@ -2572,6 +2584,10 @@ async function registerUser(event) {
     showFeedback(registerFeedback, 'Регистрацията е успешна и профилът беше влязъл автоматично.', 'success');
     toggleProfilePanel(false);
     updateHud('Успешна регистрация. Онлайн режимът е отключен.');
+    if (state.ui.inviteToken) {
+      setOnlineLobbyOpen(true);
+      await joinInviteFromToken();
+    }
     return;
   }
 
@@ -2620,6 +2636,10 @@ async function loginUser(event) {
   toggleProfilePanel(false);
   showFeedback(loginFeedback, 'Успешен вход.', 'success');
   updateHud('Успешен вход. Вече можеш да играеш онлайн.');
+  if (state.ui.inviteToken) {
+    setOnlineLobbyOpen(true);
+    await joinInviteFromToken();
+  }
 }
 
 async function logoutUser() {
@@ -2919,11 +2939,8 @@ async function continueInviteAsGuest() {
 }
 
 function openProfileFromInvite() {
-  state.ui.onlineLobbyOpen = false;
-  app.classList.remove('online-lobby-mode');
-  document.body.classList.remove('lobby-open');
-  onlineLobby.classList.add('hidden');
   state.playMode = 'online';
+  setOnlineLobbyOpen(true);
   renderModeSelector();
   toggleProfilePanel(true);
   updateHud('Поканата е валидна. Влез, регистрирай се или използвай гост режима.');
