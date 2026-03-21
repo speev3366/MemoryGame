@@ -891,3 +891,21 @@ button { font: inherit; }
   .lobby-head,
   .lobby-list-head { flex-direction: column; align-items: stretch; }
 }
+
+
+/* ==== V7.3.3 hotfix ==== */
+.app.auth-open::after {
+  display: none !important;
+  content: none !important;
+}
+.auth-panel {
+  background: linear-gradient(180deg, rgba(7, 14, 28, 1), rgba(4, 9, 18, 1)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.app.game-mode .profile-button {
+  display: none !important;
+}
+.app.game-mode .auth-panel {
+  display: none !important;
+}
