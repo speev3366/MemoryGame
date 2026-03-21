@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Duel Online V7.3.7</title>
+  <title>Memory Duel Online V7.3.8</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -25,7 +25,7 @@
       <div class="center-console">
         <div class="title-bar">
           <div class="title-wrap">
-            <p class="eyebrow">MEMORY DUEL V7.3.7</p>
+            <p class="eyebrow">MEMORY DUEL V7.3.8</p>
             <h1>Локална, AI и истинска онлайн игра</h1>
             <p class="subtitle">Гост режим за локална игра, профил с история и waiting room с публични, защитени и invite стаи.</p>
           </div>
@@ -197,7 +197,36 @@
         <div class="theme-selector" id="themeSelector"></div>
         <div class="count-selector" id="countSelector"></div>
 
+        <div class="control-row">
+          <button class="btn btn-primary" id="startButton" disabled>Старт</button>
+          <button class="btn btn-secondary" id="newRoundButton">Смени тема</button>
+        </div>
+
+        <div class="status-banner" id="statusBanner">Избери тема, режим и брой карти. За онлайн влез в профила си и създай или отвори стая.</div>
+
+        <div class="hud-row">
+          <div class="meta-chip" id="selectedThemeChip">Тема: няма</div>
+          <div class="meta-chip" id="gameModeChip">Режим: Локално</div>
+          <div class="meta-chip" id="cardCountChip">Карти: 20</div>
+          <div class="meta-chip" id="pairsLeftChip">Оставащи двойки: 0</div>
+          <div class="meta-chip highlight" id="turnChip">Ред: Играч 1</div>
+        </div>
+      </div>
+
+      <div class="player-card" id="player2Panel">
+        <div class="player-topline">
+          <span class="player-label" id="player2NameLabel">Играч 2</span>
+          <span class="turn-pill" id="player2Turn">Изчаква</span>
+        </div>
+        <div class="player-score" id="player2Score">0</div>
+        <div class="player-subtext" id="player2Subtext">Ще атакува след грешка</div>
+      </div>
+    </header>
+
+
+
         <section class="online-lobby hidden" id="onlineLobby">
+      <div class="online-lobby-shell">
           <div class="lobby-head">
             <div>
               <h3>Waiting room / онлайн лоби</h3>
@@ -277,33 +306,9 @@
           </div>
           <div class="history-feedback" id="roomListFeedback">Лобито ще покаже стаите, когато си влязъл и е избран онлайн режим.</div>
           <div class="room-list" id="roomList"></div>
-        </section>
-
-        <div class="control-row">
-          <button class="btn btn-primary" id="startButton" disabled>Старт</button>
-          <button class="btn btn-secondary" id="newRoundButton">Смени тема</button>
-        </div>
-
-        <div class="status-banner" id="statusBanner">Избери тема, режим и брой карти. За онлайн влез в профила си и създай или отвори стая.</div>
-
-        <div class="hud-row">
-          <div class="meta-chip" id="selectedThemeChip">Тема: няма</div>
-          <div class="meta-chip" id="gameModeChip">Режим: Локално</div>
-          <div class="meta-chip" id="cardCountChip">Карти: 20</div>
-          <div class="meta-chip" id="pairsLeftChip">Оставащи двойки: 0</div>
-          <div class="meta-chip highlight" id="turnChip">Ред: Играч 1</div>
-        </div>
       </div>
+    </section>
 
-      <div class="player-card" id="player2Panel">
-        <div class="player-topline">
-          <span class="player-label" id="player2NameLabel">Играч 2</span>
-          <span class="turn-pill" id="player2Turn">Изчаква</span>
-        </div>
-        <div class="player-score" id="player2Score">0</div>
-        <div class="player-subtext" id="player2Subtext">Ще атакува след грешка</div>
-      </div>
-    </header>
 
     <main class="game-shell">
       <section class="board-panel">

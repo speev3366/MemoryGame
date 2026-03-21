@@ -1123,3 +1123,193 @@ button { font: inherit; }
 @media (max-width: 900px) {
   .app.online-lobby-mode .online-lobby { inset: 8px; height: calc(100dvh - 16px); padding: 18px; }
 }
+
+
+/* ==== V7.3.8 online lobby fullscreen fix ==== */
+body.lobby-open { overflow: hidden; }
+.online-lobby {
+  display: none;
+}
+.online-lobby-shell {
+  width: min(1400px, calc(100vw - 48px));
+  min-height: min(860px, calc(100dvh - 48px));
+  margin: 0 auto;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+.app.online-lobby-mode .topbar,
+.app.online-lobby-mode .game-shell,
+.app.online-lobby-mode .result-modal,
+.app.online-lobby-mode .auth-panel,
+.app.online-lobby-mode .auth-backdrop {
+  display: none !important;
+}
+.app.online-lobby-mode .online-lobby {
+  display: block !important;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  height: 100dvh;
+  max-height: 100dvh;
+  width: 100vw;
+  padding: 24px;
+  overflow: auto;
+  border-radius: 0;
+  border: 0;
+  background: linear-gradient(180deg, rgba(6,13,27,0.96), rgba(3,7,15,0.98));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.app.online-lobby-mode .online-lobby::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 20% 15%, rgba(104,174,255,0.16), transparent 35%),
+              radial-gradient(circle at 85% 18%, rgba(122,92,255,0.18), transparent 28%),
+              radial-gradient(circle at 50% 80%, rgba(255,255,255,0.08), transparent 28%);
+  pointer-events: none;
+}
+.app.online-lobby-mode .online-lobby > .online-lobby-shell {
+  position: relative;
+  z-index: 1;
+}
+.online-lobby .lobby-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 4px;
+}
+.online-lobby .lobby-subtitle {
+  margin: 8px 0 0;
+  max-width: 78ch;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.lobby-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lobby-create-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 16px;
+}
+.room-access-selector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.room-access-option {
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  border-radius: 16px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+.room-access-option:hover {
+  transform: translateY(-2px);
+  border-color: rgba(141,215,255,0.34);
+  background: rgba(255,255,255,0.08);
+}
+.room-access-option.selected {
+  background: linear-gradient(135deg, rgba(89,167,255,0.28), rgba(111,83,255,0.3));
+  border-color: rgba(141,215,255,0.48);
+  box-shadow: 0 16px 36px rgba(0,0,0,0.24);
+}
+.room-access-option strong {
+  font-size: 1rem;
+  font-weight: 800;
+}
+.room-access-option small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+.invite-card,
+.invite-join-banner,
+.room-row {
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+  box-shadow: 0 18px 42px rgba(0,0,0,0.22);
+}
+.invite-card,
+.invite-join-banner {
+  padding: 16px 18px;
+  display: grid;
+  gap: 14px;
+}
+.lobby-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.lobby-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.room-list {
+  display: grid;
+  gap: 12px;
+}
+.room-row {
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+.room-row-main {
+  display: grid;
+  gap: 8px;
+}
+.room-row-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.room-code-badge {
+  font-size: 0.82rem;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.room-state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.room-state-pill.public { background: rgba(93, 227, 177, 0.16); color: #88f0c7; }
+.room-state-pill.password { background: rgba(255, 209, 102, 0.16); color: #ffd978; }
+.room-state-pill.invite { background: rgba(125, 131, 255, 0.16); color: #b0b4ff; }
+.room-row-title { font-size: 1rem; font-weight: 800; }
+.room-row-meta { color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
+.room-join-btn { min-width: 120px; }
+@media (max-width: 1024px) {
+  .online-lobby-shell { width: min(100vw - 28px, 1200px); min-height: calc(100dvh - 28px); }
+  .lobby-create-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .app.online-lobby-mode .online-lobby { padding: 12px; }
+  .online-lobby-shell { width: calc(100vw - 24px); min-height: calc(100dvh - 24px); gap: 14px; }
+  .room-access-selector { grid-template-columns: 1fr; }
+  .room-row { grid-template-columns: 1fr; }
+  .lobby-head, .lobby-list-head, .lobby-head-actions { flex-direction: column; align-items: stretch; }
+}

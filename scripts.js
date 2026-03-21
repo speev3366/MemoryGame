@@ -62,6 +62,7 @@ const roomStatusChip = document.getElementById('roomStatusChip');
 const roomPlayersChip = document.getElementById('roomPlayersChip');
 const onlineTurnChip = document.getElementById('onlineTurnChip');
 const roomAccessSelector = document.getElementById('roomAccessSelector');
+if (onlineLobby && app && onlineLobby.parentElement !== app) app.appendChild(onlineLobby);
 const roomPasswordField = document.getElementById('roomPasswordField');
 const roomPasswordInput = document.getElementById('roomPasswordInput');
 const roomPasswordError = document.getElementById('roomPasswordError');
@@ -582,13 +583,19 @@ function setOnlineLobbyOpen(force) {
   const open = Boolean(force) && isOnlineMode() && Boolean(state.auth.user) && !state.started;
   state.ui.onlineLobbyOpen = open;
   app.classList.toggle('online-lobby-mode', open);
+  document.body.classList.toggle('lobby-open', open);
   onlineLobby.classList.toggle('hidden', !open);
-  if (open) toggleProfilePanel(false);
+  if (open) {
+    toggleProfilePanel(false);
+    window.scrollTo(0, 0);
+  }
 }
+
 
 function exitOnlineLobby() {
   state.ui.onlineLobbyOpen = false;
   app.classList.remove('online-lobby-mode');
+  document.body.classList.remove('lobby-open');
   onlineLobby.classList.add('hidden');
   if (state.playMode === 'online' && !state.started) {
     state.playMode = 'local';
@@ -2374,7 +2381,9 @@ function updateAuthUi() {
   guestPreview.textContent = createGuestName();
   guestBanner.classList.toggle('hidden', loggedIn);
   onlineLobby.classList.toggle('hidden', !(isOnlineMode() && loggedIn && state.ui.onlineLobbyOpen));
-  app.classList.toggle('online-lobby-mode', Boolean(isOnlineMode() && loggedIn && state.ui.onlineLobbyOpen && !state.started));
+  const lobbyVisible = Boolean(isOnlineMode() && loggedIn && state.ui.onlineLobbyOpen && !state.started);
+  app.classList.toggle('online-lobby-mode', lobbyVisible);
+  document.body.classList.toggle('lobby-open', lobbyVisible);
   profilePanel.classList.toggle('hidden', !loggedIn);
   authPanel.classList.toggle('guest-auth', !loggedIn);
   loginTab?.classList.toggle('hidden', true);
