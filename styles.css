@@ -934,3 +934,101 @@ button { font: inherit; }
 .auth-panel.hidden {
   display: none !important;
 }
+
+
+/* ==== V7.3.5 auth polish ==== */
+.auth-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 48;
+  pointer-events: none;
+  background: rgba(4, 8, 16, 0.24);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.auth-panel {
+  z-index: 55;
+  width: min(820px, calc(100vw - 28px));
+  max-height: min(90vh, 940px);
+}
+
+.auth-sections-intro {
+  display: block;
+}
+
+.auth-section-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 2px 0 12px;
+}
+
+.auth-section-title.register-title {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.section-badge {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.82rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+}
+
+.auth-section-title strong {
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 3px;
+}
+
+.auth-section-title small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.auth-panel.guest-auth .auth-tabs {
+  display: none !important;
+}
+
+.auth-panel.guest-auth .auth-form {
+  display: block !important;
+}
+
+.auth-panel.guest-auth #registerForm {
+  margin-top: 0;
+}
+
+.auth-panel.guest-auth #loginForm {
+  margin-bottom: 0;
+}
+
+.auth-panel:not(.guest-auth) #authSectionsIntro,
+.auth-panel:not(.guest-auth) .register-title {
+  display: none;
+}
+
+.auth-panel .tab-btn.hidden {
+  display: none !important;
+}
+
+.app.auth-open::after {
+  display: none !important;
+  content: none !important;
+}
+
+@media (max-width: 900px) {
+  .auth-panel {
+    width: auto;
+    left: 10px;
+    right: 10px;
+  }
+}

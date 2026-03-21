@@ -24,6 +24,7 @@ const resultTitle = document.getElementById('resultTitle');
 const resultSummary = document.getElementById('resultSummary');
 
 const authPanel = document.getElementById('authPanel');
+const authBackdrop = document.getElementById('authBackdrop');
 const authStatusText = document.getElementById('authStatusText');
 const backendChip = document.getElementById('backendChip');
 const sessionChip = document.getElementById('sessionChip');
@@ -553,10 +554,18 @@ function validatePassword(value) {
 }
 
 function toggleProfilePanel(force) {
-  state.ui.profileOpen = typeof force === 'boolean' ? force : !state.ui.profileOpen;
-  authPanel.classList.toggle('hidden', !state.ui.profileOpen);
-  profileButton?.setAttribute('aria-expanded', state.ui.profileOpen ? 'true' : 'false');
+  if (app.classList.contains('game-mode')) {
+    state.ui.profileOpen = false;
+  authBackdrop?.classList.add('hidden');
   app.classList.remove('auth-open');
+  } else {
+    state.ui.profileOpen = typeof force === 'boolean' ? force : !state.ui.profileOpen;
+  }
+
+  authPanel.classList.toggle('hidden', !state.ui.profileOpen);
+  authBackdrop?.classList.toggle('hidden', !state.ui.profileOpen);
+  profileButton?.setAttribute('aria-expanded', state.ui.profileOpen ? 'true' : 'false');
+  app.classList.toggle('auth-open', state.ui.profileOpen);
 }
 
 
@@ -951,6 +960,7 @@ function setAppMode(mode) {
   app.classList.toggle('setup-mode', mode === 'setup');
   app.classList.toggle('game-mode', mode === 'game');
   app.classList.remove('auth-open');
+  authBackdrop?.classList.add('hidden');
   profileButton.classList.toggle('hidden', mode === 'game');
   if (mode === 'game') toggleProfilePanel(false);
   newRoundButton.textContent = 'Смени тема';
@@ -2183,10 +2193,11 @@ function setAuthTab(tab) {
   clearAllValidation();
   showFeedback(loginFeedback, '');
   showFeedback(registerFeedback, '');
+  const stacked = !state.auth.user;
   loginTab.classList.toggle('active', tab === 'login');
   registerTab.classList.toggle('active', tab === 'register');
-  loginForm.classList.toggle('active', tab === 'login');
-  registerForm.classList.toggle('active', tab === 'register');
+  loginForm.classList.toggle('active', stacked || tab === 'login');
+  registerForm.classList.toggle('active', stacked || tab === 'register');
 }
 
 function getSupabaseConfig() {
@@ -2302,10 +2313,13 @@ function updateAuthUi() {
   guestBanner.classList.toggle('hidden', loggedIn);
   onlineLobby.classList.toggle('hidden', !isOnlineMode() || !loggedIn);
   profilePanel.classList.toggle('hidden', !loggedIn);
-  loginTab.classList.toggle('hidden', loggedIn);
-  registerTab.classList.toggle('hidden', loggedIn);
+  authPanel.classList.toggle('guest-auth', !loggedIn);
+  loginTab.classList.toggle('hidden', true);
+  registerTab.classList.toggle('hidden', true);
   loginForm.classList.toggle('hidden', loggedIn);
   registerForm.classList.toggle('hidden', loggedIn);
+  loginForm.classList.toggle('active', !loggedIn);
+  registerForm.classList.toggle('active', !loggedIn);
   logoutButton.classList.toggle('hidden', !loggedIn);
   profileButton.classList.toggle('logged', loggedIn);
   updateProfileLauncher();
@@ -2380,20 +2394,20 @@ async function registerUser(event) {
     return;
   }
 
-  if (!data.session?.user) {
-    const fallback = await state.auth.client.auth.signInWithPassword({ email: values.email, password: values.password });
-    if (fallback.error) {
-      showFeedback(registerFeedback, 'Профилът е създаден, но автоматичният вход не успя. Влез ръчно от таб „Вход“.', 'success');
-      setAuthTab('login');
-      updateHud('Регистрацията е успешна. Влез от таб „Вход“.');
-      return;
-    }
+  if (data.session?.user) {
+    await ensureProfileFromSession();
+    await loadProfile();
+    await loadMatchHistory();
+    player1NameInput.value = sanitizeName(values.firstName || values.username, 'Играч 1');
+    showFeedback(registerFeedback, 'Регистрацията е успешна и профилът беше влязъл автоматично.', 'success');
+    toggleProfilePanel(false);
+    updateHud('Успешна регистрация. Онлайн режимът е отключен.');
+    return;
   }
 
-  player1NameInput.value = sanitizeName(values.firstName || values.username, 'Играч 1');
-  showFeedback(registerFeedback, 'Регистрацията е успешна и профилът беше влязъл автоматично.', 'success');
-  toggleProfilePanel(false);
-  updateHud('Успешна регистрация. Онлайн режимът е отключен.');
+  showFeedback(registerFeedback, 'Профилът е създаден, но проектът изисква потвърждение по имейл, преди да има сесия. Ако искаш автоматичен вход без имейл, изключи Confirm email в Supabase.', 'success');
+  setAuthTab('login');
+  updateHud('Регистрацията е успешна, но Supabase е настроен да изисква email confirmation преди вход.');
 }
 
 async function loginUser(event) {
@@ -2430,6 +2444,8 @@ async function loginUser(event) {
     return;
   }
 
+  await loadProfile();
+  await loadMatchHistory();
   player1NameInput.value = sanitizeName(state.auth.profile?.first_name || state.auth.profile?.username || values.email.split('@')[0], 'Играч 1');
   toggleProfilePanel(false);
   showFeedback(loginFeedback, 'Успешен вход.', 'success');
@@ -2443,6 +2459,8 @@ async function logoutUser() {
   showFeedback(loginFeedback, '');
   showFeedback(registerFeedback, '');
   state.ui.profileOpen = false;
+  authBackdrop?.classList.add('hidden');
+  app.classList.remove('auth-open');
   if (state.playMode === 'online') state.playMode = 'local';
   updateHud('Излязохте от профила. Онлайн режимът е заключен.');
 }
