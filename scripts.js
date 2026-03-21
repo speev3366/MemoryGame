@@ -80,6 +80,11 @@ const copyInviteButton = document.getElementById('copyInviteButton');
 const inviteJoinBanner = document.getElementById('inviteJoinBanner');
 const inviteJoinText = document.getElementById('inviteJoinText');
 const joinInviteButton = document.getElementById('joinInviteButton');
+const openProfileFromInviteButton = document.getElementById('openProfileFromInviteButton');
+const continueInviteGuestButton = document.getElementById('continueInviteGuestButton');
+const inviteGuestNameField = document.getElementById('inviteGuestNameField');
+const inviteGuestNameInput = document.getElementById('inviteGuestNameInput');
+const inviteGuestNameError = document.getElementById('inviteGuestNameError');
 const refreshRoomsButton = document.getElementById('refreshRoomsButton');
 const roomList = document.getElementById('roomList');
 const roomListFeedback = document.getElementById('roomListFeedback');
@@ -396,6 +401,11 @@ function createGuestName() {
   return `GuestMemory${randomDigits(6)}`;
 }
 
+function isAnonymousUser(user = state.auth.user) {
+  if (!user) return false;
+  return Boolean(user.is_anonymous || user.app_metadata?.provider === 'anonymous' || user.app_metadata?.providers?.includes?.('anonymous'));
+}
+
 function persistGuestState() {
   localStorage.setItem('memory_duel_guest_state', JSON.stringify(state.guest));
 }
@@ -583,7 +593,8 @@ function toggleProfilePanel(force) {
 
 
 function setOnlineLobbyOpen(force) {
-  const open = Boolean(force) && isOnlineMode() && Boolean(state.auth.user) && !state.started;
+  const canOpenForInvite = Boolean(state.ui.inviteToken) && !state.started;
+  const open = Boolean(force) && isOnlineMode() && (Boolean(state.auth.user) || canOpenForInvite) && !state.started;
   state.ui.onlineLobbyOpen = open;
   app.classList.toggle('online-lobby-mode', open);
   document.body.classList.toggle('lobby-open', open);
@@ -2375,6 +2386,18 @@ async function initAuth() {
     updateHud();
   });
 
+  if (state.ui.inviteToken) {
+    state.playMode = 'online';
+    state.ui.onlinePreviewVisible = true;
+    renderModeSelector();
+    setOnlineLobbyOpen(true);
+    if (state.auth.user) {
+      updateHud('Поканата е валидна. Натисни бутона, за да влезеш в стаята.');
+    } else {
+      updateHud('Поканата е валидна. Влез в профила си или използвай гост режима от поканата.');
+    }
+  }
+
   renderProfilePanel();
   updateAuthUi();
 }
@@ -2383,6 +2406,20 @@ async function ensureProfileFromSession() {
   if (!state.auth.user) return;
   const user = state.auth.user;
   const metadata = user.user_metadata || {};
+  const guestName = sanitizeName(metadata.guest_name || metadata.username || metadata.first_name || createGuestName(), createGuestName());
+
+  if (isAnonymousUser(user)) {
+    state.auth.profile = {
+      id: user.id,
+      username: guestName,
+      first_name: guestName,
+      last_name: '',
+      full_name: guestName,
+      email: ''
+    };
+    return;
+  }
+
   const profile = {
     id: user.id,
     username: metadata.username || user.email?.split('@')[0] || 'player',
@@ -2397,6 +2434,11 @@ async function ensureProfileFromSession() {
 
 async function loadProfile() {
   if (!state.auth.user || !state.auth.client) return;
+  if (isAnonymousUser()) {
+    await ensureProfileFromSession();
+    renderProfilePanel();
+    return;
+  }
   const { data, error } = await state.auth.client.from('profiles').select('*').eq('id', state.auth.user.id).maybeSingle();
   if (error || !data) {
     await ensureProfileFromSession();
@@ -2454,7 +2496,16 @@ function updateAuthUi() {
   inviteCard.classList.toggle('hidden', !(room && room.access_type === 'invite' && room.invite_token));
   inviteLinkInput.value = room?.invite_token ? getInviteUrl(room.invite_token) : '';
   inviteJoinBanner.classList.toggle('hidden', !state.ui.inviteToken || loggedIn && room && room.invite_token === state.ui.inviteToken);
-  if (state.ui.inviteToken) inviteJoinText.textContent = loggedIn ? 'В линка има валидна покана. Натисни, за да влезеш в стаята.' : 'Поканата е валидна. Първо влез в профила си, после натисни бутона.';
+  inviteGuestNameField.classList.toggle('hidden', loggedIn);
+  continueInviteGuestButton.classList.toggle('hidden', loggedIn);
+  openProfileFromInviteButton.classList.toggle('hidden', loggedIn);
+  joinInviteButton.textContent = loggedIn ? 'Влез с поканата' : 'Имам профил';
+  if (state.ui.inviteToken) {
+    if (!inviteGuestNameInput.value.trim()) inviteGuestNameInput.value = createGuestName();
+    inviteJoinText.textContent = loggedIn
+      ? 'В линка има валидна покана. Натисни, за да влезеш в стаята.'
+      : 'Поканата е валидна. Можеш да влезеш с профил, да се регистрираш или да използваш временен гост акаунт.';
+  }
 
   renderOnlineThemeSelector();
   renderOnlineCountSelector();
@@ -2787,24 +2838,95 @@ async function joinRoom() {
 }
 
 async function joinInviteFromToken() {
-  if (!state.auth.enabled || !state.auth.user || !state.ui.inviteToken) {
-    updateHud('Поканата изисква да си влязъл в профила си.');
+  if (!state.auth.enabled || !state.ui.inviteToken) {
+    updateHud('Поканата изисква активна Supabase конфигурация.');
+    return;
+  }
+
+  if (!state.auth.user) {
+    state.playMode = 'online';
+    renderModeSelector();
+    toggleProfilePanel(true);
+    updateHud('Първо влез в профила си или използвай гост режима от поканата.');
     return;
   }
 
   const { data, error } = await state.auth.client.rpc('join_room_with_invite', { p_invite_token: state.ui.inviteToken, p_guest_name: getDisplayName() });
   if (error || !data) {
     updateHud(`Не успях да използвам поканата: ${error?.message || 'неочаквана грешка'}`);
+    showFeedback(onlineLobbyFeedback, `Не успях да използвам поканата: ${error?.message || 'неочаквана грешка'}`, 'error');
     return;
   }
 
+  state.playMode = 'online';
+  renderModeSelector();
+  setOnlineLobbyOpen(true);
   state.online.room = data;
   state.selectedTheme = data.selected_theme;
   state.selectedCardCount = data.selected_card_count;
   await subscribeToRoom(data.id);
   await loadLobbyRooms();
   syncFromOnlineRoom();
+  showFeedback(onlineLobbyFeedback, `Влезе в invite стаята ${data.code}.`, 'success');
   updateHud(`Влезе в invite стаята ${data.code}.`);
+}
+
+async function continueInviteAsGuest() {
+  if (!state.auth.enabled || !state.ui.inviteToken) {
+    updateHud('Поканата изисква активна Supabase конфигурация.');
+    return;
+  }
+
+  const guestName = sanitizeName(inviteGuestNameInput.value, createGuestName());
+  inviteGuestNameInput.value = guestName;
+  if (guestName.length < 3) {
+    setFieldError(inviteGuestNameField, inviteGuestNameError, 'Името трябва да е минимум 3 символа.');
+    updateHud('Въведи валидно временно име за гост.');
+    return;
+  }
+
+  setFieldError(inviteGuestNameField, inviteGuestNameError, '');
+  continueInviteGuestButton.disabled = true;
+  showFeedback(onlineLobbyFeedback, 'Създаваме временна гост сесия...', '');
+
+  const { error } = await state.auth.client.auth.signInAnonymously({
+    options: {
+      data: {
+        username: guestName,
+        first_name: guestName,
+        last_name: '',
+        guest_name: guestName
+      }
+    }
+  });
+
+  continueInviteGuestButton.disabled = false;
+  if (error) {
+    const msg = error?.message?.includes('Anonymous sign-ins are disabled')
+      ? 'Гост входът е изключен в Supabase. Активирай Authentication → Providers → Anonymous или използвай регистрация.'
+      : `Не успях да стартирам гост сесия: ${error.message || 'неочаквана грешка'}`;
+    showFeedback(onlineLobbyFeedback, msg, 'error');
+    updateHud(msg);
+    return;
+  }
+
+  state.guest.active = true;
+  state.guest.name1 = guestName;
+  persistGuestState();
+  player1NameInput.value = guestName;
+  await loadProfile();
+  await joinInviteFromToken();
+}
+
+function openProfileFromInvite() {
+  state.ui.onlineLobbyOpen = false;
+  app.classList.remove('online-lobby-mode');
+  document.body.classList.remove('lobby-open');
+  onlineLobby.classList.add('hidden');
+  state.playMode = 'online';
+  renderModeSelector();
+  toggleProfilePanel(true);
+  updateHud('Поканата е валидна. Влез, регистрирай се или използвай гост режима.');
 }
 
 async function copyInviteLink() {
