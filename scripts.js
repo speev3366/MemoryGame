@@ -62,6 +62,9 @@ const roomStatusChip = document.getElementById('roomStatusChip');
 const roomPlayersChip = document.getElementById('roomPlayersChip');
 const onlineTurnChip = document.getElementById('onlineTurnChip');
 const roomAccessSelector = document.getElementById('roomAccessSelector');
+const onlineThemeSelector = document.getElementById('onlineThemeSelector');
+const onlineCountSelector = document.getElementById('onlineCountSelector');
+const onlineLobbyFeedback = document.getElementById('onlineLobbyFeedback');
 if (onlineLobby && app && onlineLobby.parentElement !== app) app.appendChild(onlineLobby);
 const roomPasswordField = document.getElementById('roomPasswordField');
 const roomPasswordInput = document.getElementById('roomPasswordInput');
@@ -586,8 +589,15 @@ function setOnlineLobbyOpen(force) {
   document.body.classList.toggle('lobby-open', open);
   onlineLobby.classList.toggle('hidden', !open);
   if (open) {
+    if (!state.selectedTheme) state.selectedTheme = 'sports';
+    if (!state.selectedCardCount) state.selectedCardCount = 20;
+    renderThemeSelector();
+    renderCountSelector();
+    renderOnlineThemeSelector();
+    renderOnlineCountSelector();
     toggleProfilePanel(false);
     window.scrollTo(0, 0);
+    showFeedback(onlineLobbyFeedback, 'Избери тип стая, тема и брой карти, после създай стаята.', '');
   }
 }
 
@@ -1089,6 +1099,7 @@ function renderThemeSelector() {
   document.querySelectorAll('.theme-card').forEach((button) => {
     button.addEventListener('click', () => selectTheme(button.dataset.theme));
   });
+  renderOnlineThemeSelector();
 }
 
 function renderCountSelector() {
@@ -1103,8 +1114,41 @@ function renderCountSelector() {
   document.querySelectorAll('.count-option').forEach((button) => {
     button.addEventListener('click', () => selectCardCount(Number(button.dataset.count)));
   });
+  renderOnlineCountSelector();
 }
 
+
+
+function renderOnlineThemeSelector() {
+  if (!onlineThemeSelector) return;
+  onlineThemeSelector.innerHTML = Object.entries(THEMES)
+    .map(([key, theme]) => `
+      <button class="online-theme-option ${state.selectedTheme === key ? 'selected' : ''}" data-online-theme="${key}" type="button">
+        <span>${theme.icon}</span>
+        <strong>${theme.name}</strong>
+      </button>
+    `)
+    .join('');
+
+  onlineThemeSelector.querySelectorAll('[data-online-theme]').forEach((button) => {
+    button.addEventListener('click', () => selectTheme(button.dataset.onlineTheme));
+  });
+}
+
+function renderOnlineCountSelector() {
+  if (!onlineCountSelector) return;
+  onlineCountSelector.innerHTML = COUNT_OPTIONS
+    .map((count) => `
+      <button class="online-count-option ${state.selectedCardCount === count ? 'selected' : ''}" data-online-count="${count}" type="button">
+        ${count} карти
+      </button>
+    `)
+    .join('');
+
+  onlineCountSelector.querySelectorAll('[data-online-count]').forEach((button) => {
+    button.addEventListener('click', () => selectCardCount(Number(button.dataset.onlineCount)));
+  });
+}
 
 function renderModeSelector() {
   const onlineUnlocked = Boolean(state.auth.user);
@@ -2400,6 +2444,7 @@ function updateAuthUi() {
 
   const room = state.online.room;
   roomCodeChip.textContent = `Код: ${room?.code || '—'}`;
+  roomCodeChip.classList.toggle('hidden', !room?.code);
   roomStatusChip.textContent = `Стая: ${room ? room.status : 'няма'}`;
   const count = room ? 1 + (room.guest_user_id ? 1 : 0) : 0;
   roomPlayersChip.textContent = `Играчите: ${count}/2`;
@@ -2411,6 +2456,8 @@ function updateAuthUi() {
   inviteJoinBanner.classList.toggle('hidden', !state.ui.inviteToken || loggedIn && room && room.invite_token === state.ui.inviteToken);
   if (state.ui.inviteToken) inviteJoinText.textContent = loggedIn ? 'В линка има валидна покана. Натисни, за да влезеш в стаята.' : 'Поканата е валидна. Първо влез в профила си, после натисни бутона.';
 
+  renderOnlineThemeSelector();
+  renderOnlineCountSelector();
   renderProfilePanel();
   renderRoomList();
 }
@@ -2595,21 +2642,29 @@ async function loadLobbyRooms() {
 async function createRoom() {
   if (!state.auth.enabled || !state.auth.user) {
     updateHud('За създаване на онлайн стая трябва да си влязъл.');
+    showFeedback(onlineLobbyFeedback, 'За създаване на стая трябва да си влязъл в профила си.', 'error');
     toggleProfilePanel(true);
     return;
   }
   clearAllValidation();
   if (!state.selectedTheme) {
+    showFeedback(onlineLobbyFeedback, 'Първо избери тема за онлайн играта.', 'error');
     updateHud('Първо избери тема.');
+    return;
+  }
+  if (!state.selectedCardCount) {
+    showFeedback(onlineLobbyFeedback, 'Първо избери брой карти.', 'error');
     return;
   }
   if (state.online.accessType === 'password' && roomPasswordInput.value.trim().length < 4) {
     setFieldError(roomPasswordField, roomPasswordError, 'Паролата трябва да е минимум 4 символа.');
+    showFeedback(onlineLobbyFeedback, 'Добави парола от поне 4 символа.', 'error');
     updateHud('Добави парола от поне 4 символа.');
     return;
   }
 
   createRoomButton.disabled = true;
+  showFeedback(onlineLobbyFeedback, 'Създаваме стаята...', '');
   const payload = {
     p_code: generateRoomCode(),
     p_host_name: getDisplayName(),
@@ -2622,7 +2677,9 @@ async function createRoom() {
   const { data, error } = await state.auth.client.rpc('create_room_secure', payload);
   createRoomButton.disabled = false;
   if (error || !data) {
-    updateHud(`Не успях да създам стая: ${error?.message || 'неочаквана грешка'}`);
+    const msg = `Не успях да създам стая: ${error?.message || 'неочаквана грешка'}`;
+    showFeedback(onlineLobbyFeedback, msg, 'error');
+    updateHud(msg);
     return;
   }
 
@@ -2631,6 +2688,7 @@ async function createRoom() {
   await subscribeToRoom(data.id);
   await loadLobbyRooms();
   updateAuthUi();
+  showFeedback(onlineLobbyFeedback, data.access_type === 'invite' ? 'Invite стаята е създадена. Копирай линка и го изпрати на опонента.' : `Стаята е създадена. Изпрати код ${data.code} на другия играч.`, 'success');
   updateHud(data.access_type === 'invite' ? 'Invite стаята е създадена. Копирай линка и го изпрати на опонента.' : `Стаята е създадена. Изпрати код ${data.code} на другия играч.`);
 }
 
