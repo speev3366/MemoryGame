@@ -1279,6 +1279,16 @@ function hasActiveOnlineRoom() {
   return Boolean(state.online.room && ['waiting', 'playing'].includes(state.online.room.status));
 }
 
+function canReplaceOwnWaitingRoom() {
+  const room = state.online.room;
+  return Boolean(
+    room
+    && room.status === 'waiting'
+    && state.auth.user
+    && room.host_user_id === state.auth.user.id
+  );
+}
+
 function returnToMainMenu(message = '') {
   queuePersistentNotice('');
   resetRoundState();
@@ -2868,7 +2878,13 @@ function updateAuthUi() {
   const canStartOnline = Boolean(loggedIn && room && room.host_user_id === state.auth.user?.id && room.guest_user_id && room.status === 'waiting');
   startOnlineButton.disabled = !canStartOnline;
   startOnlineButton.textContent = canStartOnline ? 'Старт онлайн' : (room?.status === 'playing' ? 'Играта тече' : 'Старт онлайн');
-  leaveRoomButton.textContent = room?.status === 'playing' ? 'Изход от играта' : 'Напусни стая';
+  leaveRoomButton.disabled = !room;
+  leaveRoomButton.textContent = room?.status === 'playing'
+    ? 'Изход от играта'
+    : room && loggedIn && room.host_user_id === state.auth.user?.id
+      ? 'Затвори стая'
+      : 'Напусни стая';
+  createRoomButton.textContent = canReplaceOwnWaitingRoom() ? 'Създай нова стая' : 'Създай стая';
 
   inviteCard.classList.toggle('hidden', !(room && room.access_type === 'invite' && room.invite_token));
   inviteLinkInput.value = room?.invite_token ? getInviteUrl(room.invite_token) : '';
@@ -3112,12 +3128,18 @@ async function loadLobbyRooms() {
 
 async function createRoom() {
   if (hasActiveOnlineRoom()) {
-    const msg = state.online.room?.status === 'playing'
-      ? 'Вече имаш активна онлайн игра. Завърши я или напусни стаята преди да създадеш нова.'
-      : 'Вече имаш активна waiting стая. Използвай нея или я напусни преди да създадеш нова.';
-    showFeedback(onlineLobbyFeedback, msg, 'error');
-    updateHud(msg);
-    return;
+    if (state.online.room?.status === 'playing') {
+      const msg = 'Вече имаш активна онлайн игра. Завърши я или излез от играта, преди да създадеш нова стая.';
+      showFeedback(onlineLobbyFeedback, msg, 'error');
+      updateHud(msg);
+      return;
+    }
+    if (!canReplaceOwnWaitingRoom()) {
+      const msg = 'Вече си в waiting стая. Напусни я, преди да се присъединиш към друга или да създадеш нова.';
+      showFeedback(onlineLobbyFeedback, msg, 'error');
+      updateHud(msg);
+      return;
+    }
   }
 
   if (!state.auth.enabled || !state.auth.user) {
@@ -3147,8 +3169,9 @@ async function createRoom() {
     return;
   }
 
+  const replacingExistingWaitingRoom = canReplaceOwnWaitingRoom();
   createRoomButton.disabled = true;
-  showFeedback(onlineLobbyFeedback, 'Създаваме стаята...', '');
+  showFeedback(onlineLobbyFeedback, replacingExistingWaitingRoom ? 'Подменяме старата стая и създаваме нова...' : 'Създаваме стаята...', '');
   const payload = {
     p_code: generateRoomCode(),
     p_host_name: getDisplayName(),
@@ -3184,8 +3207,8 @@ async function createRoom() {
     state.ui.inviteToken = null;
   }
   const successMessage = state.online.room.access_type === 'invite'
-    ? 'Invite стаята е създадена. Копирай линка и го изпрати на опонента.'
-    : `Стаята е създадена. Изпрати код ${state.online.room.code} на другия играч.`;
+    ? `${replacingExistingWaitingRoom ? 'Старата стая беше затворена. ' : ''}Invite стаята е създадена. Копирай линка и го изпрати на опонента.`
+    : `${replacingExistingWaitingRoom ? 'Старата стая беше затворена. ' : ''}Стаята е създадена. Изпрати код ${state.online.room.code} на другия играч.`;
   showFeedback(onlineLobbyFeedback, successMessage, 'success');
   updateHud(successMessage);
 }
@@ -3417,6 +3440,7 @@ async function copyInviteLink() {
 async function leaveRoom(options = {}) {
   const room = state.online.room;
   const finishIfPlaying = Boolean(options.finishIfPlaying);
+  const stayOnline = Boolean(options.stayOnline);
 
   if (state.online.pendingTimeout) {
     clearTimeout(state.online.pendingTimeout);
@@ -3430,14 +3454,23 @@ async function leaveRoom(options = {}) {
 
   if (!state.auth.client || !room) {
     state.online.room = null;
-    state.playMode = 'local';
-    renderModeSelector();
-    resetRoundState();
+    if (stayOnline) {
+      state.playMode = 'online';
+      renderModeSelector();
+      setOnlineLobbyOpen(true);
+    } else {
+      state.playMode = 'local';
+      renderModeSelector();
+      resetRoundState();
+    }
     updateAuthUi();
     return;
   }
 
-  const slot = myRoomSlot();
+  const userId = state.auth.user?.id || null;
+  const isHost = Boolean(userId && room.host_user_id === userId);
+  const isGuest = Boolean(userId && room.guest_user_id === userId);
+  const slot = isHost ? 1 : (isGuest ? 2 : myRoomSlot());
 
   try {
     if (finishIfPlaying && room.status === 'playing') {
@@ -3448,19 +3481,29 @@ async function leaveRoom(options = {}) {
         lock_board: false,
         flipped_indices: []
       }).eq('id', room.id);
-    } else if (slot === 1 && !room.guest_user_id) {
+    } else if (room.status === 'waiting' && isHost) {
       await state.auth.client.from('rooms').delete().eq('id', room.id);
-    } else if (slot === 1) {
-      await state.auth.client.from('rooms').update({ host_user_id: room.guest_user_id, host_name: room.guest_name, guest_user_id: null, guest_name: null, status: 'waiting' }).eq('id', room.id);
-    } else if (slot === 2) {
+    } else if (room.status === 'waiting' && isGuest) {
+      await state.auth.client.from('rooms').update({ guest_user_id: null, guest_name: null }).eq('id', room.id);
+    } else if (isGuest) {
       await state.auth.client.from('rooms').update({ guest_user_id: null, guest_name: null, status: room.status === 'playing' ? 'finished' : room.status, winner_slot: room.status === 'playing' ? 1 : room.winner_slot }).eq('id', room.id);
     }
   } finally {
     state.online.room = null;
-    state.playMode = 'local';
-    renderModeSelector();
-    resetRoundState();
-    await loadLobbyRooms();
+    if (stayOnline) {
+      resetRoundState();
+      state.playMode = 'online';
+      renderModeSelector();
+      setOnlineLobbyOpen(true);
+      await loadLobbyRooms();
+      showFeedback(onlineLobbyFeedback, room.status === 'playing' ? 'Излезе от онлайн играта.' : (slot === 1 ? 'Стаята беше затворена.' : 'Напусна стаята.'));
+      updateHud(room.status === 'playing' ? 'Излезе от онлайн играта.' : (slot === 1 ? 'Стаята беше затворена.' : 'Напусна стаята.'));
+    } else {
+      state.playMode = 'local';
+      renderModeSelector();
+      resetRoundState();
+      await loadLobbyRooms();
+    }
     updateAuthUi();
   }
 }
@@ -3784,7 +3827,7 @@ resumeRoomButton?.addEventListener('click', resumeOnlineSession);
 exitGameButton?.addEventListener('click', exitCurrentGame);
 createRoomButton.addEventListener('click', createRoom);
 joinRoomButton.addEventListener('click', joinRoom);
-leaveRoomButton.addEventListener('click', leaveRoom);
+leaveRoomButton.addEventListener('click', () => leaveRoom({ stayOnline: true }));
 startOnlineButton.addEventListener('click', startOnlineMatch);
 refreshRoomsButton.addEventListener('click', loadLobbyRooms);
 copyInviteButton.addEventListener('click', copyInviteLink);

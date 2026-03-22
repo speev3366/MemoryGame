@@ -723,6 +723,15 @@ button { font: inherit; }
 .auth-grid.two-col, .register-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+.online-lobby .auth-grid.two-col {
+  align-items: end;
+}
+.online-lobby #createRoomButton {
+  align-self: end;
+  min-height: 56px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
 .register-grid .full-span { grid-column: 1 / -1; }
 .auth-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .hidden { display: none !important; }
@@ -1139,7 +1148,7 @@ body.lobby-open { overflow: hidden; }
   margin: 0 auto;
   display: grid;
   align-content: start;
-  gap: 18px;
+  gap: 14px;
 }
 .app.online-lobby-mode .topbar,
 .app.online-lobby-mode .game-shell,
@@ -1211,11 +1220,11 @@ body.lobby-open { overflow: hidden; }
   background: rgba(255,255,255,0.05);
   color: var(--text);
   border-radius: 16px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   text-align: left;
   cursor: pointer;
   display: grid;
-  gap: 6px;
+  gap: 4px;
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 .room-access-option:hover {
