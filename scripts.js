@@ -68,6 +68,10 @@ const roomAccessSelector = document.getElementById('roomAccessSelector');
 const onlineThemeSelector = document.getElementById('onlineThemeSelector');
 const onlineCountSelector = document.getElementById('onlineCountSelector');
 const onlineLobbyFeedback = document.getElementById('onlineLobbyFeedback');
+const lobbyCreateGrid = document.getElementById('lobbyCreateGrid');
+const onlineMatchGrid = document.getElementById('onlineMatchGrid');
+const lobbyJoinCreateRow = document.getElementById('lobbyJoinCreateRow');
+const roomActionRow = document.getElementById('roomActionRow');
 if (onlineLobby && app && onlineLobby.parentElement !== app) app.appendChild(onlineLobby);
 const roomPasswordField = document.getElementById('roomPasswordField');
 const roomPasswordInput = document.getElementById('roomPasswordInput');
@@ -699,7 +703,7 @@ async function refreshOnlineState(force = false) {
         }
       }
     } else if (isOnlineMode() || state.ui.onlineLobbyOpen) {
-      const active = await loadMyActiveRoom();
+      const active = await loadMyActiveRoom({ preferInviteToken: Boolean(state.ui.inviteToken) });
       if (active) {
         await subscribeToRoom(active.id);
         syncFromOnlineRoom();
@@ -893,6 +897,18 @@ function setRoomAccess(accessType) {
   }
 }
 
+function isInvitePreviewMode() {
+  const previewId = state.online.invitePreview?.id || null;
+  if (!state.ui.inviteToken || !previewId) return false;
+  return !state.online.room || state.online.room.id !== previewId;
+}
+
+function getInvitePreviewRoomSummary() {
+  const preview = state.online.invitePreview;
+  if (!preview) return '';
+  return `${preview.host_name || 'Домакин'} • ${THEMES[preview.selected_theme]?.name || preview.selected_theme} • ${preview.selected_card_count} карти.`;
+}
+
 function renderRoomAccessSelector() {
   roomAccessSelector.innerHTML = Object.entries(ROOM_ACCESS_OPTIONS).map(([key, option]) => `
     <button class="room-access-option ${state.online.accessType === key ? 'selected' : ''}" data-access="${key}" type="button">
@@ -908,6 +924,36 @@ function renderRoomAccessSelector() {
 
 function renderRoomList() {
   if (!roomList) return;
+
+  if (isInvitePreviewMode() && state.online.invitePreview) {
+    const preview = state.online.invitePreview;
+    const inviteStateText = preview.status === 'playing'
+      ? '▶ Играта вече е започнала.'
+      : preview.has_guest
+        ? '👥 В стаята вече има двама играчи. Изчакай поканата да се освободи.'
+        : '🔗 Това е поканената стая. Избери вход с профил или като гост.';
+    roomList.innerHTML = `
+      <article class="room-row room-row-own">
+        <div class="room-row-top">
+          <div class="room-row-main">
+            <div class="room-row-title">Поканена стая • ${escapeHtml(preview.host_name || 'Домакин')}</div>
+            <div class="room-row-meta">Код ${escapeHtml(preview.code)} • ${escapeHtml(THEMES[preview.selected_theme]?.name || preview.selected_theme)} • ${preview.selected_card_count} карти</div>
+          </div>
+          <span class="room-state-pill invite">С линк</span>
+        </div>
+        <div class="room-row-bottom">
+          <div class="room-row-meta">${inviteStateText}</div>
+        </div>
+      </article>
+    `;
+    showFeedback(
+      roomListFeedback,
+      preview.status === 'waiting' ? 'Поканата е заредена. Избери как да влезеш в стаята.' : 'Тази покана вече не е в waiting режим.',
+      preview.status === 'waiting' ? 'success' : 'error'
+    );
+    return;
+  }
+
   if (!state.auth.user) {
     roomList.innerHTML = '';
     showFeedback(roomListFeedback, 'Влез в профила си, за да виждаш отворените онлайн стаи.', '');
@@ -2722,13 +2768,19 @@ async function initAuth() {
     clearGuestState();
     await loadProfile();
     await loadMatchHistory();
-    await loadMyActiveRoom();
-    if (state.online.room) {
+    await loadMyActiveRoom({ preferInviteToken: Boolean(state.ui.inviteToken) });
+    const canAdoptLoadedRoom = !state.ui.inviteToken || !state.online.invitePreview?.id || state.online.room?.id === state.online.invitePreview.id;
+    if (state.online.room && canAdoptLoadedRoom) {
       state.playMode = 'online';
       renderModeSelector();
       await subscribeToRoom(state.online.room.id);
       if (state.online.room.status === 'waiting') setOnlineLobbyOpen(true);
       syncFromOnlineRoom();
+    } else if (state.ui.inviteToken) {
+      state.online.room = null;
+      state.playMode = 'online';
+      renderModeSelector();
+      setOnlineLobbyOpen(true);
     }
     await loadLobbyRooms();
   }
@@ -2740,13 +2792,19 @@ async function initAuth() {
       await loadProfile();
       await loadMatchHistory();
       await loadInvitePreview();
-      await loadMyActiveRoom();
-      if (state.online.room) {
+      await loadMyActiveRoom({ preferInviteToken: Boolean(state.ui.inviteToken) });
+      const canAdoptLoadedRoom = !state.ui.inviteToken || !state.online.invitePreview?.id || state.online.room?.id === state.online.invitePreview.id;
+      if (state.online.room && canAdoptLoadedRoom) {
         state.playMode = 'online';
         renderModeSelector();
         await subscribeToRoom(state.online.room.id);
         if (state.online.room.status === 'waiting') setOnlineLobbyOpen(true);
         syncFromOnlineRoom();
+      } else if (state.ui.inviteToken) {
+        state.online.room = null;
+        state.playMode = 'online';
+        renderModeSelector();
+        setOnlineLobbyOpen(true);
       }
       await loadLobbyRooms();
     } else {
@@ -2869,10 +2927,14 @@ function updateAuthUi() {
   startButton.disabled = !state.selectedTheme || isOnlineMode();
 
   const room = state.online.room;
-  roomCodeChip.textContent = `Код: ${room?.code || '—'}`;
-  roomCodeChip.classList.toggle('hidden', !room?.code);
-  roomStatusChip.textContent = `Стая: ${room ? room.status : 'няма'}`;
-  const count = room ? 1 + (room.guest_user_id ? 1 : 0) : 0;
+  const invitePreviewMode = isInvitePreviewMode();
+  const preview = state.online.invitePreview;
+  const roomCode = room?.code || (invitePreviewMode ? preview?.code : '');
+  const roomStatus = room?.status || (invitePreviewMode ? preview?.status : null);
+  const count = room ? 1 + (room.guest_user_id ? 1 : 0) : (invitePreviewMode ? 1 + (preview?.has_guest ? 1 : 0) : 0);
+  roomCodeChip.textContent = `Код: ${roomCode || '—'}`;
+  roomCodeChip.classList.toggle('hidden', !roomCode);
+  roomStatusChip.textContent = `Стая: ${roomStatus || 'няма'}`;
   roomPlayersChip.textContent = `Играчите: ${count}/2`;
   onlineTurnChip.textContent = `Ход: ${room?.current_player_slot ? getPlayerName(room.current_player_slot) : '—'}`;
   const canStartOnline = Boolean(loggedIn && room && room.host_user_id === state.auth.user?.id && room.guest_user_id && room.status === 'waiting');
@@ -2886,20 +2948,31 @@ function updateAuthUi() {
       : 'Напусни стая';
   createRoomButton.textContent = canReplaceOwnWaitingRoom() ? 'Създай нова стая' : 'Създай стая';
 
+  onlineLobby.classList.toggle('invite-preview-mode', invitePreviewMode);
   inviteCard.classList.toggle('hidden', !(room && room.access_type === 'invite' && room.invite_token));
   inviteLinkInput.value = room?.invite_token ? getInviteUrl(room.invite_token) : '';
-  inviteJoinBanner.classList.toggle('hidden', !state.ui.inviteToken || loggedIn && room && room.invite_token === state.ui.inviteToken);
-  inviteGuestNameField.classList.toggle('hidden', loggedIn);
-  continueInviteGuestButton.classList.toggle('hidden', loggedIn);
-  openProfileFromInviteButton.classList.toggle('hidden', loggedIn);
-  joinInviteButton.textContent = loggedIn ? 'Влез с поканата' : 'Имам профил';
+  const joinedInviteRoom = Boolean(state.ui.inviteToken && room && room.invite_token === state.ui.inviteToken);
+  inviteJoinBanner.classList.toggle('hidden', !state.ui.inviteToken || joinedInviteRoom || !preview);
+  inviteGuestNameField.classList.toggle('hidden', loggedIn || !invitePreviewMode);
+  continueInviteGuestButton.classList.toggle('hidden', loggedIn || !invitePreviewMode);
+  openProfileFromInviteButton.classList.toggle('hidden', loggedIn || !invitePreviewMode);
+  joinInviteButton.classList.toggle('hidden', !loggedIn || !invitePreviewMode);
+  joinInviteButton.textContent = 'Влез в поканената стая';
   if (state.ui.inviteToken) {
     if (!inviteGuestNameInput.value.trim()) inviteGuestNameInput.value = createGuestName();
-    const preview = state.online.invitePreview;
-    const roomSummary = preview ? ` ${preview.host_name || 'Домакин'} • ${THEMES[preview.selected_theme]?.name || preview.selected_theme} • ${preview.selected_card_count} карти.` : '';
+    const roomSummary = preview ? ` ${getInvitePreviewRoomSummary()}` : '';
     inviteJoinText.textContent = loggedIn
-      ? `В линка има валидна покана.${roomSummary} Натисни, за да влезеш в стаята.`
-      : `Поканата е валидна.${roomSummary} Можеш да влезеш с профил, да се регистрираш или да използваш временен гост акаунт.`;
+      ? `Поканата е валидна.${roomSummary} Натисни бутона, за да влезеш в стаята.`
+      : `Поканата е валидна.${roomSummary} Избери дали да влезеш като гост или с профил.`;
+    if (invitePreviewMode) {
+      showFeedback(
+        onlineLobbyFeedback,
+        loggedIn
+          ? 'Поканата е заредена. Натисни „Влез в поканената стая“.'
+          : 'Поканата е заредена. Въведи име за гост или отвори вход / регистрация.',
+        'success'
+      );
+    }
   }
 
   renderOnlineThemeSelector();
@@ -3082,7 +3155,7 @@ async function loadInvitePreview() {
   state.online.invitePreview = normalizeRpcSingle(data);
 }
 
-async function loadMyActiveRoom() {
+async function loadMyActiveRoom(options = {}) {
   if (!state.auth.client || !state.auth.user) {
     state.online.room = null;
     return null;
@@ -3091,6 +3164,11 @@ async function loadMyActiveRoom() {
   if (error) return null;
   const room = normalizeRpcSingle(data);
   if (!room) {
+    state.online.room = null;
+    return null;
+  }
+  const preferInviteRoomId = options.preferInviteToken ? (state.online.invitePreview?.id || null) : null;
+  if (preferInviteRoomId && room.id !== preferInviteRoomId) {
     state.online.room = null;
     return null;
   }
@@ -3341,10 +3419,14 @@ async function joinInviteFromToken() {
   }
 
   if (!state.auth.user) {
-    state.playMode = 'online';
-    renderModeSelector();
-    toggleProfilePanel(true);
-    updateHud('Първо влез в профила си или използвай гост режима от поканата.');
+    openProfileFromInvite();
+    return;
+  }
+
+  if (hasActiveOnlineRoom() && state.online.invitePreview?.id && state.online.room?.id && state.online.room.id !== state.online.invitePreview.id) {
+    const msg = 'Имаш друга активна онлайн стая. Затвори я, преди да използваш тази покана.';
+    showFeedback(onlineLobbyFeedback, msg, 'error');
+    updateHud(msg);
     return;
   }
 
@@ -3366,8 +3448,9 @@ async function joinInviteFromToken() {
   await refreshOnlineState(true);
   await loadLobbyRooms();
   syncFromOnlineRoom();
-  showFeedback(onlineLobbyFeedback, `Влезе в invite стаята ${data.code}.`, 'success');
-  updateHud(`Влезе в invite стаята ${data.code}.`);
+  const joinedCode = state.online.room?.code || joinedRoom.code || '—';
+  showFeedback(onlineLobbyFeedback, `Влезе в поканената стая ${joinedCode}. Изчакай домакинът да стартира мача.`, 'success');
+  updateHud(`Влезе в поканената стая ${joinedCode}. Изчакай домакинът да стартира мача.`);
 }
 
 async function continueInviteAsGuest() {
@@ -3422,7 +3505,7 @@ function openProfileFromInvite() {
   setOnlineLobbyOpen(true);
   renderModeSelector();
   toggleProfilePanel(true);
-  updateHud('Поканата е валидна. Влез, регистрирай се или използвай гост режима.');
+  updateHud('Поканата е валидна. Оттук можеш да влезеш или да се регистрираш, а после да се върнеш към стаята.');
 }
 
 async function copyInviteLink() {
@@ -3831,6 +3914,8 @@ leaveRoomButton.addEventListener('click', () => leaveRoom({ stayOnline: true }))
 startOnlineButton.addEventListener('click', startOnlineMatch);
 refreshRoomsButton.addEventListener('click', loadLobbyRooms);
 copyInviteButton.addEventListener('click', copyInviteLink);
+openProfileFromInviteButton.addEventListener('click', openProfileFromInvite);
+continueInviteGuestButton.addEventListener('click', continueInviteAsGuest);
 joinInviteButton.addEventListener('click', joinInviteFromToken);
 joinPasswordConfirmButton.addEventListener('click', async () => {
   if (!state.ui.pendingProtectedRoomId) return;

@@ -1578,3 +1578,19 @@ body.lobby-open { overflow: hidden; }
     min-height: auto;
   }
 }
+
+
+/* ==== V7.5.5 invite landing focus ==== */
+.online-lobby.invite-preview-mode .lobby-create-grid,
+.online-lobby.invite-preview-mode .online-match-grid,
+.online-lobby.invite-preview-mode .auth-grid.two-col,
+.online-lobby.invite-preview-mode .password-join-row,
+.online-lobby.invite-preview-mode .invite-card,
+.online-lobby.invite-preview-mode .auth-actions {
+  display: none !important;
+}
+
+.online-lobby.invite-preview-mode .invite-join-banner {
+  border-color: rgba(141,215,255,0.24);
+  background: linear-gradient(180deg, rgba(89,167,255,0.12), rgba(255,255,255,0.04));
+}
