@@ -1476,7 +1476,7 @@ body.lobby-open { overflow: hidden; }
 }
 
 
-/* ==== V7.5.2 visual polish ==== */
+/* ==== V7.5.3 visual polish ==== */
 .app {
   border-radius: 28px;
   overflow: hidden;
@@ -1493,28 +1493,33 @@ body.lobby-open { overflow: hidden; }
 
 .mode-option.locked[data-mode="online"] {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
-  grid-template-areas:
-    "badge preview"
-    "title preview"
-    "desc preview";
-  align-items: start;
-  column-gap: 16px;
+  gap: 8px;
+  padding-right: 210px;
+  min-height: 104px;
 }
 
-.mode-option.locked[data-mode="online"] .mode-badge { grid-area: badge; }
-.mode-option.locked[data-mode="online"] strong { grid-area: title; }
-.mode-option.locked[data-mode="online"] > p { grid-area: desc; max-width: none; }
+.mode-option.locked[data-mode="online"] .mode-badge,
+.mode-option.locked[data-mode="online"] strong,
+.mode-option.locked[data-mode="online"] > p {
+  grid-area: auto;
+}
+
+.mode-option.locked[data-mode="online"] > p {
+  max-width: 240px;
+}
 
 .mode-option.locked[data-mode="online"] .mode-preview {
-  grid-area: preview;
-  position: static;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  left: auto;
+  bottom: auto;
+  width: 170px;
+  min-height: 70px;
   margin-top: 0;
-  width: auto;
-  min-height: 0;
-  align-self: start;
-  justify-content: flex-start;
-  padding: 10px 12px;
+  padding: 12px 14px;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
 .mode-option.locked[data-mode="online"] .mode-preview p {
@@ -1524,7 +1529,15 @@ body.lobby-open { overflow: hidden; }
 
 @media (max-width: 1200px) {
   .mode-option.locked[data-mode="online"] {
-    grid-template-columns: minmax(0, 1fr) minmax(200px, 260px);
+    padding-right: 190px;
+  }
+
+  .mode-option.locked[data-mode="online"] > p {
+    max-width: 220px;
+  }
+
+  .mode-option.locked[data-mode="online"] .mode-preview {
+    width: 156px;
   }
 }
 
@@ -1546,12 +1559,8 @@ body.lobby-open { overflow: hidden; }
   }
 
   .mode-option.locked[data-mode="online"] {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "badge"
-      "title"
-      "desc"
-      "preview";
+    padding-right: 16px;
+    min-height: auto;
   }
 
   .mode-option.locked[data-mode="online"] strong,

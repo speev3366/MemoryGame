@@ -1402,7 +1402,7 @@ function renderModeSelector() {
         <span class="mode-badge">${mode.badge}</span>
         <strong>${mode.name}</strong>
         <p>${mode.description}</p>
-        ${locked && !state.ui.inviteToken ? `<div class="mode-preview ${showPreview ? '' : 'hidden'}"><p>Онлайн режимът изисква профил.</p><span class="mode-preview-link" data-open-profile="true" role="button" tabindex="0">Отвори профила</span></div>` : ''}
+        ${locked && !state.ui.inviteToken ? `<div class="mode-preview ${showPreview ? '' : 'hidden'}"><p>Онлайн режимът изисква профил.</p><span class="mode-preview-link" data-open-profile="true" role="button" tabindex="0">Вход</span></div>` : ''}
       </button>
     `;
     })
@@ -1420,7 +1420,7 @@ function renderModeSelector() {
       if (requested === 'online' && !state.auth.user) {
         state.ui.onlinePreviewVisible = true;
         renderModeSelector();
-        updateHud('Онлайн режимът е заключен. Отвори профила от линка в картата или продължи локално като гост.');
+        updateHud('Онлайн режимът е заключен. Влез в профила от линка в картата или продължи локално като гост.');
         return;
       }
       selectPlayMode(requested);
