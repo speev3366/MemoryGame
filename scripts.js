@@ -11,6 +11,7 @@ const startButton = document.getElementById('startButton');
 const newRoundButton = document.getElementById('newRoundButton');
 const exitGameButton = document.getElementById('exitGameButton');
 const playAgainButton = document.getElementById('playAgainButton');
+const mainMenuButton = document.getElementById('mainMenuButton');
 const statusBanner = document.getElementById('statusBanner');
 const gameBoard = document.getElementById('gameBoard');
 const boardFrame = document.querySelector('.board-frame');
@@ -1206,6 +1207,22 @@ function isComputerMode() {
 
 function isOnlineMode() {
   return state.playMode === 'online';
+}
+
+function hasActiveOnlineRoom() {
+  return Boolean(state.online.room && ['waiting', 'playing'].includes(state.online.room.status));
+}
+
+function returnToMainMenu(message = '') {
+  resetRoundState();
+  if (state.playMode === 'online') {
+    state.ui.onlineLobbyOpen = false;
+    app.classList.remove('online-lobby-mode');
+    onlineLobby.classList.add('hidden');
+    document.body.classList.remove('lobby-open');
+    updateAuthUi();
+  }
+  updateHud(message || 'Върна се в началното меню.');
 }
 
 function isComputerTurn() {
@@ -2546,7 +2563,7 @@ function endGame() {
   resultTitle.textContent = title;
   resultSummary.textContent = `Краен резултат — ${getPlayerName(1)}: ${state.scores[1]} • ${getPlayerName(2)}: ${state.scores[2]} • Режим: ${getModeName()} • Тема: ${THEMES[state.selectedTheme].name} • Карти: ${state.selectedCardCount}.`;
   updatePlayerPanels();
-  updateHud('Рундът приключи. Можеш да натиснеш „Играй пак“ или „Смени тема“.');
+  updateHud('Рундът приключи. Можеш да натиснеш „Играй пак“ или да се върнеш в началното меню.');
   resultModal.classList.remove('hidden');
 
   if (state.auth.user && state.playMode !== 'online') {
@@ -2999,6 +3016,15 @@ async function loadLobbyRooms() {
 }
 
 async function createRoom() {
+  if (hasActiveOnlineRoom()) {
+    const msg = state.online.room?.status === 'playing'
+      ? 'Вече имаш активна онлайн игра. Завърши я или напусни стаята преди да създадеш нова.'
+      : 'Вече имаш активна waiting стая. Използвай нея или я напусни преди да създадеш нова.';
+    showFeedback(onlineLobbyFeedback, msg, 'error');
+    updateHud(msg);
+    return;
+  }
+
   if (!state.auth.enabled || !state.auth.user) {
     updateHud('За създаване на онлайн стая трябва да си влязъл.');
     showFeedback(onlineLobbyFeedback, 'За създаване на стая трябва да си влязъл в профила си.', 'error');
@@ -3071,6 +3097,26 @@ async function createRoom() {
 
 async function joinRoomByRecord(room) {
   if (!room) return;
+  if (room.id && state.online.room?.id === room.id) {
+    const fresh = await fetchRoomById(room.id);
+    state.online.room = fresh || room;
+    syncFromOnlineRoom();
+    updateHud(`Вече си в стая ${state.online.room.code}.`);
+    return;
+  }
+  if (hasActiveOnlineRoom()) {
+    const msg = 'Вече имаш активна онлайн стая. Напусни я, преди да се присъединиш към друга.';
+    showFeedback(roomListFeedback, msg, 'error');
+    updateHud(msg);
+    return;
+  }
+  if ((room.status || 'waiting') !== 'waiting') {
+    const msg = room.status === 'playing' ? 'Тази стая вече е в игра.' : 'Тази стая вече не е достъпна за присъединяване.';
+    showFeedback(roomListFeedback, msg, 'error');
+    updateHud(msg);
+    await refreshOnlineState(true);
+    return;
+  }
   if (room.guest_user_id && room.guest_user_id !== state.auth.user.id) {
     updateHud('Тази стая вече е пълна.');
     return;
@@ -3129,6 +3175,12 @@ async function handleListedRoomJoin(roomId, accessType, roomCode = '') {
 }
 
 async function joinRoom() {
+  if (hasActiveOnlineRoom()) {
+    updateHud('Вече имаш активна онлайн стая. Напусни я, преди да се присъединиш към друга.');
+    showFeedback(onlineLobbyFeedback, 'Вече имаш активна онлайн стая. Напусни я, преди да се присъединиш към друга.', 'error');
+    return;
+  }
+
   if (!state.auth.enabled || !state.auth.user) {
     updateHud('За присъединяване към стая трябва да си влязъл.');
     return;
@@ -3269,6 +3321,10 @@ async function copyInviteLink() {
 
 async function leaveRoom(options = {}) {
   if (!state.auth.client || !state.online.room) return;
+  if (state.online.pendingTimeout) {
+    clearTimeout(state.online.pendingTimeout);
+    state.online.pendingTimeout = null;
+  }
   const room = state.online.room;
   const slot = myRoomSlot();
   const finishIfPlaying = Boolean(options.finishIfPlaying);
@@ -3330,6 +3386,15 @@ async function startOnlineMatch() {
 
   const room = state.online.room;
   if (!room || myRoomSlot() !== 1) return;
+  if (room.status !== 'waiting') {
+    updateHud('Онлайн мачът вече е стартиран или е приключил.');
+    return;
+  }
+  if (!room.guest_user_id) {
+    showFeedback(onlineLobbyFeedback, 'Нужен е втори играч, преди да стартираш онлайн мач.', 'error');
+    updateHud('Изчакай втори играч в стаята.');
+    return;
+  }
   const deck = createSerializedDeck(room.selected_theme);
   const { data, error } = await state.auth.client.from('rooms').update({
     status: 'playing',
@@ -3356,6 +3421,10 @@ async function startOnlineMatch() {
 function syncFromOnlineRoom() {
   const room = state.online.room;
   if (!room) return;
+  if (room.status !== 'playing' && state.online.pendingTimeout) {
+    clearTimeout(state.online.pendingTimeout);
+    state.online.pendingTimeout = null;
+  }
 
   state.selectedTheme = room.selected_theme;
   state.selectedCardCount = room.selected_card_count;
@@ -3495,7 +3564,8 @@ function endOnlineGame() {
   state.gameOver = true;
   const winner = room.winner_slot;
   resultTitle.textContent = winner === 0 ? 'Равенство' : `Победител: ${getPlayerName(winner)}`;
-  resultSummary.textContent = `Онлайн резултат — ${getPlayerName(1)}: ${state.scores[1]} • ${getPlayerName(2)}: ${state.scores[2]} • Код стая: ${room.code}`;
+  resultSummary.textContent = `Онлайн резултат — ${getPlayerName(1)}: ${state.scores[1]} • ${getPlayerName(2)}: ${state.scores[2]} • Код стая: ${room.code} • Тема: ${THEMES[room.selected_theme]?.name || room.selected_theme} • Карти: ${room.selected_card_count}.`;
+  updateHud('Онлайн мачът приключи. Можеш да натиснеш „Играй пак“ или да се върнеш в началното меню.');
   resultModal.classList.remove('hidden');
   updatePlayerPanels();
   updateAuthUi();
@@ -3538,10 +3608,22 @@ playAgainButton.addEventListener('click', async () => {
     if (myRoomSlot() === 1) {
       await patchRoom({ status: 'waiting', deck: [], flipped_indices: [], matched_indices: [], scores: { '1': 0, '2': 0 }, current_player_slot: 1, winner_slot: null, lock_board: false });
       updateHud('Онлайн рундът е върнат в режим за нов старт.');
+    } else {
+      updateHud('Изчакай домакина да подготви нов онлайн рунд или се върни в началното меню.');
     }
     return;
   }
   startGame();
+});
+
+mainMenuButton?.addEventListener('click', async () => {
+  if (state.playMode === 'online' && state.online.room?.status === 'finished') {
+    resultModal.classList.add('hidden');
+    returnToMainMenu('Върна се в началното меню.');
+    return;
+  }
+  resultModal.classList.add('hidden');
+  returnToMainMenu();
 });
 
 window.addEventListener('resize', () => requestAnimationFrame(resizeBoardFit));

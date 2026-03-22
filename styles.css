@@ -31,7 +31,7 @@ button { font: inherit; }
 .app {
   position: relative;
   height: 100dvh;
-  padding: 6px;
+  padding: 4px;
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 6px;
@@ -420,16 +420,18 @@ button { font: inherit; }
   padding: 20px;
 }
 .result-modal.hidden { display: none; }
-.result-card { padding: 26px; max-width: 480px; width: min(100%, 480px); text-align: center; }
+.result-card { padding: 26px; max-width: 520px; width: min(100%, 520px); text-align: center; }
 .result-card h2 { margin: 0 0 10px; font-size: 2rem; }
 .result-card p { color: var(--muted); }
+.result-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
 
-.app.setup-mode { grid-template-rows: auto; align-content: start; }
-.app.setup-mode .topbar { width: min(1420px, 97vw); margin: 0 auto; grid-template-columns: 1fr; justify-content: center; max-height: calc(100dvh - 8px); min-height: 0; }
+.app.setup-mode { grid-template-rows: auto; align-content: stretch; }
+.app.setup-mode .topbar { width: calc(100vw - 8px); max-width: none; margin: 0 auto; grid-template-columns: 1fr; justify-content: center; height: calc(100dvh - 8px); max-height: calc(100dvh - 8px); min-height: 0; }
 .app.setup-mode .center-console {
   gap: 14px;
-  padding: 22px 26px;
-  max-height: calc(100dvh - 12px);
+  padding: 20px 22px 18px;
+  height: 100%;
+  max-height: calc(100dvh - 8px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -874,7 +876,7 @@ button { font: inherit; }
 @media (max-width: 980px) {
   .title-bar { flex-direction: column; }
   .lobby-create-grid { grid-template-columns: 1fr; }
-  .app.setup-mode .topbar { width: min(98vw, 1420px); }
+  .app.setup-mode .topbar { width: calc(100vw - 8px); }
 }
 
 @media (max-width: 900px) {
@@ -1476,7 +1478,7 @@ body.lobby-open { overflow: hidden; }
 }
 
 
-/* ==== V7.5.4 online card polish ==== */
+/* ==== V7.5.5 setup + online card polish ==== */
 .app {
   border-radius: 28px;
   overflow: hidden;
@@ -1492,54 +1494,55 @@ body.lobby-open { overflow: hidden; }
 }
 
 .mode-option.locked[data-mode="online"] {
-  display: grid;
-  gap: 8px;
-  padding-right: 198px;
   min-height: 118px;
-}
-
-.mode-option.locked[data-mode="online"] .mode-badge,
-.mode-option.locked[data-mode="online"] strong,
-.mode-option.locked[data-mode="online"] > p {
-  grid-area: auto;
-}
-
-.mode-option.locked[data-mode="online"] > p {
-  max-width: 260px;
+  padding-right: 16px;
 }
 
 .mode-option.locked[data-mode="online"] .mode-preview {
   position: absolute;
   top: 14px;
-  right: 14px;
+  right: 16px;
   left: auto;
   bottom: auto;
-  width: 182px;
-  min-height: 72px;
-  margin-top: 0;
-  padding: 12px 14px;
-  align-items: flex-start;
-  justify-content: space-between;
+  margin: 0;
+  min-height: 0;
+  width: auto;
+  max-width: min(58%, 360px);
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.05));
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .mode-option.locked[data-mode="online"] .mode-preview p {
-  font-size: 0.8rem;
-  line-height: 1.25;
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.1;
   color: var(--muted);
-  margin: 0 0 6px;
+  white-space: nowrap;
+}
+
+.mode-option.locked[data-mode="online"] .mode-preview-link {
+  font-size: 0.72rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 @media (max-width: 1200px) {
-  .mode-option.locked[data-mode="online"] {
-    padding-right: 190px;
-  }
-
-  .mode-option.locked[data-mode="online"] > p {
-    max-width: 220px;
-  }
-
   .mode-option.locked[data-mode="online"] .mode-preview {
-    width: 170px;
+    max-width: min(54%, 320px);
+    padding: 6px 10px;
+    gap: 8px;
+  }
+
+  .mode-option.locked[data-mode="online"] .mode-preview p,
+  .mode-option.locked[data-mode="online"] .mode-preview-link {
+    font-size: 0.7rem;
   }
 }
 
@@ -1556,6 +1559,7 @@ body.lobby-open { overflow: hidden; }
   .mode-option.locked[data-mode="online"] .mode-preview {
     position: static;
     width: auto;
+    max-width: none;
     min-height: 0;
     margin-top: 8px;
   }
@@ -1563,10 +1567,5 @@ body.lobby-open { overflow: hidden; }
   .mode-option.locked[data-mode="online"] {
     padding-right: 16px;
     min-height: auto;
-  }
-
-  .mode-option.locked[data-mode="online"] strong,
-  .mode-option.locked[data-mode="online"] > p {
-    max-width: none;
   }
 }
