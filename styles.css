@@ -1487,7 +1487,7 @@ body.lobby-open { overflow: hidden; }
 }
 
 
-/* ==== V7.5.5 setup + online card polish ==== */
+/* ==== V7.5.6 setup + online auth polish ==== */
 .app {
   border-radius: 28px;
   overflow: hidden;
@@ -1580,7 +1580,7 @@ body.lobby-open { overflow: hidden; }
 }
 
 
-/* ==== V7.5.5 invite landing focus ==== */
+/* ==== V7.5.6 invite landing focus ==== */
 .online-lobby.invite-preview-mode .lobby-create-grid,
 .online-lobby.invite-preview-mode .online-match-grid,
 .online-lobby.invite-preview-mode .auth-grid.two-col,

@@ -787,7 +787,7 @@ function friendlyAuthError(error) {
   if (code === 'email_address_invalid') return 'Имейлът не е валиден.';
   if (code === 'weak_password') return 'Паролата е твърде слаба.';
   if (code === 'validation_failed') return 'Провери полетата и опитай отново.';
-  if (normalized.includes('invalid login credentials')) return 'Невалиден имейл или парола.';
+  if (normalized.includes('invalid login credentials')) return 'Невалиден имейл/username или парола.';
   if (normalized.includes('email not confirmed')) return 'Потвърди имейла си и опитай отново.';
   if (normalized.includes('user already registered')) return 'Вече има профил с този имейл.';
   if (normalized.includes('password should be at least')) return 'Паролата е твърде кратка.';
@@ -1035,9 +1035,31 @@ function resolveInviteTokenFromUrl() {
   state.ui.inviteToken = params.get('invite') || null;
 }
 
+function clearInviteTokenFromUrl() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('invite')) return;
+  url.searchParams.delete('invite');
+  window.history.replaceState({}, '', url.toString());
+}
+
+function clearInviteContext() {
+  state.ui.inviteToken = null;
+  state.online.invitePreview = null;
+  clearInviteTokenFromUrl();
+}
+
+function clearInviteContextIfRoomClaimed(room = state.online.room) {
+  if (!state.ui.inviteToken || !room) return false;
+  if (room.invite_token && room.invite_token === state.ui.inviteToken) {
+    clearInviteContext();
+    return true;
+  }
+  return false;
+}
+
 function getLoginValues() {
   return {
-    email: loginEmail.value.trim(),
+    identifier: loginEmail.value.trim(),
     password: loginPassword.value
   };
 }
@@ -1061,14 +1083,22 @@ function focusFirstInvalidField(pairs) {
 function validateLoginForm() {
   clearAllValidation();
   let valid = true;
-  const { email, password } = getLoginValues();
+  const { identifier, password } = getLoginValues();
+  const normalizedIdentifier = identifier.trim();
 
-  if (!email) {
-    setFieldError(loginEmailField, loginEmailError, 'Въведи имейл.');
+  if (!normalizedIdentifier) {
+    setFieldError(loginEmailField, loginEmailError, 'Въведи имейл или username.');
     valid = false;
-  } else if (!validateEmail(email)) {
-    setFieldError(loginEmailField, loginEmailError, 'Имейлът не е валиден.');
-    valid = false;
+  } else {
+    const usernameCandidate = normalizedIdentifier.startsWith('@') ? normalizedIdentifier.slice(1) : normalizedIdentifier;
+    const looksLikeEmail = normalizedIdentifier.includes('@');
+    if (looksLikeEmail && !validateEmail(normalizedIdentifier)) {
+      setFieldError(loginEmailField, loginEmailError, 'Имейлът не е валиден.');
+      valid = false;
+    } else if (!looksLikeEmail && !validateUsername(usernameCandidate)) {
+      setFieldError(loginEmailField, loginEmailError, 'Username-ът трябва да е 3–24 символа: букви, цифри или _.');
+      valid = false;
+    }
   }
 
   if (!password) {
@@ -1077,6 +1107,75 @@ function validateLoginForm() {
   }
 
   return valid;
+}
+
+async function resolveLoginEmail(identifier) {
+  const normalizedIdentifier = String(identifier || '').trim();
+  if (!normalizedIdentifier) return { email: '', error: 'Въведи имейл или username.' };
+  if (validateEmail(normalizedIdentifier)) {
+    return { email: normalizedIdentifier.toLowerCase(), mode: 'email' };
+  }
+
+  const username = normalizedIdentifier.startsWith('@') ? normalizedIdentifier.slice(1) : normalizedIdentifier;
+  if (!validateUsername(username)) {
+    return { email: '', error: 'Username-ът трябва да е 3–24 символа: букви, цифри или _.' };
+  }
+  if (!state.auth.client) {
+    return { email: '', error: 'Няма активна Supabase връзка.' };
+  }
+
+  let { data, error } = await state.auth.client
+    .from('profiles')
+    .select('email, username')
+    .eq('username', username)
+    .maybeSingle();
+
+  if (!data && !error) {
+    const fallback = await state.auth.client
+      .from('profiles')
+      .select('email, username')
+      .ilike('username', username)
+      .limit(2);
+    if (!fallback.error && Array.isArray(fallback.data) && fallback.data.length === 1) {
+      data = fallback.data[0];
+    } else if (fallback.error) {
+      error = fallback.error;
+    }
+  }
+
+  if (error) {
+    return { email: '', error: 'Не успях да намеря профил за този username.' };
+  }
+  if (!data?.email) {
+    return { email: '', error: 'Няма профил с този username или профилът няма имейл за вход.' };
+  }
+
+  return { email: data.email, mode: 'username', matchedUsername: data.username || username };
+}
+
+async function restoreOnlineSessionAfterAuth(options = {}) {
+  const { preferInviteToken = false } = options;
+  await loadInvitePreview();
+  await loadMyActiveRoom({ preferInviteToken });
+
+  const canAdoptLoadedRoom = !state.ui.inviteToken || !state.online.invitePreview?.id || state.online.room?.id === state.online.invitePreview.id;
+  if (state.online.room && canAdoptLoadedRoom) {
+    clearInviteContextIfRoomClaimed(state.online.room);
+    state.playMode = 'online';
+    renderModeSelector();
+    await subscribeToRoom(state.online.room.id);
+    if (state.online.room.status === 'waiting') {
+      setOnlineLobbyOpen(true);
+    }
+    syncFromOnlineRoom();
+  } else if (state.ui.inviteToken) {
+    state.online.room = null;
+    state.playMode = 'online';
+    renderModeSelector();
+    setOnlineLobbyOpen(true);
+  }
+
+  await loadLobbyRooms();
 }
 
 function validateRegisterForm() {
@@ -2768,21 +2867,7 @@ async function initAuth() {
     clearGuestState();
     await loadProfile();
     await loadMatchHistory();
-    await loadMyActiveRoom({ preferInviteToken: Boolean(state.ui.inviteToken) });
-    const canAdoptLoadedRoom = !state.ui.inviteToken || !state.online.invitePreview?.id || state.online.room?.id === state.online.invitePreview.id;
-    if (state.online.room && canAdoptLoadedRoom) {
-      state.playMode = 'online';
-      renderModeSelector();
-      await subscribeToRoom(state.online.room.id);
-      if (state.online.room.status === 'waiting') setOnlineLobbyOpen(true);
-      syncFromOnlineRoom();
-    } else if (state.ui.inviteToken) {
-      state.online.room = null;
-      state.playMode = 'online';
-      renderModeSelector();
-      setOnlineLobbyOpen(true);
-    }
-    await loadLobbyRooms();
+    await restoreOnlineSessionAfterAuth({ preferInviteToken: Boolean(state.ui.inviteToken) });
   }
 
   state.auth.client.auth.onAuthStateChange(async (_event, session) => {
@@ -2791,22 +2876,7 @@ async function initAuth() {
       clearGuestState();
       await loadProfile();
       await loadMatchHistory();
-      await loadInvitePreview();
-      await loadMyActiveRoom({ preferInviteToken: Boolean(state.ui.inviteToken) });
-      const canAdoptLoadedRoom = !state.ui.inviteToken || !state.online.invitePreview?.id || state.online.room?.id === state.online.invitePreview.id;
-      if (state.online.room && canAdoptLoadedRoom) {
-        state.playMode = 'online';
-        renderModeSelector();
-        await subscribeToRoom(state.online.room.id);
-        if (state.online.room.status === 'waiting') setOnlineLobbyOpen(true);
-        syncFromOnlineRoom();
-      } else if (state.ui.inviteToken) {
-        state.online.room = null;
-        state.playMode = 'online';
-        renderModeSelector();
-        setOnlineLobbyOpen(true);
-      }
-      await loadLobbyRooms();
+      await restoreOnlineSessionAfterAuth({ preferInviteToken: Boolean(state.ui.inviteToken) });
     } else {
       state.auth.profile = null;
       state.auth.history = [];
@@ -2902,8 +2972,8 @@ function updateAuthUi() {
     : loggedIn
       ? `Влязъл си като ${getDisplayName()}. Онлайн режимът е активен, waiting room-ът е отключен и историята се пази.`
       : state.ui.inviteToken
-        ? 'Поканата е разпозната. Влез в профила си, регистрирай се или използвай временен гост вход, за да приемеш поканата.'
-        : 'Влез или се регистрирай, за да отключиш онлайн режима. Като гост можеш да продължиш локално.';
+        ? 'Поканата е разпозната. Влез с имейл или username, регистрирай се или използвай временен гост вход, за да приемеш поканата.'
+        : 'Влез с имейл или username, или се регистрирай, за да отключиш онлайн режима. Като гост можеш да продължиш локално.';
 
   guestPreview.textContent = createGuestName();
   guestBanner.classList.toggle('hidden', loggedIn);
@@ -3061,8 +3131,8 @@ async function loginUser(event) {
 
   const values = getLoginValues();
   const valid = validateLoginForm();
-  if (!valid || !values.email || !values.password) {
-    showFeedback(loginFeedback, 'Попълни имейл и парола.', 'error');
+  if (!valid || !values.identifier || !values.password) {
+    showFeedback(loginFeedback, 'Попълни имейл или username и парола.', 'error');
     focusFirstInvalidField([[loginEmailField],[loginPasswordField]]);
     return;
   }
@@ -3073,8 +3143,17 @@ async function loginUser(event) {
   loginButton.disabled = true;
   showFeedback(loginFeedback, 'Проверяваме данните...', '');
 
+  const resolved = await resolveLoginEmail(values.identifier);
+  if (!resolved.email) {
+    loginButton.disabled = false;
+    setFieldError(loginEmailField, loginEmailError, resolved.error || 'Невалиден имейл или username.');
+    showFeedback(loginFeedback, `Грешка при вход: ${resolved.error || 'Невалиден имейл или username.'}`, 'error');
+    updateHud(`Грешка при вход: ${resolved.error || 'Невалиден имейл или username.'}`);
+    return;
+  }
+
   const { error } = await state.auth.client.auth.signInWithPassword({
-    email: values.email,
+    email: resolved.email,
     password: values.password
   });
 
@@ -3088,10 +3167,13 @@ async function loginUser(event) {
 
   await loadProfile();
   await loadMatchHistory();
-  player1NameInput.value = sanitizeName(state.auth.profile?.first_name || state.auth.profile?.username || values.email.split('@')[0], 'Играч 1');
+  player1NameInput.value = sanitizeName(
+    state.auth.profile?.first_name || state.auth.profile?.username || resolved.matchedUsername || resolved.email.split('@')[0],
+    'Играч 1'
+  );
   toggleProfilePanel(false);
-  showFeedback(loginFeedback, 'Успешен вход.', 'success');
-  updateHud('Успешен вход. Вече можеш да играеш онлайн.');
+  showFeedback(loginFeedback, resolved.mode === 'username' ? 'Успешен вход с username.' : 'Успешен вход.', 'success');
+  updateHud(state.ui.inviteToken ? 'Успешен вход. Зареждаме поканената стая...' : 'Успешен вход. Вече можеш да играеш онлайн.');
   if (state.ui.inviteToken) {
     setOnlineLobbyOpen(true);
     await joinInviteFromToken();
@@ -3174,14 +3256,17 @@ async function loadMyActiveRoom(options = {}) {
   }
   if (room.status === 'finished') {
     state.online.room = null;
+    if (room.invite_token && room.invite_token === state.ui.inviteToken) clearInviteContext();
     return null;
   }
   if (isRoomInactive(room)) {
     await autoFinishRoomForInactivity(room, { keepLocalState: false });
     state.online.room = null;
+    if (room.invite_token && room.invite_token === state.ui.inviteToken) clearInviteContext();
     return null;
   }
   state.online.room = room;
+  clearInviteContextIfRoomClaimed(room);
   return room;
 }
 
@@ -3279,10 +3364,7 @@ async function createRoom() {
   await loadLobbyRooms();
   syncFromOnlineRoom();
   if (state.online.room.access_type !== 'invite') {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('invite');
-    window.history.replaceState({}, '', url.toString());
-    state.ui.inviteToken = null;
+    clearInviteContext();
   }
   const successMessage = state.online.room.access_type === 'invite'
     ? `${replacingExistingWaitingRoom ? 'Старата стая беше затворена. ' : ''}Invite стаята е създадена. Копирай линка и го изпрати на опонента.`
@@ -3442,6 +3524,7 @@ async function joinInviteFromToken() {
   renderModeSelector();
   setOnlineLobbyOpen(true);
   state.online.room = (await fetchRoomById(joinedRoom.id)) || joinedRoom;
+  clearInviteContextIfRoomClaimed(state.online.room);
   state.selectedTheme = state.online.room.selected_theme;
   state.selectedCardCount = state.online.room.selected_card_count;
   await subscribeToRoom(state.online.room.id);
@@ -3572,6 +3655,7 @@ async function leaveRoom(options = {}) {
       await state.auth.client.from('rooms').update({ guest_user_id: null, guest_name: null, status: room.status === 'playing' ? 'finished' : room.status, winner_slot: room.status === 'playing' ? 1 : room.winner_slot }).eq('id', room.id);
     }
   } finally {
+    if (room?.invite_token && room.invite_token === state.ui.inviteToken) clearInviteContext();
     state.online.room = null;
     if (stayOnline) {
       resetRoundState();
