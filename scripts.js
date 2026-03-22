@@ -336,6 +336,8 @@ const BOARD_LAYOUTS = {
 };
 
 const ASSET_CACHE = {};
+const ONLINE_INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
+const ONLINE_AUTO_FINISH_WINNER_SLOT = -1;
 
 const state = {
   selectedTheme: null,
@@ -370,7 +372,8 @@ const state = {
     pendingProtectedRoomId: null,
     inviteToken: null,
     onlinePreviewVisible: false,
-    onlineLobbyOpen: false
+    onlineLobbyOpen: false,
+    persistentNotice: ''
   },
   online: {
     room: null,
@@ -382,6 +385,7 @@ const state = {
     selectedCardCount: null,
     invitePreview: null,
     refreshBusy: false,
+    autoFinishing: false,
     lastRefreshAt: 0,
     lastTimeoutKey: null
   },
@@ -522,6 +526,63 @@ async function fetchRoomById(roomId) {
   return data || null;
 }
 
+function getRoomActivityTime(room) {
+  if (!room) return 0;
+  const candidate = room.updated_at || room.turn_started_at || room.created_at || null;
+  if (!candidate) return 0;
+  const value = new Date(candidate).getTime();
+  return Number.isFinite(value) ? value : 0;
+}
+
+function isRoomInactive(room) {
+  return Boolean(room && room.status === 'playing' && getRoomActivityTime(room) && (Date.now() - getRoomActivityTime(room) >= ONLINE_INACTIVITY_LIMIT_MS));
+}
+
+function queuePersistentNotice(message = '') {
+  state.ui.persistentNotice = message || '';
+}
+
+async function autoFinishRoomForInactivity(room, options = {}) {
+  if (!state.auth.client || !room?.id) return null;
+  if (state.online.autoFinishing) return null;
+  const { keepLocalState = true } = options;
+  if (room.status === 'finished' && Number(room.winner_slot) === ONLINE_AUTO_FINISH_WINNER_SLOT) return room;
+  if (!isRoomInactive(room) && room.status !== 'finished') return null;
+
+  state.online.autoFinishing = true;
+  try {
+    let data = room;
+    if (room.status !== 'finished') {
+      const response = await state.auth.client
+        .from('rooms')
+        .update({
+          status: 'finished',
+          winner_slot: ONLINE_AUTO_FINISH_WINNER_SLOT,
+          lock_board: false,
+          flipped_indices: []
+        })
+        .eq('id', room.id)
+        .eq('status', 'playing')
+        .select()
+        .maybeSingle();
+      if (response.error) return null;
+      data = response.data || (await fetchRoomById(room.id)) || room;
+    }
+
+    if (!keepLocalState) {
+      queuePersistentNotice('Предишната онлайн игра беше приключена автоматично поради липса на активност над 15 минути.');
+      if (state.online.room?.id === room.id) state.online.room = null;
+      return data;
+    }
+
+    state.online.room = data;
+    syncFromOnlineRoom();
+    return data;
+  } finally {
+    state.online.autoFinishing = false;
+  }
+}
+
 function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -624,8 +685,12 @@ async function refreshOnlineState(force = false) {
     if (state.online.room?.id) {
       const fresh = await fetchRoomById(state.online.room.id);
       if (fresh) {
-        state.online.room = fresh;
-        syncFromOnlineRoom();
+        if (isRoomInactive(fresh)) {
+          await autoFinishRoomForInactivity(fresh, { keepLocalState: true });
+        } else {
+          state.online.room = fresh;
+          syncFromOnlineRoom();
+        }
       } else if (state.online.room) {
         state.online.room = null;
         if (state.playMode === 'online') {
@@ -1107,8 +1172,9 @@ function renderProfilePanel() {
     const myScore = amPlayer1 ? match.player1_score : match.player2_score;
     const opponentScore = amPlayer1 ? match.player2_score : match.player1_score;
     const opponentName = amPlayer1 ? match.player2_name : match.player1_name;
-    const resultClass = match.winner_user_id === state.auth.user.id ? 'win' : (match.winner_slot === 0 || match.winner_user_id === null ? 'draw' : 'loss');
-    const resultText = resultClass === 'win' ? 'Победа' : (resultClass === 'loss' ? 'Загуба' : 'Равенство');
+    const autoFinished = Number(match.winner_slot) === ONLINE_AUTO_FINISH_WINNER_SLOT;
+    const resultClass = autoFinished ? 'draw' : (match.winner_user_id === state.auth.user.id ? 'win' : (match.winner_slot === 0 || match.winner_user_id === null ? 'draw' : 'loss'));
+    const resultText = autoFinished ? 'Прекратена' : (resultClass === 'win' ? 'Победа' : (resultClass === 'loss' ? 'Загуба' : 'Равенство'));
     const modeText = match.mode === 'online' ? 'Онлайн' : match.mode === 'computer' ? 'Срещу компютър' : 'Локално';
     const themeName = THEMES[match.theme_key]?.name || match.theme_key;
     return `
@@ -1214,8 +1280,14 @@ function hasActiveOnlineRoom() {
 }
 
 function returnToMainMenu(message = '') {
+  queuePersistentNotice('');
   resetRoundState();
   if (state.playMode === 'online') {
+    if (state.online.room?.status === 'finished') {
+      if (state.online.channel && state.auth.client) state.auth.client.removeChannel(state.online.channel);
+      state.online.channel = null;
+      state.online.room = null;
+    }
     state.ui.onlineLobbyOpen = false;
     app.classList.remove('online-lobby-mode');
     onlineLobby.classList.add('hidden');
@@ -1482,7 +1554,13 @@ function updateHud(message) {
   turnChip.textContent = state.gameOver ? 'Рундът приключи' : `Ред: ${getPlayerName(state.currentPlayer)}`;
 
   if (message) {
+    queuePersistentNotice('');
     statusBanner.textContent = message;
+    return;
+  }
+
+  if (state.ui.persistentNotice) {
+    statusBanner.textContent = state.ui.persistentNotice;
     return;
   }
 
@@ -2965,7 +3043,11 @@ async function subscribeToRoom(roomId) {
       }
       state.online.room = payload.new;
       await loadLobbyRooms();
-      syncFromOnlineRoom();
+      if (isRoomInactive(payload.new)) {
+        await autoFinishRoomForInactivity(payload.new, { keepLocalState: true });
+      } else {
+        syncFromOnlineRoom();
+      }
     });
 
   await state.online.channel.subscribe();
@@ -2992,8 +3074,21 @@ async function loadMyActiveRoom() {
   const { data, error } = await state.auth.client.rpc('get_my_active_room');
   if (error) return null;
   const room = normalizeRpcSingle(data);
-  state.online.room = room || null;
-  return room || null;
+  if (!room) {
+    state.online.room = null;
+    return null;
+  }
+  if (room.status === 'finished') {
+    state.online.room = null;
+    return null;
+  }
+  if (isRoomInactive(room)) {
+    await autoFinishRoomForInactivity(room, { keepLocalState: false });
+    state.online.room = null;
+    return null;
+  }
+  state.online.room = room;
+  return room;
 }
 
 async function loadLobbyRooms() {
@@ -3320,52 +3415,69 @@ async function copyInviteLink() {
 }
 
 async function leaveRoom(options = {}) {
-  if (!state.auth.client || !state.online.room) return;
+  const room = state.online.room;
+  const finishIfPlaying = Boolean(options.finishIfPlaying);
+
   if (state.online.pendingTimeout) {
     clearTimeout(state.online.pendingTimeout);
     state.online.pendingTimeout = null;
   }
-  const room = state.online.room;
-  const slot = myRoomSlot();
-  const finishIfPlaying = Boolean(options.finishIfPlaying);
 
-  if (state.online.channel) {
+  if (state.online.channel && state.auth.client) {
     await state.auth.client.removeChannel(state.online.channel);
     state.online.channel = null;
   }
 
-  if (finishIfPlaying && room.status === 'playing') {
-    const winnerSlot = slot === 1 ? 2 : 1;
-    await state.auth.client.from('rooms').update({
-      status: 'finished',
-      winner_slot: (room.guest_user_id || slot === 2) ? winnerSlot : null,
-      lock_board: false,
-      flipped_indices: []
-    }).eq('id', room.id);
-  } else if (slot === 1 && !room.guest_user_id) {
-    await state.auth.client.from('rooms').delete().eq('id', room.id);
-  } else if (slot === 1) {
-    await state.auth.client.from('rooms').update({ host_user_id: room.guest_user_id, host_name: room.guest_name, guest_user_id: null, guest_name: null, status: 'waiting' }).eq('id', room.id);
-  } else if (slot === 2) {
-    await state.auth.client.from('rooms').update({ guest_user_id: null, guest_name: null, status: room.status === 'playing' ? 'finished' : room.status, winner_slot: room.status === 'playing' ? 1 : room.winner_slot }).eq('id', room.id);
+  if (!state.auth.client || !room) {
+    state.online.room = null;
+    state.playMode = 'local';
+    renderModeSelector();
+    resetRoundState();
+    updateAuthUi();
+    return;
   }
 
-  state.online.room = null;
-  state.playMode = 'local';
-  renderModeSelector();
-  resetRoundState();
-  await loadLobbyRooms();
-  updateAuthUi();
+  const slot = myRoomSlot();
+
+  try {
+    if (finishIfPlaying && room.status === 'playing') {
+      const winnerSlot = slot === 1 ? 2 : 1;
+      await state.auth.client.from('rooms').update({
+        status: 'finished',
+        winner_slot: (room.guest_user_id || slot === 2) ? winnerSlot : null,
+        lock_board: false,
+        flipped_indices: []
+      }).eq('id', room.id);
+    } else if (slot === 1 && !room.guest_user_id) {
+      await state.auth.client.from('rooms').delete().eq('id', room.id);
+    } else if (slot === 1) {
+      await state.auth.client.from('rooms').update({ host_user_id: room.guest_user_id, host_name: room.guest_name, guest_user_id: null, guest_name: null, status: 'waiting' }).eq('id', room.id);
+    } else if (slot === 2) {
+      await state.auth.client.from('rooms').update({ guest_user_id: null, guest_name: null, status: room.status === 'playing' ? 'finished' : room.status, winner_slot: room.status === 'playing' ? 1 : room.winner_slot }).eq('id', room.id);
+    }
+  } finally {
+    state.online.room = null;
+    state.playMode = 'local';
+    renderModeSelector();
+    resetRoundState();
+    await loadLobbyRooms();
+    updateAuthUi();
+  }
 }
 
 async function exitCurrentGame() {
-  if (state.playMode === 'online' && state.online.room) {
-    await leaveRoom({ finishIfPlaying: true });
-    updateHud('Онлайн играта беше прекратена и стаята е приключена.');
-    return;
+  if (exitGameButton) exitGameButton.disabled = true;
+  try {
+    if (state.playMode === 'online' && state.online.room) {
+      await leaveRoom({ finishIfPlaying: true });
+      returnToMainMenu('Онлайн играта беше прекратена и стаята е приключена.');
+      return;
+    }
+    resetRoundState();
+    updateHud('Излезе от текущата игра.');
+  } finally {
+    if (exitGameButton) exitGameButton.disabled = false;
   }
-  resetRoundState();
-  updateHud('Излезе от текущата игра.');
 }
 
 function resumeOnlineSession() {
@@ -3562,10 +3674,17 @@ function endOnlineGame() {
   if (!room) return;
   state.started = false;
   state.gameOver = true;
-  const winner = room.winner_slot;
-  resultTitle.textContent = winner === 0 ? 'Равенство' : `Победител: ${getPlayerName(winner)}`;
-  resultSummary.textContent = `Онлайн резултат — ${getPlayerName(1)}: ${state.scores[1]} • ${getPlayerName(2)}: ${state.scores[2]} • Код стая: ${room.code} • Тема: ${THEMES[room.selected_theme]?.name || room.selected_theme} • Карти: ${room.selected_card_count}.`;
-  updateHud('Онлайн мачът приключи. Можеш да натиснеш „Играй пак“ или да се върнеш в началното меню.');
+  const winner = Number(room.winner_slot);
+  const autoFinished = winner === ONLINE_AUTO_FINISH_WINNER_SLOT;
+  resultTitle.textContent = autoFinished
+    ? 'Играта е приключена автоматично'
+    : (winner === 0 ? 'Равенство' : `Победител: ${getPlayerName(winner)}`);
+  resultSummary.textContent = autoFinished
+    ? `Онлайн играта беше прекратена автоматично поради липса на активност над 15 минути. Текущ резултат — ${getPlayerName(1)}: ${state.scores[1]} • ${getPlayerName(2)}: ${state.scores[2]} • Код стая: ${room.code} • Тема: ${THEMES[room.selected_theme]?.name || room.selected_theme} • Карти: ${room.selected_card_count}.`
+    : `Онлайн резултат — ${getPlayerName(1)}: ${state.scores[1]} • ${getPlayerName(2)}: ${state.scores[2]} • Код стая: ${room.code} • Тема: ${THEMES[room.selected_theme]?.name || room.selected_theme} • Карти: ${room.selected_card_count}.`;
+  updateHud(autoFinished
+    ? 'Онлайн играта се приключва автоматично поради липса на активност.'
+    : 'Онлайн мачът приключи. Можеш да натиснеш „Играй пак“ или да се върнеш в началното меню.');
   resultModal.classList.remove('hidden');
   updatePlayerPanels();
   updateAuthUi();
