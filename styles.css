@@ -1411,3 +1411,25 @@ body.lobby-open { overflow: hidden; }
     max-width: none;
   }
 }
+
+
+.room-row-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.room-row-own {
+  border-color: rgba(105, 212, 255, 0.32);
+  box-shadow: 0 18px 42px rgba(16, 119, 255, 0.16);
+}
+.room-row-own .room-row-title::before {
+  content: '★ ';
+  color: #7dd3fc;
+}
+@media (max-width: 720px) {
+  .room-row-bottom {
+    align-items: stretch;
+  }
+}

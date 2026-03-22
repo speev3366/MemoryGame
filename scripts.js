@@ -371,7 +371,10 @@ const state = {
     channel: null,
     pendingTimeout: null,
     publicRooms: [],
-    accessType: 'public'
+    accessType: 'public',
+    selectedTheme: null,
+    selectedCardCount: null,
+    invitePreview: null
   },
   aiTurnTimeout: null
 };
@@ -483,6 +486,26 @@ function getInviteUrl(token) {
   const url = new URL(window.location.href);
   url.searchParams.set('invite', token);
   return url.toString();
+}
+
+function normalizeRpcSingle(data) {
+  if (Array.isArray(data)) return data[0] || null;
+  return data || null;
+}
+
+function isValidOnlineTheme(value) {
+  return Boolean(value && THEMES[value]);
+}
+
+function isValidOnlineCount(value) {
+  return COUNT_OPTIONS.includes(Number(value));
+}
+
+async function fetchRoomById(roomId) {
+  if (!state.auth.client || !roomId) return null;
+  const { data, error } = await state.auth.client.from('rooms').select('*').eq('id', roomId).maybeSingle();
+  if (error) return null;
+  return data || null;
 }
 
 function escapeHtml(value) {
@@ -600,15 +623,28 @@ function setOnlineLobbyOpen(force) {
   document.body.classList.toggle('lobby-open', open);
   onlineLobby.classList.toggle('hidden', !open);
   if (open) {
-    if (!state.selectedTheme) state.selectedTheme = 'sports';
-    if (!state.selectedCardCount) state.selectedCardCount = 20;
-    renderThemeSelector();
-    renderCountSelector();
+    if (state.online.room) {
+      state.online.selectedTheme = state.online.room.selected_theme || state.online.selectedTheme;
+      state.online.selectedCardCount = state.online.room.selected_card_count || state.online.selectedCardCount;
+      state.online.accessType = ROOM_ACCESS_OPTIONS[state.online.room.access_type] ? state.online.room.access_type : state.online.accessType;
+    } else {
+      state.online.selectedTheme = null;
+      state.online.selectedCardCount = null;
+      state.online.accessType = ROOM_ACCESS_OPTIONS[state.online.accessType] ? state.online.accessType : 'public';
+    }
+    renderRoomAccessSelector();
     renderOnlineThemeSelector();
     renderOnlineCountSelector();
     toggleProfilePanel(false);
     window.scrollTo(0, 0);
-    showFeedback(onlineLobbyFeedback, 'Избери тип стая, тема и брой карти, после създай стаята.', '');
+    const hasRoom = Boolean(state.online.room);
+    showFeedback(
+      onlineLobbyFeedback,
+      hasRoom
+        ? 'Стаята е активна. Изчакай втория играч или натисни „Старт онлайн“, когато и двамата сте вътре.'
+        : 'Избери тип стая, тема и брой карти, после създай стаята.',
+      hasRoom ? 'success' : ''
+    );
   }
 }
 
@@ -665,28 +701,64 @@ function renderRoomList() {
     showFeedback(roomListFeedback, 'Влез в профила си, за да виждаш отворените онлайн стаи.', '');
     return;
   }
-  if (!state.online.publicRooms.length) {
+
+  const ownRoom = state.online.room && state.online.room.status === 'waiting'
+    ? state.online.room
+    : null;
+  const rooms = [...state.online.publicRooms];
+  const cards = [];
+
+  if (ownRoom && ['public', 'password'].includes(ownRoom.access_type || 'public')) {
+    cards.push(`
+      <article class="room-row room-row-own">
+        <div class="room-row-top">
+          <div>
+            <div class="room-row-title">Твоята стая • ${escapeHtml(ownRoom.host_name || 'Домакин')}</div>
+            <div class="room-row-meta">Код ${escapeHtml(ownRoom.code)} • ${escapeHtml(THEMES[ownRoom.selected_theme]?.name || ownRoom.selected_theme)} • ${ownRoom.selected_card_count} карти</div>
+          </div>
+          <span class="room-state-pill ${ownRoom.access_type || 'public'}">${ROOM_ACCESS_OPTIONS[ownRoom.access_type || 'public']?.name || 'Свободно'}</span>
+        </div>
+        <div class="room-row-bottom">
+          <div class="room-row-meta">${ownRoom.guest_user_id ? '👥 Вторият играч е влязъл. Можеш да натиснеш „Старт онлайн“.' : '⌛ Стаята чака втори играч.'}</div>
+          <button class="btn btn-secondary btn-small" type="button" disabled>Домакин</button>
+        </div>
+      </article>
+    `);
+  }
+
+  if (rooms.length) {
+    cards.push(...rooms.map((room) => `
+      <article class="room-row">
+        <div class="room-row-top">
+          <div>
+            <div class="room-row-title">${escapeHtml(room.host_name || 'Домакин')}</div>
+            <div class="room-row-meta">Код ${escapeHtml(room.code)} • ${escapeHtml(THEMES[room.selected_theme]?.name || room.selected_theme)} • ${room.selected_card_count} карти</div>
+          </div>
+          <span class="room-state-pill ${room.access_type || 'public'}">${ROOM_ACCESS_OPTIONS[room.access_type || 'public']?.name || 'Свободно'}</span>
+        </div>
+        <div class="room-row-bottom">
+          <div class="room-row-meta">${room.access_type === 'password' ? '🔐 Изисква парола' : room.access_type === 'invite' ? '🔗 Само с линк' : '🌐 Отворена за всеки'} • Създадена ${formatDateTime(room.created_at)}</div>
+          <button class="btn btn-secondary btn-small room-join-btn" data-room-id="${room.id}" data-access="${room.access_type || 'public'}" data-code="${room.code}" type="button">${room.access_type === 'password' ? 'Въведи парола' : 'Влез'}</button>
+        </div>
+      </article>
+    `));
+  }
+
+  if (!cards.length) {
     roomList.innerHTML = '';
     showFeedback(roomListFeedback, 'В момента няма свободни стаи. Създай първата.', '');
     return;
   }
-  showFeedback(roomListFeedback, `Намерени са ${state.online.publicRooms.length} свободни стаи.`, 'success');
-  roomList.innerHTML = state.online.publicRooms.map((room) => `
-    <article class="room-row">
-      <div class="room-row-top">
-        <div>
-          <div class="room-row-title">${escapeHtml(room.host_name || 'Домакин')}</div>
-          <div class="room-row-meta">Код ${escapeHtml(room.code)} • ${escapeHtml(THEMES[room.selected_theme]?.name || room.selected_theme)} • ${room.selected_card_count} карти</div>
-        </div>
-        <span class="room-state-pill ${room.access_type || 'public'}">${ROOM_ACCESS_OPTIONS[room.access_type || 'public']?.name || 'Свободно'}</span>
-      </div>
-      <div class="room-row-bottom">
-        <div class="room-row-meta">${room.access_type === 'password' ? '🔐 Изисква парола' : room.access_type === 'invite' ? '🔗 Само с линк' : '🌐 Отворена за всеки'} • Създадена ${formatDateTime(room.created_at)}</div>
-        <button class="btn btn-secondary btn-small room-join-btn" data-room-id="${room.id}" data-access="${room.access_type || 'public'}" data-code="${room.code}" type="button">${room.access_type === 'password' ? 'Въведи парола' : 'Влез'} </button>
-      </div>
-    </article>
-  `).join('');
 
+  if (ownRoom && rooms.length) {
+    showFeedback(roomListFeedback, `Твоята стая е активна. Освен нея има още ${rooms.length} свободни стаи.`, 'success');
+  } else if (ownRoom) {
+    showFeedback(roomListFeedback, 'Твоята стая е активна и чака втори играч.', 'success');
+  } else {
+    showFeedback(roomListFeedback, `Намерени са ${rooms.length} свободни стаи.`, 'success');
+  }
+
+  roomList.innerHTML = cards.join('');
   roomList.querySelectorAll('.room-join-btn').forEach((button) => {
     button.addEventListener('click', () => handleListedRoomJoin(button.dataset.roomId, button.dataset.access, button.dataset.code));
   });
@@ -1134,7 +1206,7 @@ function renderOnlineThemeSelector() {
   if (!onlineThemeSelector) return;
   onlineThemeSelector.innerHTML = Object.entries(THEMES)
     .map(([key, theme]) => `
-      <button class="online-theme-option ${state.selectedTheme === key ? 'selected' : ''}" data-online-theme="${key}" type="button">
+      <button class="online-theme-option ${state.online.selectedTheme === key ? 'selected' : ''}" data-online-theme="${key}" type="button">
         <span>${theme.icon}</span>
         <strong>${theme.name}</strong>
       </button>
@@ -1142,7 +1214,7 @@ function renderOnlineThemeSelector() {
     .join('');
 
   onlineThemeSelector.querySelectorAll('[data-online-theme]').forEach((button) => {
-    button.addEventListener('click', () => selectTheme(button.dataset.onlineTheme));
+    button.addEventListener('click', () => selectOnlineTheme(button.dataset.onlineTheme));
   });
 }
 
@@ -1150,14 +1222,14 @@ function renderOnlineCountSelector() {
   if (!onlineCountSelector) return;
   onlineCountSelector.innerHTML = COUNT_OPTIONS
     .map((count) => `
-      <button class="online-count-option ${state.selectedCardCount === count ? 'selected' : ''}" data-online-count="${count}" type="button">
+      <button class="online-count-option ${state.online.selectedCardCount === count ? 'selected' : ''}" data-online-count="${count}" type="button">
         ${count} карти
       </button>
     `)
     .join('');
 
   onlineCountSelector.querySelectorAll('[data-online-count]').forEach((button) => {
-    button.addEventListener('click', () => selectCardCount(Number(button.dataset.onlineCount)));
+    button.addEventListener('click', () => selectOnlineCardCount(Number(button.dataset.onlineCount)));
   });
 }
 
@@ -1252,6 +1324,19 @@ function updateHud(message) {
   } else {
     statusBanner.textContent = `Тема: ${THEMES[state.selectedTheme].name} • Режим: ${getModeName()} • Карти: ${state.selectedCardCount} • Остават ${state.totalPairs - state.matchedPairs} двойки.`;
   }
+}
+
+
+function selectOnlineTheme(themeKey) {
+  state.online.selectedTheme = themeKey;
+  renderOnlineThemeSelector();
+  showFeedback(onlineLobbyFeedback, '', '');
+}
+
+function selectOnlineCardCount(count) {
+  state.online.selectedCardCount = count;
+  renderOnlineCountSelector();
+  showFeedback(onlineLobbyFeedback, '', '');
 }
 
 function selectTheme(themeKey) {
@@ -2364,10 +2449,19 @@ async function initAuth() {
 
   const { data } = await state.auth.client.auth.getSession();
   state.auth.user = data.session?.user || null;
+  await loadInvitePreview();
   if (state.auth.user) {
     clearGuestState();
     await loadProfile();
     await loadMatchHistory();
+    await loadMyActiveRoom();
+    if (state.online.room) {
+      state.playMode = 'online';
+      renderModeSelector();
+      await subscribeToRoom(state.online.room.id);
+      if (state.online.room.status === 'waiting') setOnlineLobbyOpen(true);
+      syncFromOnlineRoom();
+    }
     await loadLobbyRooms();
   }
 
@@ -2377,6 +2471,15 @@ async function initAuth() {
       clearGuestState();
       await loadProfile();
       await loadMatchHistory();
+      await loadInvitePreview();
+      await loadMyActiveRoom();
+      if (state.online.room) {
+        state.playMode = 'online';
+        renderModeSelector();
+        await subscribeToRoom(state.online.room.id);
+        if (state.online.room.status === 'waiting') setOnlineLobbyOpen(true);
+        syncFromOnlineRoom();
+      }
       await loadLobbyRooms();
     } else {
       state.auth.profile = null;
@@ -2514,9 +2617,11 @@ function updateAuthUi() {
   joinInviteButton.textContent = loggedIn ? 'Влез с поканата' : 'Имам профил';
   if (state.ui.inviteToken) {
     if (!inviteGuestNameInput.value.trim()) inviteGuestNameInput.value = createGuestName();
+    const preview = state.online.invitePreview;
+    const roomSummary = preview ? ` ${preview.host_name || 'Домакин'} • ${THEMES[preview.selected_theme]?.name || preview.selected_theme} • ${preview.selected_card_count} карти.` : '';
     inviteJoinText.textContent = loggedIn
-      ? 'В линка има валидна покана. Натисни, за да влезеш в стаята.'
-      : 'Поканата е валидна. Можеш да влезеш с профил, да се регистрираш или да използваш временен гост акаунт.';
+      ? `В линка има валидна покана.${roomSummary} Натисни, за да влезеш в стаята.`
+      : `Поканата е валидна.${roomSummary} Можеш да влезеш с профил, да се регистрираш или да използваш временен гост акаунт.`;
   }
 
   renderOnlineThemeSelector();
@@ -2682,6 +2787,31 @@ async function subscribeToRoom(roomId) {
   await state.online.channel.subscribe();
 }
 
+async function loadInvitePreview() {
+  if (!state.auth.client || !state.ui.inviteToken) {
+    state.online.invitePreview = null;
+    return;
+  }
+  const { data, error } = await state.auth.client.rpc('get_invite_room_preview', { p_invite_token: state.ui.inviteToken });
+  if (error) {
+    state.online.invitePreview = null;
+    return;
+  }
+  state.online.invitePreview = normalizeRpcSingle(data);
+}
+
+async function loadMyActiveRoom() {
+  if (!state.auth.client || !state.auth.user) {
+    state.online.room = null;
+    return null;
+  }
+  const { data, error } = await state.auth.client.rpc('get_my_active_room');
+  if (error) return null;
+  const room = normalizeRpcSingle(data);
+  state.online.room = room || null;
+  return room || null;
+}
+
 async function loadLobbyRooms() {
   if (!state.auth.client || !state.auth.user) {
     state.online.publicRooms = [];
@@ -2689,16 +2819,7 @@ async function loadLobbyRooms() {
     return;
   }
 
-  const { data, error } = await state.auth.client
-    .from('rooms')
-    .select('*')
-    .eq('status', 'waiting')
-    .is('guest_user_id', null)
-    .in('access_type', ['public', 'password'])
-    .neq('host_user_id', state.auth.user.id)
-    .order('created_at', { ascending: false })
-    .limit(16);
-
+  const { data, error } = await state.auth.client.rpc('list_waiting_rooms');
   if (error) {
     state.online.publicRooms = [];
     showFeedback(roomListFeedback, `Лобито не се зареди: ${error.message}`, 'error');
@@ -2706,7 +2827,7 @@ async function loadLobbyRooms() {
     return;
   }
 
-  state.online.publicRooms = data || [];
+  state.online.publicRooms = Array.isArray(data) ? data : [];
   renderRoomList();
 }
 
@@ -2718,13 +2839,17 @@ async function createRoom() {
     return;
   }
   clearAllValidation();
-  if (!state.selectedTheme) {
+
+  if (!isValidOnlineTheme(state.online.selectedTheme)) {
     showFeedback(onlineLobbyFeedback, 'Първо избери тема за онлайн играта.', 'error');
-    updateHud('Първо избери тема.');
+    updateHud('Първо избери тема за онлайн играта.');
+    renderOnlineThemeSelector();
     return;
   }
-  if (!state.selectedCardCount) {
-    showFeedback(onlineLobbyFeedback, 'Първо избери брой карти.', 'error');
+  if (!isValidOnlineCount(state.online.selectedCardCount)) {
+    showFeedback(onlineLobbyFeedback, 'Първо избери брой карти за онлайн играта.', 'error');
+    updateHud('Първо избери брой карти за онлайн играта.');
+    renderOnlineCountSelector();
     return;
   }
   if (state.online.accessType === 'password' && roomPasswordInput.value.trim().length < 4) {
@@ -2739,28 +2864,41 @@ async function createRoom() {
   const payload = {
     p_code: generateRoomCode(),
     p_host_name: getDisplayName(),
-    p_selected_theme: state.selectedTheme,
-    p_selected_card_count: state.selectedCardCount,
+    p_selected_theme: state.online.selectedTheme,
+    p_selected_card_count: Number(state.online.selectedCardCount),
     p_access_type: state.online.accessType,
     p_plain_password: state.online.accessType === 'password' ? roomPasswordInput.value.trim() : null
   };
 
   const { data, error } = await state.auth.client.rpc('create_room_secure', payload);
   createRoomButton.disabled = false;
-  if (error || !data) {
+  const createdRoom = normalizeRpcSingle(data);
+  if (error || !createdRoom) {
     const msg = `Не успях да създам стая: ${error?.message || 'неочаквана грешка'}`;
     showFeedback(onlineLobbyFeedback, msg, 'error');
     updateHud(msg);
     return;
   }
 
-  state.online.room = data;
+  const freshRoom = await fetchRoomById(createdRoom.id);
+  state.online.room = freshRoom || createdRoom;
+  state.selectedTheme = state.online.room.selected_theme;
+  state.selectedCardCount = state.online.room.selected_card_count;
   roomPasswordInput.value = '';
-  await subscribeToRoom(data.id);
+  await subscribeToRoom(state.online.room.id);
   await loadLobbyRooms();
-  updateAuthUi();
-  showFeedback(onlineLobbyFeedback, data.access_type === 'invite' ? 'Invite стаята е създадена. Копирай линка и го изпрати на опонента.' : `Стаята е създадена. Изпрати код ${data.code} на другия играч.`, 'success');
-  updateHud(data.access_type === 'invite' ? 'Invite стаята е създадена. Копирай линка и го изпрати на опонента.' : `Стаята е създадена. Изпрати код ${data.code} на другия играч.`);
+  syncFromOnlineRoom();
+  if (state.online.room.access_type !== 'invite') {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('invite');
+    window.history.replaceState({}, '', url.toString());
+    state.ui.inviteToken = null;
+  }
+  const successMessage = state.online.room.access_type === 'invite'
+    ? 'Invite стаята е създадена. Копирай линка и го изпрати на опонента.'
+    : `Стаята е създадена. Изпрати код ${state.online.room.code} на другия играч.`;
+  showFeedback(onlineLobbyFeedback, successMessage, 'success');
+  updateHud(successMessage);
 }
 
 async function joinRoomByRecord(room) {
@@ -2878,13 +3016,14 @@ async function joinInviteFromToken() {
     return;
   }
 
+  const joinedRoom = normalizeRpcSingle(data);
   state.playMode = 'online';
   renderModeSelector();
   setOnlineLobbyOpen(true);
-  state.online.room = data;
-  state.selectedTheme = data.selected_theme;
-  state.selectedCardCount = data.selected_card_count;
-  await subscribeToRoom(data.id);
+  state.online.room = (await fetchRoomById(joinedRoom.id)) || joinedRoom;
+  state.selectedTheme = state.online.room.selected_theme;
+  state.selectedCardCount = state.online.room.selected_card_count;
+  await subscribeToRoom(state.online.room.id);
   await loadLobbyRooms();
   syncFromOnlineRoom();
   showFeedback(onlineLobbyFeedback, `Влезе в invite стаята ${data.code}.`, 'success');
