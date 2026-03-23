@@ -474,10 +474,20 @@ async function withTimeout(promise, ms = 8000, label = 'Операцията') {
   }
 }
 
+function removeOnlineChannel(channel = state.online.channel) {
+  if (!channel || !state.auth.client) return;
+  try {
+    const result = state.auth.client.removeChannel(channel);
+    if (result && typeof result.catch === 'function') result.catch((error) => console.warn('Channel removal failed', error));
+  } catch (error) {
+    console.warn('Channel removal failed', error);
+  }
+}
+
 function clearOnlineRoomLocalState() {
   state.online.room = null;
   if (state.online.channel && state.auth.client) {
-    state.auth.client.removeChannel(state.online.channel);
+    removeOnlineChannel(state.online.channel);
   }
   state.online.channel = null;
   if (state.online.pendingTimeout) {
@@ -590,9 +600,18 @@ function isValidOnlineCount(value) {
 
 async function fetchRoomById(roomId) {
   if (!state.auth.client || !roomId) return null;
-  const { data, error } = await state.auth.client.from('rooms').select('*').eq('id', roomId).maybeSingle();
-  if (error) return null;
-  return data || null;
+  try {
+    const { data, error } = await withTimeout(
+      state.auth.client.from('rooms').select('*').eq('id', roomId).maybeSingle(),
+      3500,
+      'Опресняването на стаята'
+    );
+    if (error) return null;
+    return data || null;
+  } catch (error) {
+    console.warn('fetchRoomById failed', error);
+    return null;
+  }
 }
 
 function getRoomActivityTime(room) {
@@ -3509,7 +3528,7 @@ async function logoutUser() {
 
 async function subscribeToRoom(roomId) {
   if (state.online.channel) {
-    await state.auth.client.removeChannel(state.online.channel);
+    removeOnlineChannel(state.online.channel);
     state.online.channel = null;
   }
 
@@ -3580,7 +3599,13 @@ async function loadMyActiveRoom() {
     clearOnlineRoomLocalState();
     return null;
   }
-  const { data, error } = await state.auth.client.rpc('get_my_active_room');
+  let data, error;
+  try {
+    ({ data, error } = await withTimeout(state.auth.client.rpc('get_my_active_room'), 4000, 'Проверката за активна стая'));
+  } catch (rpcError) {
+    console.warn('get_my_active_room failed', rpcError);
+    return null;
+  }
   if (error) return null;
   const room = normalizeRpcSingle(data);
   if (!room) {
@@ -3622,7 +3647,15 @@ async function loadLobbyRooms() {
     return;
   }
 
-  const { data, error } = await state.auth.client.rpc('list_waiting_rooms');
+  let data, error;
+  try {
+    ({ data, error } = await withTimeout(state.auth.client.rpc('list_waiting_rooms'), 4000, 'Зареждането на свободните стаи'));
+  } catch (rpcError) {
+    state.online.publicRooms = [];
+    showFeedback(roomListFeedback, rpcError.message || 'Лобито не се зареди навреме.', 'error');
+    renderRoomList();
+    return;
+  }
   if (error) {
     state.online.publicRooms = [];
     showFeedback(roomListFeedback, `Лобито не се зареди: ${error.message}`, 'error');
@@ -3692,7 +3725,7 @@ async function createRoom() {
     if (replacingExistingWaitingRoom && state.online.room?.id) {
       const oldRoom = state.online.room;
       if (state.online.channel && state.auth.client) {
-        await state.auth.client.removeChannel(state.online.channel);
+        removeOnlineChannel(state.online.channel);
         state.online.channel = null;
       }
       const closeResponse = await withTimeout(
@@ -4087,7 +4120,7 @@ async function leaveRoom(options = {}) {
 
   try {
     if (state.online.channel && state.auth.client) {
-      await state.auth.client.removeChannel(state.online.channel);
+      removeOnlineChannel(state.online.channel);
       state.online.channel = null;
     }
 
@@ -4139,14 +4172,14 @@ async function leaveRoom(options = {}) {
       state.playMode = 'online';
       renderModeSelector();
       setOnlineLobbyOpen(true);
-      await loadLobbyRooms();
+      Promise.resolve().then(() => loadLobbyRooms()).catch((error) => console.warn('Lobby refresh failed', error));
       showFeedback(onlineLobbyFeedback, room.status === 'playing' ? 'Излезе от онлайн играта.' : (slot === 1 ? 'Стаята беше затворена.' : 'Напусна стаята.'));
       updateHud(room.status === 'playing' ? 'Излезе от онлайн играта.' : (slot === 1 ? 'Стаята беше затворена.' : 'Напусна стаята.'));
     } else {
       state.playMode = 'local';
       renderModeSelector();
       resetRoundState();
-      await loadLobbyRooms();
+      Promise.resolve().then(() => loadLobbyRooms()).catch((error) => console.warn('Lobby refresh failed', error));
     }
     updateAuthUi();
   } catch (error) {
@@ -4227,13 +4260,16 @@ async function startOnlineMatch() {
   state.online.startBusy = true;
   updateAuthUi();
   showFeedback(onlineLobbyFeedback, 'Стартираме онлайн мача...', '');
+  const previousRoom = { ...room };
   try {
     const deck = createSerializedDeck(room.selected_theme);
     const nowIso = getNowIso();
     if (!state.online.channel && state.auth.client) {
       await subscribeToRoom(room.id);
     }
-    const response = await withTimeout(state.auth.client.from('rooms').update({
+
+    const optimisticRoom = {
+      ...room,
       status: 'playing',
       deck,
       scores: { '1': 0, '2': 0 },
@@ -4242,26 +4278,51 @@ async function startOnlineMatch() {
       matched_indices: [],
       lock_board: false,
       winner_slot: null,
-      turn_started_at: nowIso
-    }).eq('id', room.id).select().single(), 8000, 'Старта на играта');
-
-    if (response.error || !response.data) {
-      const msg = `Не успях да стартирам онлайн мача: ${response.error?.message || 'неочаквана грешка'}`;
-      showFeedback(onlineLobbyFeedback, msg, 'error');
-      updateHud(msg);
-      return;
-    }
-
-    state.online.room = response.data;
+      turn_started_at: nowIso,
+      updated_at: nowIso
+    };
+    state.online.room = optimisticRoom;
     state.playMode = 'online';
     state.ui.onlineLobbyOpen = false;
     renderModeSelector();
     syncFromOnlineRoom();
-    await loadLobbyRooms();
+    updateHud('Онлайн мачът стартира. Зареждаме картите...');
+
+    const response = await withTimeout(
+      state.auth.client.from('rooms').update({
+        status: 'playing',
+        deck,
+        scores: { '1': 0, '2': 0 },
+        current_player_slot: 1,
+        flipped_indices: [],
+        matched_indices: [],
+        lock_board: false,
+        winner_slot: null,
+        turn_started_at: nowIso
+      }).eq('id', room.id),
+      7000,
+      'Старта на играта'
+    );
+
+    if (response.error) {
+      throw new Error(`Не успях да стартирам онлайн мача: ${response.error.message || 'неочаквана грешка'}`);
+    }
+
     showFeedback(onlineLobbyFeedback, 'Онлайн мачът стартира успешно.', 'success');
     updateHud('Онлайн мачът стартира. Играта започва.');
-    scheduleOnlineRefreshBurst([0, 250, 700, 1400, 2400]);
+    Promise.resolve().then(async () => {
+      try {
+        scheduleOnlineRefreshBurst([0, 250, 700, 1400, 2400, 3600]);
+        await loadLobbyRooms();
+      } catch (error) {
+        console.warn('Post-start refresh failed', error);
+      }
+    });
   } catch (error) {
+    state.online.room = previousRoom;
+    state.ui.onlineLobbyOpen = true;
+    renderModeSelector();
+    syncFromOnlineRoom();
     const msg = error?.message || 'Не успях да стартирам онлайн мача.';
     showFeedback(onlineLobbyFeedback, msg, 'error');
     updateHud(msg);
@@ -4359,17 +4420,27 @@ async function patchRoom(patch, options = {}) {
   const room = state.online.room;
   if (!room || !state.auth.client) return null;
   const { silent = false, refreshLobby = true } = options;
-  const { data, error } = await state.auth.client.from('rooms').update(patch).eq('id', room.id).select().single();
-  if (error) {
+  const optimistic = { ...room, ...patch, updated_at: patch.updated_at || getNowIso() };
+  state.online.room = optimistic;
+  syncFromOnlineRoom();
+  try {
+    const response = await withTimeout(
+      state.auth.client.from('rooms').update(patch).eq('id', room.id),
+      5000,
+      'Синхронизацията на стаята'
+    );
+    if (response.error) throw response.error;
+    if (refreshLobby && state.ui.onlineLobbyOpen) {
+      Promise.resolve().then(() => loadLobbyRooms()).catch((error) => console.warn('Lobby refresh failed', error));
+    }
+    scheduleOnlineRefreshBurst([0, 300, 900]);
+    return optimistic;
+  } catch (error) {
+    state.online.room = room;
+    syncFromOnlineRoom();
     if (!silent) updateHud(`Грешка при синхронизация: ${error.message}`);
     return null;
   }
-  state.online.room = data;
-  syncFromOnlineRoom();
-  if (refreshLobby && state.ui.onlineLobbyOpen) {
-    await loadLobbyRooms();
-  }
-  return data;
 }
 
 async function handleOnlineFlip(card) {

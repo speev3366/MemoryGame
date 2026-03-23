@@ -556,7 +556,7 @@ button { font: inherit; }
 }
 .app.game-mode .player-topline {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 78px;
+  grid-template-columns: minmax(0, 1fr) 72px;
   align-items: center;
   gap: 7px;
 }
@@ -565,10 +565,11 @@ button { font: inherit; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.84rem;
 }
 .app.game-mode .turn-pill {
-  width: 78px;
-  min-width: 78px;
+  width: 72px;
+  min-width: 72px;
   justify-content: center;
   text-align: center;
 }
