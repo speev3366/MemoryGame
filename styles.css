@@ -550,10 +550,22 @@ button { font: inherit; }
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.26), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
 }
 .app.game-mode .player-topline {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px;
   align-items: center;
   gap: 7px;
-  flex-wrap: wrap;
+}
+.app.game-mode .player-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app.game-mode .turn-pill {
+  width: 88px;
+  min-width: 88px;
+  justify-content: center;
+  text-align: center;
 }
 .app.game-mode .player-subtext { display: none; }
 .app.game-mode .player-score { font-size: 1.45rem; text-align: right; }
@@ -571,7 +583,7 @@ button { font: inherit; }
   .app.game-mode .center-console { padding: 5px 6px; min-height: 46px; }
   .app.game-mode .player-card { padding: 5px 6px; min-height: 46px; }
   .app.game-mode .player-label { font-size: 0.76rem; }
-  .app.game-mode .turn-pill { padding: 5px 8px; font-size: 0.7rem; }
+  .app.game-mode .turn-pill { width: 78px; min-width: 78px; padding: 5px 8px; font-size: 0.7rem; }
   .app.game-mode .player-score { font-size: 1.2rem; }
   .app.game-mode .meta-chip { padding: 5px 7px; font-size: 0.68rem; }
 }
@@ -726,9 +738,16 @@ button { font: inherit; }
 .online-lobby .auth-grid.two-col {
   align-items: end;
 }
+.online-lobby .auth-grid.two-col {
+  grid-template-columns: minmax(280px, 0.95fr) minmax(380px, 1.05fr);
+  gap: 14px;
+}
+
 .online-lobby #createRoomButton {
   align-self: end;
-  min-height: 56px;
+  min-height: 48px;
+  max-width: 560px;
+  width: 100%;
   padding-top: 0;
   padding-bottom: 0;
 }
