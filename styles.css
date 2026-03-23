@@ -503,7 +503,7 @@ button { font: inherit; }
   padding: 10px 14px;
 }
 .app.game-mode .topbar {
-  grid-template-columns: minmax(126px, 176px) minmax(0, 1fr) minmax(126px, 176px);
+  grid-template-columns: minmax(156px, 228px) minmax(0, 1fr) minmax(156px, 228px);
   align-items: center;
   gap: 6px;
 }
@@ -556,7 +556,7 @@ button { font: inherit; }
 }
 .app.game-mode .player-topline {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px;
+  grid-template-columns: minmax(0, 1fr) 78px;
   align-items: center;
   gap: 7px;
 }
@@ -567,8 +567,8 @@ button { font: inherit; }
   white-space: nowrap;
 }
 .app.game-mode .turn-pill {
-  width: 88px;
-  min-width: 88px;
+  width: 78px;
+  min-width: 78px;
   justify-content: center;
   text-align: center;
 }
