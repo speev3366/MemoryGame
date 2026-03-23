@@ -356,7 +356,7 @@ const ONLINE_WAITING_ROOM_LIMIT_MS = 30 * 60 * 1000;
 const ONLINE_AUTO_FINISH_WINNER_SLOT = -1;
 
 const state = {
-  selectedTheme: null,
+  selectedTheme: 'sport',
   selectedCardCount: 20,
   playMode: 'local',
   aiDifficulty: 'medium',
@@ -400,7 +400,7 @@ const state = {
     pendingTimeout: null,
     publicRooms: [],
     accessType: 'public',
-    selectedTheme: null,
+    selectedTheme: 'sport',
     selectedCardCount: null,
     invitePreview: null,
     invitePreviewLoaded: false,
@@ -3296,7 +3296,8 @@ function updateAuthUi() {
   roomAccessSelector?.classList.toggle('hidden', !showHostControls);
   onlineThemeSelector?.classList.toggle('hidden', !showHostControls);
   onlineCountSelector?.classList.toggle('hidden', !showHostControls);
-  lobbyJoinCreateRow?.classList.toggle('hidden', !showHostControls);
+  // Login полетата не трябва да зависят от online host controls.
+  lobbyJoinCreateRow?.classList.toggle('hidden', loggedIn);
   inviteCard?.classList.toggle('hidden', !shouldShowInviteLinkCard() || !showHostControls);
   refreshRoomsButton?.classList.toggle('hidden', !showHostControls);
   createRoomButton.disabled = !showHostControls || state.online.createBusy;
