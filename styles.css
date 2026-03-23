@@ -1613,3 +1613,88 @@ body.lobby-open { overflow: hidden; }
   border-color: rgba(141,215,255,0.24);
   background: linear-gradient(180deg, rgba(89,167,255,0.12), rgba(255,255,255,0.04));
 }
+
+/* ==== V7.6 invite landing + setup card stabilization ==== */
+.app.setup-mode .mode-option {
+  min-height: 86px;
+  padding: 14px 18px;
+  align-content: start;
+}
+.app.setup-mode .mode-option p {
+  line-height: 1.35;
+}
+.app.setup-mode .mode-option strong {
+  margin-top: 2px;
+}
+.app.setup-mode .mode-selector {
+  align-items: start;
+}
+
+.invite-landing {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(3, 8, 18, 0.48);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.invite-landing-card {
+  position: relative;
+  width: min(720px, calc(100vw - 32px));
+  border-radius: 26px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: linear-gradient(180deg, rgba(10, 18, 34, 0.96), rgba(6, 11, 22, 0.98));
+  box-shadow: 0 34px 90px rgba(0,0,0,0.5);
+  padding: 24px;
+  display: grid;
+  gap: 14px;
+}
+.invite-landing-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+.invite-landing-card h3 {
+  margin: 0;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+}
+.invite-landing-card p {
+  margin: 0;
+}
+.invite-landing-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.invite-landing-meta .meta-chip {
+  background: rgba(255,255,255,0.06);
+}
+.invite-landing-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.invite-landing .setup-field {
+  margin: 0;
+}
+.invite-landing .setup-field input {
+  max-width: 360px;
+}
+@media (max-width: 720px) {
+  .invite-landing {
+    padding: 12px;
+  }
+  .invite-landing-card {
+    width: calc(100vw - 24px);
+    padding: 18px;
+  }
+  .invite-landing-actions {
+    flex-direction: column;
+  }
+  .invite-landing .setup-field input {
+    max-width: none;
+  }
+}

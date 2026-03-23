@@ -92,6 +92,17 @@ const continueInviteGuestButton = document.getElementById('continueInviteGuestBu
 const inviteGuestNameField = document.getElementById('inviteGuestNameField');
 const inviteGuestNameInput = document.getElementById('inviteGuestNameInput');
 const inviteGuestNameError = document.getElementById('inviteGuestNameError');
+const inviteLanding = document.getElementById('inviteLanding');
+const inviteLandingTitle = document.getElementById('inviteLandingTitle');
+const inviteLandingText = document.getElementById('inviteLandingText');
+const inviteLandingMeta = document.getElementById('inviteLandingMeta');
+const closeInviteLandingButton = document.getElementById('closeInviteLandingButton');
+const inviteLandingGuestField = document.getElementById('inviteLandingGuestField');
+const inviteLandingGuestInput = document.getElementById('inviteLandingGuestInput');
+const inviteLandingGuestError = document.getElementById('inviteLandingGuestError');
+const inviteLandingLoginButton = document.getElementById('inviteLandingLoginButton');
+const inviteLandingGuestButton = document.getElementById('inviteLandingGuestButton');
+const inviteLandingJoinButton = document.getElementById('inviteLandingJoinButton');
 const refreshRoomsButton = document.getElementById('refreshRoomsButton');
 const roomList = document.getElementById('roomList');
 const roomListFeedback = document.getElementById('roomListFeedback');
@@ -391,6 +402,7 @@ const state = {
     selectedTheme: null,
     selectedCardCount: null,
     invitePreview: null,
+    invitePreviewLoaded: false,
     refreshBusy: false,
     autoFinishing: false,
     lastRefreshAt: 0,
@@ -560,8 +572,8 @@ function shouldAutoOpenOnlineAfterAuth() {
     state.ui.inviteToken
     || state.ui.pendingOnlineIntent
     || state.ui.pendingInviteAutoJoin
-    || state.playMode === 'online'
     || state.ui.onlineLobbyOpen
+    || (state.online.room && state.online.room.status === 'playing')
   );
 }
 
@@ -1086,7 +1098,9 @@ function clearInviteTokenFromUrl() {
 function clearInviteContext() {
   state.ui.inviteToken = null;
   state.online.invitePreview = null;
+  state.online.invitePreviewLoaded = false;
   clearInviteTokenFromUrl();
+  renderInviteLanding();
 }
 
 function clearInviteContextIfRoomClaimed(room = state.online.room) {
@@ -1101,6 +1115,69 @@ function clearInviteContextIfRoomClaimed(room = state.online.room) {
 function shouldShowInviteLinkCard() {
   const room = state.online.room;
   return Boolean(room && room.access_type === 'invite' && state.online.accessType === 'invite');
+}
+
+function isSameInviteRoom(room = state.online.room, preview = state.online.invitePreview) {
+  if (!state.ui.inviteToken || !room) return false;
+  if (room.invite_token && room.invite_token === state.ui.inviteToken) return true;
+  return Boolean(preview && room.id === preview.id);
+}
+
+function shouldShowInviteLanding() {
+  if (!state.ui.inviteToken || state.started) return false;
+  return !isSameInviteRoom();
+}
+
+function getInviteGuestInput() {
+  if (inviteLanding && !inviteLanding.classList.contains('hidden')) return inviteLandingGuestInput;
+  return inviteGuestNameInput;
+}
+
+function renderInviteLanding() {
+  if (!inviteLanding) return;
+  const show = shouldShowInviteLanding();
+  inviteLanding.classList.toggle('hidden', !show);
+  if (!show) return;
+
+  const preview = state.online.invitePreview;
+  const previewLoaded = state.online.invitePreviewLoaded;
+  const loggedIn = Boolean(state.auth.user);
+  const loading = !previewLoaded;
+  const validPreview = Boolean(preview);
+  const displayName = preview?.host_name || 'домакин';
+  const themeName = preview?.selected_theme ? (THEMES[preview.selected_theme]?.name || preview.selected_theme) : '—';
+  const countText = preview?.selected_card_count ? `${preview.selected_card_count} карти` : '';
+
+  inviteLandingTitle.textContent = loading
+    ? 'Зареждаме поканата…'
+    : validPreview
+      ? `${displayName} те кани на онлайн двубой`
+      : 'Поканата не е валидна';
+
+  inviteLandingText.textContent = loading
+    ? 'Проверяваме линка и подготвяме стаята. Това може да отнеме секунда.'
+    : validPreview
+      ? `Това е директна покана за конкретна стая. ${loggedIn ? 'Натисни бутона и ще те добавим директно към мача.' : 'Избери дали да влезеш с профил или като гост с еднократен псевдоним.'}`
+      : 'Линкът е невалиден, изтекъл е или стаята вече не е достъпна.';
+
+  inviteLandingMeta.innerHTML = validPreview
+    ? `
+      <span class="meta-chip">Домакин: ${escapeHtml(displayName)}</span>
+      <span class="meta-chip">Тема: ${escapeHtml(themeName)}</span>
+      <span class="meta-chip">${escapeHtml(countText)}</span>
+      <span class="meta-chip">Код: ${escapeHtml(preview.code || '—')}</span>
+    `
+    : (loading ? '<span class="meta-chip">Проверка на стаята…</span>' : '<span class="meta-chip">Изпрати нов линк за покана от домакина.</span>');
+
+  inviteLandingGuestField.classList.toggle('hidden', loggedIn || !validPreview);
+  inviteLandingGuestButton.classList.toggle('hidden', loggedIn || !validPreview);
+  inviteLandingLoginButton.classList.toggle('hidden', loggedIn || !validPreview);
+  inviteLandingJoinButton.classList.toggle('hidden', !loggedIn || !validPreview);
+
+  if (validPreview && !loggedIn && !inviteLandingGuestInput.value.trim()) inviteLandingGuestInput.value = createGuestName();
+  inviteLandingJoinButton.disabled = !validPreview;
+  inviteLandingGuestButton.disabled = loading || !validPreview;
+  inviteLandingLoginButton.disabled = loading || !validPreview;
 }
 
 function getInviteConflictMessage() {
@@ -1212,11 +1289,6 @@ async function restoreOnlineSessionAfterAuth() {
   const autoOpenOnline = shouldAutoOpenOnlineAfterAuth();
 
   if (state.online.room) {
-    clearInviteContextIfRoomClaimed(state.online.room);
-    if (state.online.invitePreview?.id && state.online.invitePreview.id === state.online.room.id) {
-      clearInviteContext();
-    }
-
     if (autoOpenOnline) {
       state.playMode = 'online';
       renderModeSelector();
@@ -1225,15 +1297,15 @@ async function restoreOnlineSessionAfterAuth() {
         setOnlineLobbyOpen(true);
       }
       syncFromOnlineRoom();
+    } else if (state.online.room.status === 'playing') {
+      await subscribeToRoom(state.online.room.id);
+      syncFromOnlineRoom();
     }
-  } else if (state.ui.inviteToken) {
-    state.playMode = 'online';
-    renderModeSelector();
-    setOnlineLobbyOpen(true);
   }
 
   state.ui.pendingOnlineIntent = false;
   await loadLobbyRooms();
+  renderInviteLanding();
 }
 
 function validateRegisterForm() {
@@ -1427,6 +1499,7 @@ async function loadMatchHistory() {
   state.auth.history = data || [];
   state.auth.historyLoaded = true;
   renderProfilePanel();
+  renderInviteLanding();
 }
 
 async function saveMatchToHistory(source) {
@@ -2964,19 +3037,16 @@ async function initAuth() {
   });
 
   if (state.ui.inviteToken) {
-    state.playMode = 'online';
     state.ui.onlinePreviewVisible = false;
     renderModeSelector();
-    setOnlineLobbyOpen(true);
+    renderInviteLanding();
     if (state.auth.user && state.online.room && state.online.invitePreview?.id === state.online.room.id) {
       clearInviteContext();
       updateHud('Върна се в активната си стая.');
     } else if (state.auth.user) {
-      updateHud(getInviteConflictMessage() || 'Поканата е валидна. Натисни бутона, за да влезеш в стаята.');
+      updateHud(getInviteConflictMessage() || 'Поканата е разпозната. Натисни бутона и ще влезеш в стаята.');
     } else {
-      state.ui.pendingOnlineIntent = true;
-      toggleProfilePanel(true);
-      updateHud('Поканата е валидна. Влез в профила си, регистрирай се или използвай временен гост вход.');
+      updateHud('Поканата е разпозната. Избери вход с профил или временен гост вход.');
     }
   }
 
@@ -3095,7 +3165,7 @@ function updateAuthUi() {
   onlineLobby.classList.toggle('invite-preview-mode', invitePreviewMode);
   inviteCard.classList.toggle('hidden', !shouldShowInviteLinkCard());
   inviteLinkInput.value = shouldShowInviteLinkCard() && room?.invite_token ? getInviteUrl(room.invite_token) : '';
-  const joinedInviteRoom = Boolean(state.ui.inviteToken && room && ((room.invite_token && room.invite_token === state.ui.inviteToken) || (preview && preview.id === room.id)));
+  const joinedInviteRoom = isSameInviteRoom(room, preview);
   inviteJoinBanner.classList.toggle('hidden', !state.ui.inviteToken || joinedInviteRoom || !preview);
   inviteGuestNameField.classList.toggle('hidden', loggedIn || !invitePreviewMode);
   continueInviteGuestButton.classList.toggle('hidden', loggedIn || !invitePreviewMode);
@@ -3169,6 +3239,7 @@ async function registerUser(event) {
   };
 
   const { data, error } = await state.auth.client.auth.signUp(payload);
+  if (data?.session?.user) state.auth.user = data.session.user;
   registerButton.disabled = false;
   if (error) {
     const friendly = friendlyAuthError(error);
@@ -3183,11 +3254,13 @@ async function registerUser(event) {
     await loadMatchHistory();
     player1NameInput.value = sanitizeName(values.firstName || values.username, 'Играч 1');
     showFeedback(registerFeedback, 'Регистрацията е успешна и профилът беше влязъл автоматично.', 'success');
-    toggleProfilePanel(false);
-    updateHud('Успешна регистрация. Онлайн режимът е отключен.');
     if (state.ui.inviteToken) {
-      setOnlineLobbyOpen(true);
-      updateHud('Профилът е активен. Поканата е заредена — натисни „Влез в поканената стая“.' );
+      toggleProfilePanel(false);
+      await loadInvitePreview();
+      await joinInviteFromToken();
+    } else {
+      toggleProfilePanel(false);
+      updateHud('Успешна регистрация. Онлайн режимът е отключен.');
     }
     return;
   }
@@ -3227,10 +3300,11 @@ async function loginUser(event) {
     return;
   }
 
-  const { error } = await state.auth.client.auth.signInWithPassword({
+  const { data, error } = await state.auth.client.auth.signInWithPassword({
     email: resolved.email,
     password: values.password
   });
+  if (data?.user) state.auth.user = data.user;
 
   loginButton.disabled = false;
   if (error) {
@@ -3246,12 +3320,15 @@ async function loginUser(event) {
     state.auth.profile?.first_name || state.auth.profile?.username || resolved.matchedUsername || resolved.email.split('@')[0],
     'Играч 1'
   );
-  toggleProfilePanel(false);
   state.ui.pendingOnlineIntent = false;
   showFeedback(loginFeedback, resolved.mode === 'username' ? 'Успешен вход с username.' : 'Успешен вход.', 'success');
-  updateHud(state.ui.inviteToken ? 'Успешен вход. Поканата е заредена — натисни „Влез в поканената стая“.' : 'Успешен вход. Остана на началния екран.');
   if (state.ui.inviteToken) {
-    setOnlineLobbyOpen(true);
+    toggleProfilePanel(false);
+    await loadInvitePreview();
+    await joinInviteFromToken();
+  } else {
+    toggleProfilePanel(false);
+    updateHud('Успешен вход. Остана на началния екран.');
   }
 }
 
@@ -3302,14 +3379,22 @@ async function subscribeToRoom(roomId) {
 async function loadInvitePreview() {
   if (!state.auth.client || !state.ui.inviteToken) {
     state.online.invitePreview = null;
+    state.online.invitePreviewLoaded = false;
+    renderInviteLanding();
     return;
   }
+  state.online.invitePreviewLoaded = false;
+  renderInviteLanding();
   const { data, error } = await state.auth.client.rpc('get_invite_room_preview', { p_invite_token: state.ui.inviteToken });
   if (error) {
     state.online.invitePreview = null;
+    state.online.invitePreviewLoaded = true;
+    renderInviteLanding();
     return;
   }
   state.online.invitePreview = normalizeRpcSingle(data);
+  state.online.invitePreviewLoaded = true;
+  renderInviteLanding();
 }
 
 async function loadMyActiveRoom() {
@@ -3633,6 +3718,7 @@ async function joinInviteFromToken() {
   setOnlineLobbyOpen(true);
   state.online.room = (await fetchRoomById(joinedRoom.id)) || joinedRoom;
   clearInviteContextIfRoomClaimed(state.online.room);
+  renderInviteLanding();
   state.selectedTheme = state.online.room.selected_theme;
   state.selectedCardCount = state.online.room.selected_card_count;
   await subscribeToRoom(state.online.room.id);
@@ -3650,16 +3736,20 @@ async function continueInviteAsGuest() {
     return;
   }
 
-  const guestName = sanitizeName(inviteGuestNameInput.value, createGuestName());
-  inviteGuestNameInput.value = guestName;
+  const inviteInput = getInviteGuestInput();
+  const guestName = sanitizeName(inviteInput?.value, createGuestName());
+  if (inviteInput) inviteInput.value = guestName;
   if (guestName.length < 3) {
     setFieldError(inviteGuestNameField, inviteGuestNameError, 'Името трябва да е минимум 3 символа.');
+    setFieldError(inviteLandingGuestField, inviteLandingGuestError, 'Името трябва да е минимум 3 символа.');
     updateHud('Въведи валидно временно име за гост.');
     return;
   }
 
   setFieldError(inviteGuestNameField, inviteGuestNameError, '');
+  setFieldError(inviteLandingGuestField, inviteLandingGuestError, '');
   continueInviteGuestButton.disabled = true;
+  if (inviteLandingGuestButton) inviteLandingGuestButton.disabled = true;
   state.ui.pendingInviteAutoJoin = true;
   showFeedback(onlineLobbyFeedback, 'Създаваме временна гост сесия...', '');
 
@@ -3675,6 +3765,7 @@ async function continueInviteAsGuest() {
   });
 
   continueInviteGuestButton.disabled = false;
+  if (inviteLandingGuestButton) inviteLandingGuestButton.disabled = false;
   if (error) {
     state.ui.pendingInviteAutoJoin = false;
     const msg = error?.message?.includes('Anonymous sign-ins are disabled')
@@ -3692,11 +3783,10 @@ async function continueInviteAsGuest() {
 }
 
 function openProfileFromInvite() {
-  state.playMode = 'online';
-  setOnlineLobbyOpen(true);
-  renderModeSelector();
+  state.ui.pendingOnlineIntent = false;
   toggleProfilePanel(true);
-  updateHud('Поканата е валидна. Оттук можеш да влезеш или да се регистрираш, а после да се върнеш към стаята.');
+  renderInviteLanding();
+  updateHud('Поканата е активна. Влез в профила си и ще те добавим директно в стаята.');
 }
 
 async function copyInviteLink() {
@@ -3924,13 +4014,15 @@ function syncFromOnlineRoom() {
   if (room.status === 'waiting') {
     state.started = false;
     setAppMode('setup');
-    setOnlineLobbyOpen(true);
-    if (room.guest_user_id) {
-      updateHud(myRoomSlot() === 1
-        ? 'И двамата играчи са в стаята. Можеш да дадеш „Старт онлайн“.'
-        : 'Влезе в стаята успешно. Изчакай домакинът да натисне „Старт онлайн“.');
-    } else {
-      updateHud('Стаята чака втори играч.');
+    if (isOnlineMode() || state.ui.onlineLobbyOpen || shouldShowInviteLanding()) {
+      setOnlineLobbyOpen(true);
+      if (room.guest_user_id) {
+        updateHud(myRoomSlot() === 1
+          ? 'И двамата играчи са в стаята. Можеш да дадеш „Старт онлайн“.'
+          : 'Влезе в стаята успешно. Изчакай домакинът да натисне „Старт онлайн“.');
+      } else if (isOnlineMode() || state.ui.onlineLobbyOpen) {
+        updateHud('Стаята чака втори играч.');
+      }
     }
   } else if (room.status === 'playing') {
     state.playMode = 'online';
@@ -4150,6 +4242,10 @@ copyInviteButton.addEventListener('click', copyInviteLink);
 openProfileFromInviteButton.addEventListener('click', openProfileFromInvite);
 continueInviteGuestButton.addEventListener('click', continueInviteAsGuest);
 joinInviteButton.addEventListener('click', joinInviteFromToken);
+inviteLandingLoginButton?.addEventListener('click', openProfileFromInvite);
+inviteLandingGuestButton?.addEventListener('click', continueInviteAsGuest);
+inviteLandingJoinButton?.addEventListener('click', joinInviteFromToken);
+closeInviteLandingButton?.addEventListener('click', () => { clearInviteContext(); updateHud('Поканата беше затворена.'); });
 joinPasswordConfirmButton.addEventListener('click', async () => {
   if (!state.ui.pendingProtectedRoomId) return;
   const room = state.online.publicRooms.find((item) => item.id === state.ui.pendingProtectedRoomId)
@@ -4171,8 +4267,10 @@ joinRoomInput.addEventListener('input', () => {
   [registerEmail, registerEmailField, registerEmailError],
   [registerPassword, registerPasswordField, registerPasswordError],
   [roomPasswordInput, roomPasswordField, roomPasswordError],
-  [joinPasswordInput, joinPasswordField, joinPasswordError]
+  [joinPasswordInput, joinPasswordField, joinPasswordError],
+  [inviteLandingGuestInput, inviteLandingGuestField, inviteLandingGuestError]
 ].forEach(([input, field, errorEl]) => {
+  if (!input) return;
   input.addEventListener('input', () => {
     if (input.value.trim()) setFieldError(field, errorEl, '');
   });
