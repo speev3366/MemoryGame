@@ -654,7 +654,13 @@ function getTurnDurationMs() {
 
 function getOnlineTurnAnchor(room = state.online.room) {
   if (!room) return null;
-  return room.turn_started_at || room.updated_at || room.created_at || null;
+  const turnAnchor = room.turn_started_at || null;
+  if (turnAnchor && !Number.isNaN(new Date(turnAnchor).getTime())) return turnAnchor;
+  return room.updated_at || room.created_at || null;
+}
+
+function getNowIso() {
+  return new Date().toISOString();
 }
 
 function getTurnRemainingMs() {
@@ -724,16 +730,27 @@ async function refreshOnlineState(force = false) {
   if (!state.auth.client || !state.auth.user) return;
   if (state.online.refreshBusy) return;
   const now = Date.now();
-  if (!force && now - state.online.lastRefreshAt < 1800) return;
+  const minRefreshGap = state.online.room?.status === 'waiting' ? 600 : 1200;
+  if (!force && now - state.online.lastRefreshAt < minRefreshGap) return;
   state.online.refreshBusy = true;
   state.online.lastRefreshAt = now;
   try {
     if (state.online.room?.id) {
+      const previousRoom = state.online.room;
       const fresh = await fetchRoomById(state.online.room.id);
       if (fresh) {
         if (isRoomInactive(fresh)) {
           await autoFinishRoomForInactivity(fresh, { keepLocalState: true });
         } else {
+          if (previousRoom?.status === 'waiting' && !previousRoom?.guest_user_id && fresh.guest_user_id && fresh.host_user_id === state.auth.user?.id) {
+            const guestLabel = sanitizeName(fresh.guest_name || 'Гост', 'Гост');
+            showFeedback(onlineLobbyFeedback, `Играч ${guestLabel} се присъедини. Вече можеш да натиснеш „Старт онлайн“.`, 'success');
+            queuePersistentNotice(`Играч ${guestLabel} се присъедини към стаята. Натисни „Старт онлайн“.`);
+            updateHud(`Играч ${guestLabel} се присъедини към стаята. Натисни „Старт онлайн“.`);
+          }
+          if (previousRoom?.status === 'waiting' && fresh.status === 'playing') {
+            queuePersistentNotice('Онлайн мачът започна. Успех!');
+          }
           state.online.room = fresh;
           syncFromOnlineRoom();
         }
@@ -785,7 +802,8 @@ async function handleOnlineTurnTimeout() {
   await patchRoom({
     flipped_indices: [],
     lock_board: false,
-    current_player_slot: nextSlot
+    current_player_slot: nextSlot,
+    turn_started_at: getNowIso()
   }, { silent: false, refreshLobby: false });
   updateHud(`Времето за ход изтече. Ред е на ${getPlayerName(nextSlot)}.`);
 }
@@ -3980,6 +3998,7 @@ async function startOnlineMatch() {
   startOnlineButton.disabled = true;
   showFeedback(onlineLobbyFeedback, 'Стартираме онлайн мача...', '');
   const deck = createSerializedDeck(room.selected_theme);
+  const nowIso = getNowIso();
   const { data, error } = await state.auth.client.from('rooms').update({
     status: 'playing',
     deck,
@@ -3988,7 +4007,8 @@ async function startOnlineMatch() {
     flipped_indices: [],
     matched_indices: [],
     lock_board: false,
-    winner_slot: null
+    winner_slot: null,
+    turn_started_at: nowIso
   }).eq('id', room.id).select().single();
   startOnlineButton.disabled = false;
 
@@ -4000,8 +4020,13 @@ async function startOnlineMatch() {
   }
 
   state.playMode = 'online';
+  state.ui.onlineLobbyOpen = false;
   renderModeSelector();
-  state.online.room = data;
+  if (!state.online.channel && state.auth.client) {
+    await subscribeToRoom(room.id);
+  }
+  const freshRoom = await fetchRoomById(room.id);
+  state.online.room = freshRoom || data;
   await loadLobbyRooms();
   showFeedback(onlineLobbyFeedback, 'Онлайн мачът стартира успешно.', 'success');
   updateHud('Онлайн мачът стартира. Играта започва.');
@@ -4014,6 +4039,11 @@ function syncFromOnlineRoom() {
   if (room.status !== 'playing' && state.online.pendingTimeout) {
     clearTimeout(state.online.pendingTimeout);
     state.online.pendingTimeout = null;
+  }
+
+  if (room.status === 'playing' || room.status === 'finished') {
+    state.playMode = 'online';
+    state.ui.onlineLobbyOpen = false;
   }
 
   state.selectedTheme = room.selected_theme;
@@ -4051,6 +4081,7 @@ function syncFromOnlineRoom() {
     setAppMode('setup');
     if (isOnlineMode() || state.ui.onlineLobbyOpen || shouldShowInviteLanding()) {
       setOnlineLobbyOpen(true);
+      updateAuthUi();
       if (room.guest_user_id) {
         updateHud(myRoomSlot() === 1
           ? 'И двамата играчи са в стаята. Можеш да дадеш „Старт онлайн“.'
@@ -4061,7 +4092,9 @@ function syncFromOnlineRoom() {
     }
   } else if (room.status === 'playing') {
     state.playMode = 'online';
+    state.ui.onlineLobbyOpen = false;
     renderModeSelector();
+    updateAuthUi();
     updateHud(`Онлайн мач: на ход е ${getPlayerName(state.currentPlayer)}.`);
   } else if (room.status === 'finished') {
     endOnlineGame();
@@ -4134,7 +4167,8 @@ async function handleOnlineFlip(card) {
       scores,
       lock_board: false,
       status: finished ? 'finished' : 'playing',
-      winner_slot: winnerSlot
+      winner_slot: winnerSlot,
+      turn_started_at: finished ? room.turn_started_at : getNowIso()
     }, { silent: false, refreshLobby: false });
     return;
   }
@@ -4149,7 +4183,8 @@ async function handleOnlineFlip(card) {
     await patchRoom({
       flipped_indices: [],
       lock_board: false,
-      current_player_slot: nextSlot
+      current_player_slot: nextSlot,
+      turn_started_at: getNowIso()
     }, { silent: false, refreshLobby: false });
     state.online.pendingTimeout = null;
   }, 900);
@@ -4211,7 +4246,7 @@ playAgainButton.addEventListener('click', async () => {
   resultModal.classList.add('hidden');
   if (state.playMode === 'online' && state.online.room) {
     if (myRoomSlot() === 1) {
-      await patchRoom({ status: 'waiting', deck: [], flipped_indices: [], matched_indices: [], scores: { '1': 0, '2': 0 }, current_player_slot: 1, winner_slot: null, lock_board: false });
+      await patchRoom({ status: 'waiting', deck: [], flipped_indices: [], matched_indices: [], scores: { '1': 0, '2': 0 }, current_player_slot: 1, winner_slot: null, lock_board: false, turn_started_at: getNowIso() });
       updateHud('Онлайн рундът е върнат в режим за нов старт.');
     } else {
       updateHud('Изчакай домакина да подготви нов онлайн рунд или се върни в началното меню.');
