@@ -617,9 +617,15 @@ function getTurnDurationMs() {
   return state.timers.durationMs;
 }
 
+function getOnlineTurnAnchor(room = state.online.room) {
+  if (!room) return null;
+  return room.turn_started_at || room.updated_at || room.created_at || null;
+}
+
 function getTurnRemainingMs() {
-  if (state.playMode === 'online' && state.online.room?.status === 'playing' && state.online.room.turn_started_at) {
-    return Math.max(0, getTurnDurationMs() - (Date.now() - new Date(state.online.room.turn_started_at).getTime()));
+  const onlineTurnAnchor = getOnlineTurnAnchor();
+  if (state.playMode === 'online' && state.online.room?.status === 'playing' && onlineTurnAnchor) {
+    return Math.max(0, getTurnDurationMs() - (Date.now() - new Date(onlineTurnAnchor).getTime()));
   }
   if (state.started && state.playMode !== 'online' && !state.gameOver && state.timers.localTurnStartedAt) {
     if (isComputerMode() && state.currentPlayer === 2) return null;
@@ -660,10 +666,11 @@ function ensureTurnLoop() {
     if (state.auth.user && (state.ui.onlineLobbyOpen || state.playMode === 'online' || state.online.room)) {
       await refreshOnlineState(false);
     }
-    if (state.playMode === 'online' && state.online.room?.status === 'playing' && state.online.room.turn_started_at) {
+    const onlineTurnAnchor = getOnlineTurnAnchor();
+    if (state.playMode === 'online' && state.online.room?.status === 'playing' && onlineTurnAnchor) {
       const remaining = getTurnRemainingMs();
       if (remaining === 0 && !state.online.room.lock_board) {
-        const key = `${state.online.room.id}:${state.online.room.current_player_slot}:${state.online.room.turn_started_at}`;
+        const key = `${state.online.room.id}:${state.online.room.current_player_slot}:${onlineTurnAnchor}`;
         if (state.online.lastTimeoutKey !== key) {
           state.online.lastTimeoutKey = key;
           await handleOnlineTurnTimeout();
@@ -743,8 +750,7 @@ async function handleOnlineTurnTimeout() {
   await patchRoom({
     flipped_indices: [],
     lock_board: false,
-    current_player_slot: nextSlot,
-    turn_started_at: new Date().toISOString()
+    current_player_slot: nextSlot
   }, { silent: false, refreshLobby: false });
   updateHud(`Времето за ход изтече. Ред е на ${getPlayerName(nextSlot)}.`);
 }
@@ -965,23 +971,31 @@ function renderRoomList() {
   const cards = [];
 
   if (ownRoom) {
+    const slot = myRoomSlot();
+    const amHost = slot === 1;
     const ownRoomHint = ownRoom.status === 'playing'
-      ? '▶ Онлайн мачът е активен. Можеш да се върнеш в играта от профила си.'
+      ? (amHost ? '▶ Онлайн мачът е активен. Играта вече е стартирала.' : '▶ Онлайн мачът е активен. Изчакай своя ред и започвайте.')
       : ownRoom.guest_user_id
-        ? '👥 Вторият играч е влязъл. Можеш да натиснеш „Старт онлайн“.'
-        : (ownRoom.access_type === 'invite' ? '🔗 Стаята е с invite линк. Изпрати поканата на конкретен опонент.' : '⌛ Стаята чака втори играч.');
+        ? (amHost ? '👥 Вторият играч е влязъл. Можеш да натиснеш „Старт онлайн“.' : '👥 Влезе в стаята. Изчакай домакинът да натисне „Старт онлайн“.')
+        : (ownRoom.access_type === 'invite' ? '🔗 Стаята е с invite линк. Изпрати поканата на конкретния опонент.' : '⌛ Стаята чака втори играч.');
+    const roomTitle = amHost ? `Твоята стая • ${escapeHtml(ownRoom.host_name || 'Домакин')}` : `Стая на ${escapeHtml(ownRoom.host_name || 'Домакин')}`;
+    const ownRoomButtonLabel = ownRoom.status === 'playing'
+      ? 'Активна игра'
+      : amHost
+        ? (ownRoom.access_type === 'invite' ? 'С покана' : 'Домакин')
+        : 'Чака старт';
     cards.push(`
       <article class="room-row room-row-own">
         <div class="room-row-top">
           <div>
-            <div class="room-row-title">Твоята стая • ${escapeHtml(ownRoom.host_name || 'Домакин')}</div>
+            <div class="room-row-title">${roomTitle}</div>
             <div class="room-row-meta">Код ${escapeHtml(ownRoom.code)} • ${escapeHtml(THEMES[ownRoom.selected_theme]?.name || ownRoom.selected_theme)} • ${ownRoom.selected_card_count} карти</div>
           </div>
           <span class="room-state-pill ${ownRoom.access_type || 'public'}">${ROOM_ACCESS_OPTIONS[ownRoom.access_type || 'public']?.name || 'Свободно'}</span>
         </div>
         <div class="room-row-bottom">
           <div class="room-row-meta">${ownRoomHint}</div>
-          <button class="btn btn-secondary btn-small" type="button" disabled>${ownRoom.status === 'playing' ? 'Активна игра' : (ownRoom.access_type === 'invite' ? 'С покана' : 'Домакин')}</button>
+          <button class="btn btn-secondary btn-small" type="button" disabled>${ownRoomButtonLabel}</button>
         </div>
       </article>
     `);
@@ -3551,8 +3565,8 @@ async function joinInviteFromToken() {
   await loadLobbyRooms();
   syncFromOnlineRoom();
   const joinedCode = state.online.room?.code || joinedRoom.code || '—';
-  showFeedback(onlineLobbyFeedback, `Влезе в поканената стая ${joinedCode}. Изчакай домакинът да стартира мача.`, 'success');
-  updateHud(`Влезе в поканената стая ${joinedCode}. Изчакай домакинът да стартира мача.`);
+  showFeedback(onlineLobbyFeedback, `Влезе в поканената стая ${joinedCode}. Изчакай домакинът да натисне „Старт онлайн“.`, 'success');
+  updateHud(`Влезе в поканената стая ${joinedCode}. Изчакай домакинът да натисне „Старт онлайн“.`);
 }
 
 async function continueInviteAsGuest() {
@@ -3724,9 +3738,17 @@ function resumeOnlineSession() {
 }
 
 async function startOnlineMatch() {
-
   const room = state.online.room;
-  if (!room || myRoomSlot() !== 1) return;
+  if (!room) {
+    updateHud('Няма активна онлайн стая за стартиране.');
+    return;
+  }
+  if (myRoomSlot() !== 1) {
+    const msg = 'Само домакинът може да стартира онлайн мача.';
+    showFeedback(onlineLobbyFeedback, msg, 'error');
+    updateHud(msg);
+    return;
+  }
   if (room.status !== 'waiting') {
     updateHud('Онлайн мачът вече е стартиран или е приключил.');
     return;
@@ -3736,6 +3758,9 @@ async function startOnlineMatch() {
     updateHud('Изчакай втори играч в стаята.');
     return;
   }
+
+  startOnlineButton.disabled = true;
+  showFeedback(onlineLobbyFeedback, 'Стартираме онлайн мача...', '');
   const deck = createSerializedDeck(room.selected_theme);
   const { data, error } = await state.auth.client.from('rooms').update({
     status: 'playing',
@@ -3745,17 +3770,23 @@ async function startOnlineMatch() {
     flipped_indices: [],
     matched_indices: [],
     lock_board: false,
-    winner_slot: null,
-    turn_started_at: new Date().toISOString()
+    winner_slot: null
   }).eq('id', room.id).select().single();
+  startOnlineButton.disabled = false;
 
-  if (error) {
-    updateHud(`Не успях да стартирам онлайн мача: ${error.message}`);
+  if (error || !data) {
+    const msg = `Не успях да стартирам онлайн мача: ${error?.message || 'неочаквана грешка'}`;
+    showFeedback(onlineLobbyFeedback, msg, 'error');
+    updateHud(msg);
     return;
   }
 
+  state.playMode = 'online';
+  renderModeSelector();
   state.online.room = data;
   await loadLobbyRooms();
+  showFeedback(onlineLobbyFeedback, 'Онлайн мачът стартира успешно.', 'success');
+  updateHud('Онлайн мачът стартира. Играта започва.');
   syncFromOnlineRoom();
 }
 
@@ -3801,8 +3832,16 @@ function syncFromOnlineRoom() {
     state.started = false;
     setAppMode('setup');
     setOnlineLobbyOpen(true);
-    updateHud(room.guest_user_id ? 'И двамата играчи са в стаята. Домакинът може да даде „Старт онлайн“.' : 'Стаята чака втори играч.');
+    if (room.guest_user_id) {
+      updateHud(myRoomSlot() === 1
+        ? 'И двамата играчи са в стаята. Можеш да дадеш „Старт онлайн“.'
+        : 'Влезе в стаята успешно. Изчакай домакинът да натисне „Старт онлайн“.');
+    } else {
+      updateHud('Стаята чака втори играч.');
+    }
   } else if (room.status === 'playing') {
+    state.playMode = 'online';
+    renderModeSelector();
     updateHud(`Онлайн мач: на ход е ${getPlayerName(state.currentPlayer)}.`);
   } else if (room.status === 'finished') {
     endOnlineGame();
@@ -3875,8 +3914,7 @@ async function handleOnlineFlip(card) {
       scores,
       lock_board: false,
       status: finished ? 'finished' : 'playing',
-      winner_slot: winnerSlot,
-      turn_started_at: new Date().toISOString()
+      winner_slot: winnerSlot
     }, { silent: false, refreshLobby: false });
     return;
   }
@@ -3891,8 +3929,7 @@ async function handleOnlineFlip(card) {
     await patchRoom({
       flipped_indices: [],
       lock_board: false,
-      current_player_slot: nextSlot,
-      turn_started_at: new Date().toISOString()
+      current_player_slot: nextSlot
     }, { silent: false, refreshLobby: false });
     state.online.pendingTimeout = null;
   }, 900);
