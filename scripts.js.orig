@@ -1128,16 +1128,6 @@ function shouldShowInviteLanding() {
   return !isSameInviteRoom();
 }
 
-function isWaitingGuestView(room = state.online.room) {
-  return Boolean(
-    room
-    && room.status === 'waiting'
-    && state.auth.user
-    && room.guest_user_id === state.auth.user.id
-    && room.host_user_id !== state.auth.user.id
-  );
-}
-
 function getInviteGuestInput() {
   if (inviteLanding && !inviteLanding.classList.contains('hidden')) return inviteLandingGuestInput;
   return inviteGuestNameInput;
@@ -1154,49 +1144,40 @@ function renderInviteLanding() {
   const loggedIn = Boolean(state.auth.user);
   const loading = !previewLoaded;
   const validPreview = Boolean(preview);
-  const conflictMessage = getInviteConflictMessage();
-  const titleName = preview?.host_name || 'домакин';
+  const displayName = preview?.host_name || 'домакин';
   const themeName = preview?.selected_theme ? (THEMES[preview.selected_theme]?.name || preview.selected_theme) : '—';
-  const countText = preview?.selected_card_count ? `${preview.selected_card_count} карти` : '—';
+  const countText = preview?.selected_card_count ? `${preview.selected_card_count} карти` : '';
 
   inviteLandingTitle.textContent = loading
     ? 'Зареждаме поканата…'
     : validPreview
-      ? `${titleName} те кани на онлайн двубой`
-      : 'Получи линк за онлайн покана';
+      ? `${displayName} те кани на онлайн двубой`
+      : 'Поканата не е валидна';
 
   inviteLandingText.textContent = loading
     ? 'Проверяваме линка и подготвяме стаята. Това може да отнеме секунда.'
-    : conflictMessage
-      ? conflictMessage
-      : validPreview
-        ? `Това е директна покана за конкретна стая. ${loggedIn ? 'След вход ще те добавим директно към стаята.' : 'Избери дали да влезеш с профил или като гост с еднократен псевдоним.'}`
-        : 'Не успяхме да заредим детайлите за поканата, но можеш да продължиш с профил или като гост. При опит за вход ще проверим линка отново.';
+    : validPreview
+      ? `Това е директна покана за конкретна стая. ${loggedIn ? 'Натисни бутона и ще те добавим директно към мача.' : 'Избери дали да влезеш с профил или като гост с еднократен псевдоним.'}`
+      : 'Линкът е невалиден, изтекъл е или стаята вече не е достъпна.';
 
   inviteLandingMeta.innerHTML = validPreview
     ? `
-      <span class="meta-chip">Домакин: ${escapeHtml(titleName)}</span>
+      <span class="meta-chip">Домакин: ${escapeHtml(displayName)}</span>
       <span class="meta-chip">Тема: ${escapeHtml(themeName)}</span>
       <span class="meta-chip">${escapeHtml(countText)}</span>
       <span class="meta-chip">Код: ${escapeHtml(preview.code || '—')}</span>
     `
-    : `
-      <span class="meta-chip">Покана по линк</span>
-      <span class="meta-chip">Токен: ${escapeHtml(String(state.ui.inviteToken || '').slice(0, 8))}…</span>
-    `;
+    : (loading ? '<span class="meta-chip">Проверка на стаята…</span>' : '<span class="meta-chip">Изпрати нов линк за покана от домакина.</span>');
 
-  const canShowGuestFlow = Boolean(state.ui.inviteToken && !loggedIn && !conflictMessage);
-  const canShowJoinFlow = Boolean(state.ui.inviteToken && loggedIn && !conflictMessage);
+  inviteLandingGuestField.classList.toggle('hidden', loggedIn || !validPreview);
+  inviteLandingGuestButton.classList.toggle('hidden', loggedIn || !validPreview);
+  inviteLandingLoginButton.classList.toggle('hidden', loggedIn || !validPreview);
+  inviteLandingJoinButton.classList.toggle('hidden', !loggedIn || !validPreview);
 
-  inviteLandingGuestField.classList.toggle('hidden', !canShowGuestFlow);
-  inviteLandingGuestButton.classList.toggle('hidden', !canShowGuestFlow);
-  inviteLandingLoginButton.classList.toggle('hidden', loggedIn || Boolean(conflictMessage));
-  inviteLandingJoinButton.classList.toggle('hidden', !canShowJoinFlow);
-
-  if (canShowGuestFlow && !inviteLandingGuestInput.value.trim()) inviteLandingGuestInput.value = createGuestName();
-  inviteLandingJoinButton.disabled = loading && !validPreview;
-  inviteLandingGuestButton.disabled = loading && !state.ui.inviteToken;
-  inviteLandingLoginButton.disabled = loading && !state.ui.inviteToken;
+  if (validPreview && !loggedIn && !inviteLandingGuestInput.value.trim()) inviteLandingGuestInput.value = createGuestName();
+  inviteLandingJoinButton.disabled = !validPreview;
+  inviteLandingGuestButton.disabled = loading || !validPreview;
+  inviteLandingLoginButton.disabled = loading || !validPreview;
 }
 
 function getInviteConflictMessage() {
@@ -3170,12 +3151,9 @@ function updateAuthUi() {
   roomStatusChip.textContent = `Стая: ${roomStatus || 'няма'}`;
   roomPlayersChip.textContent = `Играчите: ${count}/2`;
   onlineTurnChip.textContent = `Ход: ${room?.current_player_slot ? getPlayerName(room.current_player_slot) : '—'}`;
-  const isHostWaitingRoom = Boolean(loggedIn && room && room.host_user_id === state.auth.user?.id && room.status === 'waiting');
-  const isGuestWaitingRoom = isWaitingGuestView(room);
-  const canStartOnline = Boolean(isHostWaitingRoom && room.guest_user_id);
+  const canStartOnline = Boolean(loggedIn && room && room.host_user_id === state.auth.user?.id && room.guest_user_id && room.status === 'waiting');
   startOnlineButton.disabled = !canStartOnline;
   startOnlineButton.textContent = canStartOnline ? 'Старт онлайн' : (room?.status === 'playing' ? 'Играта тече' : 'Старт онлайн');
-  startOnlineButton.classList.toggle('hidden', !isHostWaitingRoom);
   leaveRoomButton.disabled = !room;
   leaveRoomButton.textContent = room?.status === 'playing'
     ? 'Изход от играта'
@@ -3185,8 +3163,6 @@ function updateAuthUi() {
   createRoomButton.textContent = canReplaceOwnWaitingRoom() ? 'Създай нова стая' : 'Създай стая';
 
   onlineLobby.classList.toggle('invite-preview-mode', invitePreviewMode);
-  onlineLobby.classList.toggle('guest-waiting-mode', isGuestWaitingRoom);
-  onlineLobby.classList.toggle('host-waiting-mode', Boolean(isHostWaitingRoom));
   inviteCard.classList.toggle('hidden', !shouldShowInviteLinkCard());
   inviteLinkInput.value = shouldShowInviteLinkCard() && room?.invite_token ? getInviteUrl(room.invite_token) : '';
   const joinedInviteRoom = isSameInviteRoom(room, preview);
@@ -3200,7 +3176,7 @@ function updateAuthUi() {
     if (!inviteGuestNameInput.value.trim()) inviteGuestNameInput.value = createGuestName();
     const roomSummary = preview ? ` ${getInvitePreviewRoomSummary()}` : '';
     inviteJoinText.textContent = loggedIn
-      ? `Поканата е валидна.${roomSummary} Ще те добавим директно в стаята и ще изчакаш домакина да стартира мача.`
+      ? `Поканата е валидна.${roomSummary} Натисни бутона, за да влезеш в стаята.`
       : `Поканата е валидна.${roomSummary} Избери дали да влезеш като гост или с профил.`;
     if (invitePreviewMode) {
       const conflictMessage = getInviteConflictMessage();
@@ -3380,7 +3356,6 @@ async function subscribeToRoom(roomId) {
   state.online.channel = state.auth.client
     .channel(`room-${roomId}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, async (payload) => {
-      const previousRoom = state.online.room;
       if (payload.eventType === 'DELETE') {
         state.online.room = null;
         await loadLobbyRooms();
@@ -3391,15 +3366,6 @@ async function subscribeToRoom(roomId) {
       }
       state.online.room = payload.new;
       await loadLobbyRooms();
-      if (previousRoom?.status === 'waiting' && !previousRoom?.guest_user_id && payload.new?.guest_user_id && payload.new.host_user_id === state.auth.user?.id) {
-        const guestLabel = sanitizeName(payload.new.guest_name || 'Гост', 'Гост');
-        showFeedback(onlineLobbyFeedback, `Играч ${guestLabel} се присъедини. Вече можеш да натиснеш „Старт онлайн“.`, 'success');
-        queuePersistentNotice(`Играч ${guestLabel} се присъедини към стаята. Натисни „Старт онлайн“.`);
-        updateHud(`Играч ${guestLabel} се присъедини към стаята. Натисни „Старт онлайн“.`);
-      }
-      if (previousRoom?.status === 'waiting' && payload.new?.status === 'playing') {
-        queuePersistentNotice('Онлайн мачът започна. Успех!');
-      }
       if (isRoomInactive(payload.new)) {
         await autoFinishRoomForInactivity(payload.new, { keepLocalState: true });
       } else {
@@ -3761,7 +3727,6 @@ async function joinInviteFromToken() {
   syncFromOnlineRoom();
   const joinedCode = state.online.room?.code || joinedRoom.code || '—';
   showFeedback(onlineLobbyFeedback, `Влезе в поканената стая ${joinedCode}. Изчакай домакинът да натисне „Старт онлайн“.`, 'success');
-  queuePersistentNotice(`Влезе в поканената стая ${joinedCode}. Изчакай домакинът да натисне „Старт онлайн“.`);
   updateHud(`Влезе в поканената стая ${joinedCode}. Изчакай домакинът да натисне „Старт онлайн“.`);
 }
 
