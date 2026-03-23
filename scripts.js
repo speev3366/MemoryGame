@@ -401,7 +401,7 @@ const state = {
     publicRooms: [],
     accessType: 'public',
     selectedTheme: 'sport',
-    selectedCardCount: null,
+    selectedCardCount: 20,
     invitePreview: null,
     invitePreviewLoaded: false,
     refreshBusy: false,
@@ -421,6 +421,9 @@ const state = {
   },
   aiTurnTimeout: null
 };
+
+let lastRenderedOnlineTheme = null;
+let lastRenderedOnlineCount = null;
 
 function shuffle(array) {
   const clone = [...array];
@@ -616,7 +619,9 @@ async function fetchRoomById(roomId) {
 
 function getRoomActivityTime(room) {
   if (!room) return 0;
-  const candidate = room.updated_at || room.turn_started_at || room.created_at || null;
+  const candidate = room.status === 'playing'
+    ? (room.turn_started_at || room.updated_at || room.created_at || null)
+    : (room.updated_at || room.created_at || room.turn_started_at || null);
   if (!candidate) return 0;
   const value = new Date(candidate).getTime();
   return Number.isFinite(value) ? value : 0;
@@ -998,8 +1003,8 @@ function setOnlineLobbyOpen(force) {
     }
     state.online.accessType = ROOM_ACCESS_OPTIONS[state.online.accessType] ? state.online.accessType : 'public';
     renderRoomAccessSelector();
-    renderOnlineThemeSelector();
-    renderOnlineCountSelector();
+    renderOnlineThemeSelector(true);
+    renderOnlineCountSelector(true);
     toggleProfilePanel(false);
     window.scrollTo(0, 0);
     const hasRoom = Boolean(state.online.room);
@@ -1874,11 +1879,15 @@ function renderCountSelector() {
 
 
 
-function renderOnlineThemeSelector() {
+function renderOnlineThemeSelector(force = false) {
   if (!onlineThemeSelector) return;
+  const selected = isValidOnlineTheme(state.online.selectedTheme) ? state.online.selectedTheme : 'sport';
+  state.online.selectedTheme = selected;
+  if (!force && lastRenderedOnlineTheme === selected && onlineThemeSelector.children.length === Object.keys(THEMES).length) return;
+  lastRenderedOnlineTheme = selected;
   onlineThemeSelector.innerHTML = Object.entries(THEMES)
     .map(([key, theme]) => `
-      <button class="online-theme-option ${state.online.selectedTheme === key ? 'selected' : ''}" data-online-theme="${key}" type="button">
+      <button class="online-theme-option ${selected === key ? 'selected' : ''}" data-online-theme="${key}" type="button">
         <span>${theme.icon}</span>
         <strong>${theme.name}</strong>
       </button>
@@ -1890,11 +1899,15 @@ function renderOnlineThemeSelector() {
   });
 }
 
-function renderOnlineCountSelector() {
+function renderOnlineCountSelector(force = false) {
   if (!onlineCountSelector) return;
+  const selected = isValidOnlineCount(state.online.selectedCardCount) ? Number(state.online.selectedCardCount) : 20;
+  state.online.selectedCardCount = selected;
+  if (!force && lastRenderedOnlineCount === selected && onlineCountSelector.children.length === COUNT_OPTIONS.length) return;
+  lastRenderedOnlineCount = selected;
   onlineCountSelector.innerHTML = COUNT_OPTIONS
     .map((count) => `
-      <button class="online-count-option ${state.online.selectedCardCount === count ? 'selected' : ''}" data-online-count="${count}" type="button">
+      <button class="online-count-option ${selected === count ? 'selected' : ''}" data-online-count="${count}" type="button">
         ${count} карти
       </button>
     `)
@@ -2006,14 +2019,21 @@ function updateHud(message) {
 
 
 function selectOnlineTheme(themeKey) {
-  state.online.selectedTheme = themeKey;
-  renderOnlineThemeSelector();
+  state.online.selectedTheme = isValidOnlineTheme(themeKey) ? themeKey : 'sport';
+  state.selectedTheme = state.online.selectedTheme;
+  applyThemePalette(state.online.selectedTheme);
+  renderOnlineThemeSelector(true);
+  renderThemeSelector();
+  updateHud();
   showFeedback(onlineLobbyFeedback, '', '');
 }
 
 function selectOnlineCardCount(count) {
-  state.online.selectedCardCount = count;
-  renderOnlineCountSelector();
+  state.online.selectedCardCount = isValidOnlineCount(count) ? Number(count) : 20;
+  state.selectedCardCount = state.online.selectedCardCount;
+  renderOnlineCountSelector(true);
+  renderCountSelector();
+  updateHud();
   showFeedback(onlineLobbyFeedback, '', '');
 }
 
@@ -3351,8 +3371,8 @@ function updateAuthUi() {
     }
   }
 
-  renderOnlineThemeSelector();
-  renderOnlineCountSelector();
+  renderOnlineThemeSelector(false);
+  renderOnlineCountSelector(false);
   renderProfilePanel();
   renderRoomList();
 }
@@ -4298,7 +4318,8 @@ async function startOnlineMatch() {
         matched_indices: [],
         lock_board: false,
         winner_slot: null,
-        turn_started_at: nowIso
+        turn_started_at: nowIso,
+        updated_at: nowIso
       }).eq('id', room.id),
       7000,
       'Старта на играта'
@@ -4306,6 +4327,12 @@ async function startOnlineMatch() {
 
     if (response.error) {
       throw new Error(`Не успях да стартирам онлайн мача: ${response.error.message || 'неочаквана грешка'}`);
+    }
+
+    const freshStartedRoom = await fetchRoomById(room.id);
+    if (freshStartedRoom) {
+      state.online.room = freshStartedRoom;
+      syncFromOnlineRoom();
     }
 
     showFeedback(onlineLobbyFeedback, 'Онлайн мачът стартира успешно.', 'success');
@@ -4596,6 +4623,8 @@ renderDifficultySelector();
 renderThemeSelector();
 renderCountSelector();
 renderRoomAccessSelector();
+renderOnlineThemeSelector(true);
+renderOnlineCountSelector(true);
 setRoomAccess(state.online.accessType);
 updatePlayerInputUi();
 updatePlayerPanels();
