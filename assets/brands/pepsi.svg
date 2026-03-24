@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fbff"/>
+      <stop offset="100%" stop-color="#ecf5ff"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff5ea9"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#09111f" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect x="14" y="14" width="372" height="492" rx="34" fill="url(#bg)"/>
+  <rect x="24" y="24" width="352" height="54" rx="18" fill="url(#accent)"/>
+  <text x="42" y="58" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="19" font-weight="800" fill="white">МАРКИ</text>
+  <rect x="32" y="94" width="336" height="264" rx="28" fill="white" stroke="#d9e8fb" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="58" y="124" width="284" height="180" rx="26" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+        <circle cx="200" cy="214" r="74" fill="#ffffff" stroke="#cbd5e1" stroke-width="4"/>
+        <path d="M128 214 A72 72 0 0 1 272 214 C246 190,214 184,180 190 C156 194,140 202,128 214 Z" fill="#ef4444"/>
+        <path d="M128 214 C152 196,188 198,220 208 C242 214,258 230,272 250 A72 72 0 0 1 128 214 Z" fill="#1d4ed8"/>
+        <path d="M128 214 C152 230,190 228,220 218 C240 212,256 202,272 178" stroke="#ffffff" stroke-width="18" fill="none"/>
+        
+  <rect x="32" y="378" width="336" height="102" rx="26" fill="#0f172a"/>
+  <text x="48" y="428" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="32" font-weight="800" fill="white">Pepsi</text>
+  <text x="48" y="455" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" fill="#c8daee">MEMORY DUEL</text>
+</svg>

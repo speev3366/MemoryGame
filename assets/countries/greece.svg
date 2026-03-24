@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fbff"/>
+      <stop offset="100%" stop-color="#ecf5ff"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff9d3f"/>
+      <stop offset="100%" stop-color="#ff5b77"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#09111f" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect x="14" y="14" width="372" height="492" rx="34" fill="url(#bg)"/>
+  <rect x="24" y="24" width="352" height="54" rx="18" fill="url(#accent)"/>
+  <text x="42" y="58" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="19" font-weight="800" fill="white">ДЪРЖАВИ</text>
+  <rect x="32" y="94" width="336" height="264" rx="28" fill="white" stroke="#d9e8fb" stroke-width="2" filter="url(#shadow)"/>
+  <g transform="translate(50 116)">
+  <rect width="300" height="196" rx="22" fill="#f8fbff" stroke="#cfdef0" stroke-width="2"/>
+  <g clip-path="url(#clipflag)">
+    
+        <rect y="0.0" width="300" height="21.8" fill="#2b59c3"/><rect y="21.8" width="300" height="21.8" fill="#ffffff"/><rect y="43.6" width="300" height="21.8" fill="#2b59c3"/><rect y="65.4" width="300" height="21.8" fill="#ffffff"/><rect y="87.2" width="300" height="21.8" fill="#2b59c3"/><rect y="109.0" width="300" height="21.8" fill="#ffffff"/><rect y="130.8" width="300" height="21.8" fill="#2b59c3"/><rect y="152.6" width="300" height="21.8" fill="#ffffff"/><rect y="174.4" width="300" height="21.8" fill="#2b59c3"/>
+        <rect width="110" height="110" fill="#2b59c3"/>
+        <rect x="44" width="22" height="110" fill="#ffffff"/>
+        <rect y="44" width="110" height="22" fill="#ffffff"/>
+        
+  </g>
+  <defs>
+    <clipPath id="clipflag">
+      <rect width="300" height="196" rx="22"/>
+    </clipPath>
+  </defs>
+</g>
+  <rect x="32" y="378" width="336" height="102" rx="26" fill="#0f172a"/>
+  <text x="48" y="428" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="32" font-weight="800" fill="white">Гърция</text>
+  <text x="48" y="455" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" fill="#c8daee">MEMORY DUEL</text>
+</svg>

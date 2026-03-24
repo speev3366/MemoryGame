@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fbff"/>
+      <stop offset="100%" stop-color="#ecf5ff"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#18d38d"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#09111f" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect x="14" y="14" width="372" height="492" rx="34" fill="url(#bg)"/>
+  <rect x="24" y="24" width="352" height="54" rx="18" fill="url(#accent)"/>
+  <text x="42" y="58" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="19" font-weight="800" fill="white">СПОРТ</text>
+  <rect x="32" y="94" width="336" height="264" rx="28" fill="white" stroke="#d9e8fb" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="56" y="122" width="288" height="184" rx="26" fill="#f2f8ff"/>
+        <ellipse cx="210" cy="196" rx="56" ry="72" fill="#19253a"/>
+        <ellipse cx="210" cy="196" rx="40" ry="56" fill="none" stroke="#f8fbff" stroke-width="5"/>
+        <path d="M176 148 Q210 196 244 244 M244 148 Q210 196 176 244 M158 176 H262 M160 216 H260" stroke="#e2e8f0" stroke-width="4"/>
+        <rect x="126" y="244" width="34" height="72" rx="16" fill="#4f46e5" transform="rotate(-34 143 280)"/>
+        <circle cx="286" cy="236" r="22" fill="#d6f256" stroke="#a3c400" stroke-width="5"/>
+        <path d="M274 218 C286 226,286 246,274 254 M298 218 C286 226,286 246,298 254" stroke="#ffffff" stroke-width="4" fill="none"/>
+        
+  <rect x="32" y="378" width="336" height="102" rx="26" fill="#0f172a"/>
+  <text x="48" y="428" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="32" font-weight="800" fill="white">Тенис</text>
+  <text x="48" y="455" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" fill="#c8daee">MEMORY DUEL</text>
+</svg>
