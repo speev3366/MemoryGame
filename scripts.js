@@ -419,7 +419,9 @@ const state = {
     inviteAutoJoinAttemptedToken: null,
     inviteAutoJoinBusy: false,
     preferredRoomId: sessionStorage.getItem('memory_duel_preferred_room_id') || null,
-    playingGraceUntil: 0
+    playingGraceUntil: 0,
+    allowPlayingBurstUntil: 0,
+    lastGuestWaitingBurstKey: null
   },
   timers: {
     interval: null,
@@ -523,6 +525,8 @@ function clearOnlineRoomLocalState() {
     clearTimeout(state.online.pendingTimeout);
     state.online.pendingTimeout = null;
   }
+  state.online.lastGuestWaitingBurstKey = null;
+  state.online.allowPlayingBurstUntil = 0;
 }
 
 function ensureOnlineSyncLoop() {
@@ -821,10 +825,17 @@ function getNowIso() {
   return new Date().toISOString();
 }
 
-function scheduleOnlineRefreshBurst(delays = [0, 400, 1200, 2400]) {
+function scheduleOnlineRefreshBurst(delays = [0, 400, 1200, 2400], options = {}) {
   if (!state.auth.client || !state.auth.user) return;
+  const { allowDuringPlaying = false } = options;
+  if (allowDuringPlaying) {
+    state.online.allowPlayingBurstUntil = Date.now() + Math.max(...delays, 0) + 1500;
+  }
   delays.forEach((delay) => {
     window.setTimeout(() => {
+      const isPlaying = state.online.room?.status === 'playing';
+      const burstAllowed = Date.now() <= (state.online.allowPlayingBurstUntil || 0);
+      if (isPlaying && !allowDuringPlaying && !burstAllowed) return;
       refreshOnlineState(true);
     }, delay);
   });
@@ -898,7 +909,9 @@ async function refreshOnlineState(force = false) {
     state.online.refreshBusyAt = 0;
   }
   if (state.online.refreshBusy) return;
-  const minRefreshGap = state.online.room?.status === 'playing' ? 8000 : (state.online.room?.status === 'waiting' ? 700 : 1500);
+  const isPlayingRoom = state.online.room?.status === 'playing';
+  if (force && isPlayingRoom && now > (state.online.allowPlayingBurstUntil || 0)) return;
+  const minRefreshGap = isPlayingRoom ? 8000 : (state.online.room?.status === 'waiting' ? 700 : 1500);
   if (!force && now - state.online.lastRefreshAt < minRefreshGap) return;
   state.online.refreshBusy = true;
   state.online.refreshBusyAt = now;
@@ -3688,9 +3701,9 @@ async function subscribeToRoom(roomId) {
       }
       if (previousRoom?.status === 'waiting' && payload.new?.status === 'playing') {
         state.online.playingGraceUntil = Date.now() + 20000;
+        state.online.allowPlayingBurstUntil = Date.now() + 1200;
         queuePersistentNotice('Онлайн мачът започна. Успех!');
         updateHud('Онлайн мачът започна. Зареждаме картите...');
-        scheduleOnlineRefreshBurst([0, 400, 1200, 2600, 4200]);
       }
       if (isRoomInactive(payload.new)) {
         await autoFinishRoomForInactivity(payload.new, { keepLocalState: true });
@@ -4556,7 +4569,7 @@ async function startOnlineMatch() {
     updateHud('Онлайн мачът стартира. Играта започва.');
     Promise.resolve().then(async () => {
       try {
-        scheduleOnlineRefreshBurst([0, 250, 700, 1400, 2400, 3600, 5200]);
+        state.online.allowPlayingBurstUntil = Date.now() + 1200;
         await loadLobbyRooms();
       } catch (error) {
         console.warn('Post-start refresh failed', error);
@@ -4632,7 +4645,11 @@ function syncFromOnlineRoom() {
           ? 'И двамата играчи са в стаята. Можеш да дадеш „Старт онлайн“.'
           : 'Успешно присъединяване. Изчаква се домакинът да стартира играта.');
         if (myRoomSlot() === 2) {
-          scheduleOnlineRefreshBurst([300, 900, 1800, 3200, 5000]);
+          const burstKey = `${room.id}:${room.guest_user_id || ''}:${room.status}`;
+          if (state.online.lastGuestWaitingBurstKey !== burstKey) {
+            state.online.lastGuestWaitingBurstKey = burstKey;
+            scheduleOnlineRefreshBurst([300, 900, 1800, 3200, 5000]);
+          }
         }
       } else if (isOnlineMode() || state.ui.onlineLobbyOpen) {
         updateHud(myRoomSlot() === 2
@@ -4681,7 +4698,9 @@ async function patchRoom(patch, options = {}) {
     if (refreshLobby && state.ui.onlineLobbyOpen && state.online.room?.status !== 'playing') {
       Promise.resolve().then(() => loadLobbyRooms()).catch((error) => console.warn('Lobby refresh failed', error));
     }
-    scheduleOnlineRefreshBurst(state.online.room?.status === 'playing' ? [250, 900] : [0, 300, 900]);
+    if (state.online.room?.status !== 'playing') {
+      scheduleOnlineRefreshBurst([0, 300, 900]);
+    }
     return optimistic;
   } catch (error) {
     state.online.room = room;
