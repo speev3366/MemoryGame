@@ -354,7 +354,7 @@ const ASSET_CACHE = {};
 const ONLINE_INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
 const ONLINE_WAITING_ROOM_LIMIT_MS = 30 * 60 * 1000;
 const ONLINE_AUTO_FINISH_WINNER_SLOT = -1;
-const ONLINE_WAITING_RESTORE_WITH_GUEST_MS = 90 * 1000;
+const ONLINE_WAITING_RESTORE_WITH_GUEST_MS = 10 * 60 * 1000;
 const ONLINE_WAITING_RESTORE_EMPTY_MS = 10 * 60 * 1000;
 
 const state = {
@@ -652,6 +652,46 @@ function getRoomActivityTime(room) {
   return Number.isFinite(value) ? value : 0;
 }
 
+function getRoomFreshnessTime(room) {
+  if (!room) return 0;
+  const candidates = [room.updated_at, room.turn_started_at, room.created_at]
+    .map((value) => new Date(value || 0).getTime())
+    .filter((value) => Number.isFinite(value) && value > 0);
+  return candidates.length ? Math.max(...candidates) : 0;
+}
+
+function shouldIgnoreIncomingRoom(current, incoming) {
+  if (!current || !incoming || current.id !== incoming.id) return false;
+
+  if (current.status === 'playing' && incoming.status === 'waiting') {
+    const currentDeckSize = Array.isArray(current.deck) ? current.deck.length : 0;
+    const incomingDeckSize = Array.isArray(incoming.deck) ? incoming.deck.length : 0;
+    const currentTime = Math.max(getRoomFreshnessTime(current), getRoomActivityTime(current));
+    const incomingTime = Math.max(getRoomFreshnessTime(incoming), getRoomActivityTime(incoming));
+    if (currentDeckSize > 0 && incomingDeckSize === 0) return true;
+    if (incomingTime && currentTime && incomingTime <= currentTime + 1500) return true;
+  }
+
+  if (current.status === 'finished' && incoming.status !== 'finished') {
+    const currentTime = Math.max(getRoomFreshnessTime(current), getRoomActivityTime(current));
+    const incomingTime = Math.max(getRoomFreshnessTime(incoming), getRoomActivityTime(incoming));
+    if (incomingTime && currentTime && incomingTime <= currentTime + 1500) return true;
+  }
+
+  return false;
+}
+
+function adoptIncomingRoom(incoming) {
+  if (!incoming) return false;
+  const current = state.online.room;
+  if (shouldIgnoreIncomingRoom(current, incoming)) return false;
+  state.online.room = incoming;
+  state.online.refreshMisses = 0;
+  setPreferredRoomId(incoming.id);
+  clearInviteContextIfRoomClaimed(incoming);
+  return true;
+}
+
 function isRoomInactive(room) {
   return Boolean(room && room.status === 'playing' && getRoomActivityTime(room) && (Date.now() - getRoomActivityTime(room) >= ONLINE_INACTIVITY_LIMIT_MS));
 }
@@ -852,7 +892,7 @@ async function refreshOnlineState(force = false) {
     state.online.refreshBusyAt = 0;
   }
   if (state.online.refreshBusy) return;
-  const minRefreshGap = state.online.room?.status === 'waiting' ? 600 : 1200;
+  const minRefreshGap = state.online.room?.status === 'playing' ? 2500 : (state.online.room?.status === 'waiting' ? 800 : 1500);
   if (!force && now - state.online.lastRefreshAt < minRefreshGap) return;
   state.online.refreshBusy = true;
   state.online.refreshBusyAt = now;
@@ -875,12 +915,14 @@ async function refreshOnlineState(force = false) {
           if (previousRoom?.status === 'waiting' && fresh.status === 'playing') {
             queuePersistentNotice('Онлайн мачът започна. Успех!');
           }
-          state.online.room = fresh;
-          syncFromOnlineRoom();
+          if (adoptIncomingRoom(fresh)) {
+            syncFromOnlineRoom();
+          }
         }
       } else if (state.online.room) {
         state.online.refreshMisses = (state.online.refreshMisses || 0) + 1;
-        if (state.online.refreshMisses >= 3) {
+        const missLimit = previousRoom?.status === 'playing' ? 8 : (previousRoom?.guest_user_id ? 6 : 3);
+        if (state.online.refreshMisses >= missLimit) {
           const active = await loadMyActiveRoom();
           if (active) {
             state.online.refreshMisses = 0;
@@ -3618,8 +3660,9 @@ async function subscribeToRoom(roomId) {
         scheduleOnlineRefreshBurst([0, 500]);
         return;
       }
-      state.online.refreshMisses = 0;
-      state.online.room = payload.new;
+      if (!adoptIncomingRoom(payload.new)) {
+        return;
+      }
       syncFromOnlineRoom();
       Promise.resolve().then(() => loadLobbyRooms()).catch((error) => console.warn('Lobby refresh failed', error));
       if (previousRoom?.status === 'waiting' && !previousRoom?.guest_user_id && payload.new?.guest_user_id && payload.new.host_user_id === state.auth.user?.id) {
@@ -3642,7 +3685,7 @@ async function subscribeToRoom(roomId) {
 
   await state.online.channel.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
-      scheduleOnlineRefreshBurst([0, 400, 1200]);
+      scheduleOnlineRefreshBurst([0, 250, 900]);
     }
   });
 }
@@ -3852,6 +3895,7 @@ async function createRoom() {
     showFeedback(onlineLobbyFeedback, successMessage, 'success');
     updateHud(successMessage);
 
+    await subscribeToRoom(createdRoom.id);
     Promise.resolve().then(async () => {
       try {
         if (previousWaitingRoom?.id) {
@@ -3861,11 +3905,11 @@ async function createRoom() {
             'Затварянето на старата стая'
           ).catch((error) => console.warn('Background previous room cleanup failed', error));
         }
-        await subscribeToRoom(createdRoom.id);
         const freshRoom = await fetchRoomById(createdRoom.id);
-        state.online.room = freshRoom || createdRoom;
-        setPreferredRoomId((freshRoom || createdRoom).id);
-        syncFromOnlineRoom();
+        if (freshRoom) {
+          adoptIncomingRoom(freshRoom);
+          syncFromOnlineRoom();
+        }
         await loadLobbyRooms();
         scheduleOnlineRefreshBurst();
       } catch (error) {
@@ -3963,12 +4007,14 @@ async function joinRoomByRecord(room) {
     setFieldError(joinRoomField, joinRoomError, '');
     updateHud(`Свързан си към стая ${joined.code}.`);
 
+    await subscribeToRoom(joined.id);
     Promise.resolve().then(async () => {
       try {
-        await subscribeToRoom(joined.id);
         const fresh = await fetchRoomById(joined.id);
-        state.online.room = fresh || joined;
-        syncFromOnlineRoom();
+        if (fresh) {
+          adoptIncomingRoom(fresh);
+          syncFromOnlineRoom();
+        }
         await loadLobbyRooms();
         scheduleOnlineRefreshBurst();
       } catch (error) {
@@ -4093,12 +4139,14 @@ async function joinInviteFromToken() {
     queuePersistentNotice(`Влезе в поканената стая ${joinedCode}. Изчакай домакинът да натисне „Старт онлайн“.`);
     updateHud(`Влезе в поканената стая ${joinedCode}. Изчакай домакинът да натисне „Старт онлайн“.`);
 
+    await subscribeToRoom(joinedRoom.id);
     Promise.resolve().then(async () => {
       try {
-        await subscribeToRoom(joinedRoom.id);
         const fresh = await fetchRoomById(joinedRoom.id);
-        state.online.room = fresh || joinedRoom;
-        syncFromOnlineRoom();
+        if (fresh) {
+          adoptIncomingRoom(fresh);
+          syncFromOnlineRoom();
+        }
         await loadLobbyRooms();
         scheduleOnlineRefreshBurst();
       } catch (error) {
@@ -4473,9 +4521,7 @@ async function startOnlineMatch() {
 
     const freshStartedRoom = await fetchRoomById(room.id);
     if (freshStartedRoom) {
-      state.online.room = freshStartedRoom;
-      setPreferredRoomId(freshStartedRoom.id);
-      state.online.refreshMisses = 0;
+      adoptIncomingRoom(freshStartedRoom);
       syncFromOnlineRoom();
     }
 
