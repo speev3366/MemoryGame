@@ -354,6 +354,8 @@ const ASSET_CACHE = {};
 const ONLINE_INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
 const ONLINE_WAITING_ROOM_LIMIT_MS = 30 * 60 * 1000;
 const ONLINE_AUTO_FINISH_WINNER_SLOT = -1;
+const ONLINE_WAITING_RESTORE_WITH_GUEST_MS = 90 * 1000;
+const ONLINE_WAITING_RESTORE_EMPTY_MS = 10 * 60 * 1000;
 
 const state = {
   selectedTheme: 'sport',
@@ -415,7 +417,8 @@ const state = {
     syncInterval: null,
     refreshMisses: 0,
     inviteAutoJoinAttemptedToken: null,
-    inviteAutoJoinBusy: false
+    inviteAutoJoinBusy: false,
+    preferredRoomId: sessionStorage.getItem('memory_duel_preferred_room_id') || null
   },
   timers: {
     interval: null,
@@ -490,8 +493,27 @@ function removeOnlineChannel(channel = state.online.channel) {
   }
 }
 
+function persistPreferredRoomId(roomId) {
+  try {
+    if (roomId) sessionStorage.setItem('memory_duel_preferred_room_id', roomId);
+    else sessionStorage.removeItem('memory_duel_preferred_room_id');
+  } catch (error) {
+    console.warn('Preferred room persistence failed', error);
+  }
+}
+
+function setPreferredRoomId(roomId) {
+  state.online.preferredRoomId = roomId || null;
+  persistPreferredRoomId(state.online.preferredRoomId);
+}
+
+function clearPreferredRoomId() {
+  setPreferredRoomId(null);
+}
+
 function clearOnlineRoomLocalState() {
   state.online.room = null;
+  clearPreferredRoomId();
   if (state.online.channel && state.auth.client) {
     removeOnlineChannel(state.online.channel);
   }
@@ -642,6 +664,16 @@ function isWaitingRoomExpired(room) {
     && getRoomActivityTime(room)
     && (Date.now() - getRoomActivityTime(room) >= ONLINE_WAITING_ROOM_LIMIT_MS)
   );
+}
+
+function shouldAutoRestoreWaitingRoom(room) {
+  if (!room || room.status !== 'waiting') return false;
+  const activity = getRoomActivityTime(room);
+  if (!activity) return false;
+  const age = Date.now() - activity;
+  return room.guest_user_id
+    ? age <= ONLINE_WAITING_RESTORE_WITH_GUEST_MS
+    : age <= ONLINE_WAITING_RESTORE_EMPTY_MS;
 }
 
 function shouldAutoOpenOnlineAfterAuth() {
@@ -866,6 +898,7 @@ async function refreshOnlineState(force = false) {
     } else if (isOnlineMode() || state.ui.onlineLobbyOpen) {
       const active = await loadMyActiveRoom();
       if (active) {
+        setPreferredRoomId(active.id);
         await subscribeToRoom(active.id);
         syncFromOnlineRoom();
       }
@@ -3643,47 +3676,70 @@ async function loadMyActiveRoom() {
     clearOnlineRoomLocalState();
     return null;
   }
+
+  const adoptRoom = (room) => {
+    state.online.refreshMisses = 0;
+    state.online.room = room;
+    setPreferredRoomId(room.id);
+    if (state.ui.inviteToken && (clearInviteContextIfRoomClaimed(room) || state.online.invitePreview?.id === room.id)) {
+      clearInviteContext();
+    }
+    return room;
+  };
+
+  const cleanupRoom = async (room) => {
+    if (!room) return null;
+    if (room.status === 'finished') {
+      clearOnlineRoomLocalState();
+      if (room.invite_token && room.invite_token === state.ui.inviteToken) clearInviteContext();
+      if (state.online.invitePreview?.id === room.id) clearInviteContext();
+      return null;
+    }
+    if (isWaitingRoomExpired(room) && room.host_user_id === state.auth.user?.id) {
+      await state.auth.client.from('rooms').delete().eq('id', room.id).eq('host_user_id', state.auth.user.id);
+      clearOnlineRoomLocalState();
+      queuePersistentNotice('Старата waiting стая беше затворена автоматично след 30 минути без втори играч.');
+      if (room.invite_token && room.invite_token === state.ui.inviteToken) clearInviteContext();
+      if (state.online.invitePreview?.id === room.id) clearInviteContext();
+      return null;
+    }
+    if (isRoomInactive(room)) {
+      await autoFinishRoomForInactivity(room, { keepLocalState: false });
+      clearOnlineRoomLocalState();
+      if (room.invite_token && room.invite_token === state.ui.inviteToken) clearInviteContext();
+      if (state.online.invitePreview?.id === room.id) clearInviteContext();
+      return null;
+    }
+    return room;
+  };
+
+  if (state.online.preferredRoomId) {
+    const preferred = await cleanupRoom(await fetchRoomById(state.online.preferredRoomId));
+    if (preferred && (preferred.host_user_id === state.auth.user.id || preferred.guest_user_id === state.auth.user.id)) {
+      if (preferred.status === 'playing' || shouldAutoRestoreWaitingRoom(preferred)) return adoptRoom(preferred);
+      clearPreferredRoomId();
+      return null;
+    }
+    clearPreferredRoomId();
+  }
+
   let data, error;
   try {
-    ({ data, error } = await withTimeout(state.auth.client.rpc('get_my_active_room'), 4000, 'Проверката за активна стая'));
+    ({ data, error } = await withTimeout(state.auth.client.rpc('get_my_active_room'), 3500, 'Проверката за активна стая'));
   } catch (rpcError) {
     console.warn('get_my_active_room failed', rpcError);
     return null;
   }
   if (error) return null;
-  const room = normalizeRpcSingle(data);
+  const room = await cleanupRoom(normalizeRpcSingle(data));
   if (!room) {
     state.online.refreshMisses = 0;
     clearOnlineRoomLocalState();
     return null;
   }
-  if (room.status === 'finished') {
-    clearOnlineRoomLocalState();
-    if (room.invite_token && room.invite_token === state.ui.inviteToken) clearInviteContext();
-    if (state.online.invitePreview?.id === room.id) clearInviteContext();
-    return null;
-  }
-  if (isWaitingRoomExpired(room) && room.host_user_id === state.auth.user?.id) {
-    await state.auth.client.from('rooms').delete().eq('id', room.id).eq('host_user_id', state.auth.user.id);
-    clearOnlineRoomLocalState();
-    queuePersistentNotice('Старата waiting стая беше затворена автоматично след 30 минути без втори играч.');
-    if (room.invite_token && room.invite_token === state.ui.inviteToken) clearInviteContext();
-    if (state.online.invitePreview?.id === room.id) clearInviteContext();
-    return null;
-  }
-  if (isRoomInactive(room)) {
-    await autoFinishRoomForInactivity(room, { keepLocalState: false });
-    clearOnlineRoomLocalState();
-    if (room.invite_token && room.invite_token === state.ui.inviteToken) clearInviteContext();
-    if (state.online.invitePreview?.id === room.id) clearInviteContext();
-    return null;
-  }
-  state.online.refreshMisses = 0;
-  state.online.room = room;
-  if (state.ui.inviteToken && (clearInviteContextIfRoomClaimed(room) || state.online.invitePreview?.id === room.id)) {
-    clearInviteContext();
-  }
-  return room;
+  if (room.status === 'playing' || shouldAutoRestoreWaitingRoom(room)) return adoptRoom(room);
+  clearOnlineRoomLocalState();
+  return null;
 }
 
 async function loadLobbyRooms() {
@@ -3719,20 +3775,6 @@ async function createRoom() {
     showFeedback(onlineLobbyFeedback, 'Гостът може само да приема покана по линк.', 'error');
     return;
   }
-  if (hasActiveOnlineRoom()) {
-    if (state.online.room?.status === 'playing') {
-      const msg = 'Вече имаш активна онлайн игра. Завърши я или излез от играта, преди да създадеш нова стая.';
-      showFeedback(onlineLobbyFeedback, msg, 'error');
-      updateHud(msg);
-      return;
-    }
-    if (!canReplaceOwnWaitingRoom()) {
-      const msg = 'Вече си в waiting стая. Напусни я, преди да се присъединиш към друга или да създадеш нова.';
-      showFeedback(onlineLobbyFeedback, msg, 'error');
-      updateHud(msg);
-      return;
-    }
-  }
 
   if (!state.auth.enabled || !state.auth.user) {
     updateHud('За създаване на онлайн стая трябва да си влязъл.');
@@ -3761,32 +3803,22 @@ async function createRoom() {
     return;
   }
 
-  const replacingExistingWaitingRoom = canReplaceOwnWaitingRoom();
+  const previousWaitingRoom = canReplaceOwnWaitingRoom() ? { ...state.online.room } : null;
+
   state.online.createBusy = true;
   createRoomButton.disabled = true;
   updateAuthUi();
   try {
-    showFeedback(onlineLobbyFeedback, replacingExistingWaitingRoom ? 'Затваряме старата waiting стая и създаваме нова...' : 'Създаваме стаята...', '');
+    showFeedback(onlineLobbyFeedback, 'Създаваме стаята...', '');
 
-    if (replacingExistingWaitingRoom && state.online.room?.id) {
-      const oldRoom = state.online.room;
+    if (previousWaitingRoom) {
       if (state.online.channel && state.auth.client) {
         removeOnlineChannel(state.online.channel);
         state.online.channel = null;
       }
-      const closeResponse = await withTimeout(
-        state.auth.client.from('rooms').delete().eq('id', oldRoom.id).eq('host_user_id', state.auth.user.id).eq('status', 'waiting'),
-        7000,
-        'Затварянето на старата стая'
-      );
-      if (closeResponse.error) {
-        const msg = `Не успях да затворя старата стая: ${closeResponse.error.message || 'неочаквана грешка'}`;
-        showFeedback(onlineLobbyFeedback, msg, 'error');
-        updateHud(msg);
-        return;
-      }
-      clearOnlineRoomLocalState();
-      if (oldRoom.invite_token && oldRoom.invite_token === state.ui.inviteToken) clearInviteContext();
+      state.online.room = null;
+      clearPreferredRoomId();
+      if (typeof syncFromOnlineRoom === 'function') syncFromOnlineRoom();
     }
 
     const payload = {
@@ -3798,16 +3830,14 @@ async function createRoom() {
       p_plain_password: state.online.accessType === 'password' ? roomPasswordInput.value.trim() : null
     };
 
-    const response = await withTimeout(state.auth.client.rpc('create_room_secure', payload), 9000, 'Създаването на стая');
+    const response = await withTimeout(state.auth.client.rpc('create_room_secure', payload), 5000, 'Създаването на стая');
     const createdRoom = normalizeRpcSingle(response.data);
     if (response.error || !createdRoom) {
-      const msg = `Не успях да създам стая: ${response.error?.message || 'неочаквана грешка'}`;
-      showFeedback(onlineLobbyFeedback, msg, 'error');
-      updateHud(msg);
-      return;
+      throw new Error(response.error?.message || 'Неуспешно създаване на стая.');
     }
 
     state.online.room = createdRoom;
+    setPreferredRoomId(createdRoom.id);
     state.selectedTheme = createdRoom.selected_theme;
     state.selectedCardCount = createdRoom.selected_card_count;
     state.playMode = 'online';
@@ -3818,16 +3848,24 @@ async function createRoom() {
     updateAuthUi();
 
     const successMessage = createdRoom.access_type === 'invite'
-      ? `${replacingExistingWaitingRoom ? 'Старата стая беше затворена. ' : ''}Invite стаята е създадена. Копирай линка и го изпрати на опонента.`
-      : `${replacingExistingWaitingRoom ? 'Старата стая беше затворена. ' : ''}Стаята е създадена. Изпрати код ${createdRoom.code} на другия играч.`;
+      ? 'Invite стаята е създадена. Копирай линка и го изпрати на опонента.'
+      : `Стаята е създадена. Изпрати код ${createdRoom.code} на другия играч.`;
     showFeedback(onlineLobbyFeedback, successMessage, 'success');
     updateHud(successMessage);
 
     Promise.resolve().then(async () => {
       try {
+        if (previousWaitingRoom?.id) {
+          await withTimeout(
+            state.auth.client.from('rooms').delete().eq('id', previousWaitingRoom.id).eq('host_user_id', state.auth.user.id).eq('status', 'waiting'),
+            3000,
+            'Затварянето на старата стая'
+          ).catch((error) => console.warn('Background previous room cleanup failed', error));
+        }
         await subscribeToRoom(createdRoom.id);
         const freshRoom = await fetchRoomById(createdRoom.id);
         state.online.room = freshRoom || createdRoom;
+        setPreferredRoomId((freshRoom || createdRoom).id);
         syncFromOnlineRoom();
         await loadLobbyRooms();
         scheduleOnlineRefreshBurst();
@@ -3838,6 +3876,11 @@ async function createRoom() {
       }
     });
   } catch (error) {
+    if (previousWaitingRoom) {
+      state.online.room = previousWaitingRoom;
+      setPreferredRoomId(previousWaitingRoom.id);
+      syncFromOnlineRoom();
+    }
     const msg = error?.message || 'Не успях да създам стая.';
     showFeedback(onlineLobbyFeedback, msg, 'error');
     updateHud(msg);
@@ -3908,6 +3951,7 @@ async function joinRoomByRecord(room) {
     joinPasswordRow.classList.add('hidden');
     state.ui.pendingProtectedRoomId = null;
     state.online.room = joined;
+    setPreferredRoomId(joined.id);
     state.selectedTheme = joined.selected_theme;
     state.selectedCardCount = joined.selected_card_count;
     state.playMode = 'online';
@@ -4037,6 +4081,7 @@ async function joinInviteFromToken() {
     state.playMode = 'online';
     state.ui.onlineLobbyOpen = true;
     state.online.room = joinedRoom;
+    setPreferredRoomId(joinedRoom.id);
     state.selectedTheme = joinedRoom.selected_theme;
     state.selectedCardCount = joinedRoom.selected_card_count;
     clearInviteContextIfRoomClaimed(state.online.room);
@@ -4367,6 +4412,7 @@ async function startOnlineMatch() {
       updated_at: nowIso
     };
     state.online.room = optimisticRoom;
+    setPreferredRoomId(optimisticRoom.id);
     state.playMode = 'online';
     state.ui.onlineLobbyOpen = false;
     renderModeSelector();
@@ -4397,6 +4443,7 @@ async function startOnlineMatch() {
     const freshStartedRoom = await fetchRoomById(room.id);
     if (freshStartedRoom) {
       state.online.room = freshStartedRoom;
+      setPreferredRoomId(freshStartedRoom.id);
       state.online.refreshMisses = 0;
       syncFromOnlineRoom();
     }
@@ -4433,6 +4480,7 @@ async function startOnlineMatch() {
 function syncFromOnlineRoom() {
   const room = state.online.room;
   if (!room) return;
+  setPreferredRoomId(room.id);
   if (room.status !== 'playing' && state.online.pendingTimeout) {
     clearTimeout(state.online.pendingTimeout);
     state.online.pendingTimeout = null;
@@ -4501,6 +4549,7 @@ function syncFromOnlineRoom() {
 function applyOnlineBoardState() {
   const room = state.online.room;
   if (!room) return;
+  setPreferredRoomId(room.id);
   const flipped = new Set(room.flipped_indices || []);
   const matched = new Set(room.matched_indices || []);
   gameBoard.querySelectorAll('.memory-card').forEach((card) => {
@@ -4600,6 +4649,7 @@ async function handleOnlineFlip(card) {
 function endOnlineGame() {
   const room = state.online.room;
   if (!room) return;
+  setPreferredRoomId(room.id);
   state.started = false;
   state.gameOver = true;
   const winner = Number(room.winner_slot);
