@@ -1726,3 +1726,16 @@ body.lobby-open { overflow: hidden; }
     max-width: none;
   }
 }
+
+
+@media (max-width: 1280px) {
+  .app.game-mode .hud-row { flex-wrap: wrap; }
+  .app.game-mode .topbar { gap: 8px; }
+  .app.game-mode .center-console { align-items: flex-start; }
+}
+
+@media (max-width: 980px) {
+  .app.game-mode .topbar { grid-template-columns: 1fr; }
+  .app.game-mode .center-console { order: 3; }
+  .app.game-mode .player-card { min-width: 0; }
+}
