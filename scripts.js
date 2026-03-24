@@ -1314,26 +1314,23 @@ function renderInviteLanding() {
   const preview = state.online.invitePreview;
   const previewLoaded = state.online.invitePreviewLoaded;
   const loggedIn = Boolean(state.auth.user);
-  const loading = !previewLoaded;
   const validPreview = Boolean(preview);
   const conflictMessage = getInviteConflictMessage();
   const titleName = preview?.host_name || 'домакин';
   const themeName = preview?.selected_theme ? (THEMES[preview.selected_theme]?.name || preview.selected_theme) : '—';
   const countText = preview?.selected_card_count ? `${preview.selected_card_count} карти` : '—';
 
-  inviteLandingTitle.textContent = loading
-    ? 'Зареждаме поканата…'
-    : validPreview
-      ? `${titleName} те кани на онлайн двубой`
-      : 'Получи линк за онлайн покана';
+  inviteLandingTitle.textContent = validPreview
+    ? `${titleName} те кани на онлайн двубой`
+    : 'Онлайн покана';
 
-  inviteLandingText.textContent = loading
-    ? 'Проверяваме линка и подготвяме стаята. Това може да отнеме секунда.'
-    : conflictMessage
-      ? `${conflictMessage} Можеш да смениш профила или да продължиш като гост само за тази покана.`
-      : validPreview
-        ? `Това е директна покана за конкретна стая. ${loggedIn ? 'Натисни бутона и ще те добавим директно към стаята, или смени профила/продължи като гост.' : 'Избери дали да влезеш с профил или като гост с еднократен псевдоним.'}`
-        : 'Не успяхме да заредим детайлите за поканата, но можеш да продължиш с профил или като гост. При опит за вход ще проверим линка отново.';
+  inviteLandingText.textContent = conflictMessage
+    ? `${conflictMessage} Можеш да влезеш с профил или да се присъединиш като гост само за тази покана.`
+    : validPreview
+      ? 'Това е директна покана за конкретна стая. Избери дали да влезеш с профил или като гост с еднократен псевдоним.'
+      : (previewLoaded
+          ? 'Не успяхме да заредим детайлите за поканата, но можеш да продължиш с профил или като гост.'
+          : 'Подготвяме поканата. Можеш да въведеш псевдоним и да продължиш веднага.');
 
   inviteLandingMeta.innerHTML = validPreview
     ? `
@@ -1345,6 +1342,7 @@ function renderInviteLanding() {
     : `
       <span class="meta-chip">Покана по линк</span>
       <span class="meta-chip">Токен: ${escapeHtml(String(state.ui.inviteToken || '').slice(0, 8))}…</span>
+      <span class="meta-chip">Статус: ${previewLoaded ? 'готово' : 'зареждане'}</span>
     `;
 
   const canShowGuestFlow = Boolean(state.ui.inviteToken);
@@ -1353,12 +1351,12 @@ function renderInviteLanding() {
   inviteLandingGuestButton.classList.toggle('hidden', !canShowGuestFlow);
   inviteLandingLoginButton.classList.remove('hidden');
   inviteLandingJoinButton.classList.add('hidden');
-  inviteLandingLoginButton.textContent = loggedIn ? 'Смени профил' : 'Вход в акаунт';
+  inviteLandingLoginButton.textContent = 'Влез в профил';
   inviteLandingGuestButton.textContent = 'Присъедини се като гост';
 
   if (canShowGuestFlow && !inviteLandingGuestInput.value.trim()) inviteLandingGuestInput.value = createGuestName();
-  inviteLandingGuestButton.disabled = loading && !state.ui.inviteToken;
-  inviteLandingLoginButton.disabled = loading && !state.ui.inviteToken;
+  inviteLandingGuestButton.disabled = state.online.joinBusy || state.online.inviteAutoJoinBusy;
+  inviteLandingLoginButton.disabled = state.online.joinBusy || state.online.inviteAutoJoinBusy;
 }
 
 function getInviteConflictMessage() {
@@ -3656,8 +3654,9 @@ async function loadInvitePreview() {
     renderInviteLanding();
     return;
   }
+  const hadPreview = Boolean(state.online.invitePreviewLoaded || state.online.invitePreview);
   state.online.invitePreviewLoaded = false;
-  renderInviteLanding();
+  if (!hadPreview) renderInviteLanding();
   const { data, error } = await state.auth.client.rpc('get_invite_room_preview', { p_invite_token: state.ui.inviteToken });
   if (error) {
     state.online.invitePreview = null;
@@ -4125,21 +4124,7 @@ async function continueInviteAsGuest() {
     updateHud('Поканата изисква активна Supabase конфигурация.');
     return;
   }
-
-  if (state.auth.user) {
-    try {
-      await withTimeout(state.auth.client.auth.signOut(), 5000, 'Смяната към гост сесия');
-      state.auth.user = null;
-      state.auth.profile = null;
-      state.auth.history = [];
-      state.auth.historyLoaded = false;
-      clearOnlineRoomLocalState();
-      updateAuthUi();
-    } catch (error) {
-      updateHud('Не успях да сменя текущия профил. Пробвай пак.');
-      return;
-    }
-  }
+  if (state.online.inviteAutoJoinBusy || state.online.joinBusy) return;
 
   const inviteInput = getInviteGuestInput();
   const guestName = sanitizeName(inviteInput?.value, createGuestName());
@@ -4153,38 +4138,84 @@ async function continueInviteAsGuest() {
 
   setFieldError(inviteGuestNameField, inviteGuestNameError, '');
   setFieldError(inviteLandingGuestField, inviteLandingGuestError, '');
+  state.online.inviteAutoJoinBusy = true;
   continueInviteGuestButton.disabled = true;
   if (inviteLandingGuestButton) inviteLandingGuestButton.disabled = true;
-  state.ui.pendingInviteAutoJoin = true;
-  showFeedback(onlineLobbyFeedback, 'Създаваме временна гост сесия...', '');
+  if (inviteLandingLoginButton) inviteLandingLoginButton.disabled = true;
+  showFeedback(onlineLobbyFeedback, 'Подготвяме гост достъп и те присъединяваме към стаята...', '');
+  updateHud('Подготвяме гост достъп и те присъединяваме към стаята...');
 
-  const { error } = await state.auth.client.auth.signInAnonymously({
-    options: {
-      data: {
-        username: guestName,
-        first_name: guestName,
-        last_name: '',
-        guest_name: guestName
-      }
+  try {
+    if (state.auth.user) {
+      await withTimeout(state.auth.client.auth.signOut(), 5000, 'Смяната към гост сесия');
+      state.auth.user = null;
+      state.auth.profile = null;
+      state.auth.history = [];
+      state.auth.historyLoaded = false;
+      clearOnlineRoomLocalState();
+      updateAuthUi();
     }
-  });
 
-  continueInviteGuestButton.disabled = false;
-  if (inviteLandingGuestButton) inviteLandingGuestButton.disabled = false;
-  if (error) {
+    const { data, error } = await withTimeout(
+      state.auth.client.auth.signInAnonymously({
+        options: {
+          data: {
+            username: guestName,
+            first_name: guestName,
+            last_name: '',
+            guest_name: guestName
+          }
+        }
+      }),
+      8000,
+      'Създаването на гост сесия'
+    );
+
+    if (error) {
+      const msg = error?.message?.includes('Anonymous sign-ins are disabled')
+        ? 'Гост входът е изключен в Supabase. Активирай Authentication → Providers → Anonymous или използвай регистрация.'
+        : `Не успях да стартирам гост сесия: ${error.message || 'неочаквана грешка'}`;
+      showFeedback(onlineLobbyFeedback, msg, 'error');
+      updateHud(msg);
+      return;
+    }
+
+    const sessionUser = data?.user || data?.session?.user || (await state.auth.client.auth.getSession()).data.session?.user || null;
+    state.auth.user = sessionUser;
+    state.auth.profile = sessionUser
+      ? {
+          id: sessionUser.id,
+          username: guestName,
+          first_name: guestName,
+          last_name: '',
+          full_name: guestName,
+          email: ''
+        }
+      : null;
+    state.auth.history = [];
+    state.auth.historyLoaded = false;
+    state.guest.active = true;
+    state.guest.name1 = guestName;
+    persistGuestState();
+    player1NameInput.value = guestName;
     state.ui.pendingInviteAutoJoin = false;
-    const msg = error?.message?.includes('Anonymous sign-ins are disabled')
-      ? 'Гост входът е изключен в Supabase. Активирай Authentication → Providers → Anonymous или използвай регистрация.'
-      : `Не успях да стартирам гост сесия: ${error.message || 'неочаквана грешка'}`;
+    clearOnlineRoomLocalState();
+    updateAuthUi();
+    renderInviteLanding();
+
+    await joinInviteFromToken();
+  } catch (error) {
+    const msg = error?.message || 'Не успях да те присъединя като гост.';
     showFeedback(onlineLobbyFeedback, msg, 'error');
     updateHud(msg);
-    return;
+  } finally {
+    state.online.inviteAutoJoinBusy = false;
+    continueInviteGuestButton.disabled = false;
+    if (inviteLandingGuestButton) inviteLandingGuestButton.disabled = false;
+    if (inviteLandingLoginButton) inviteLandingLoginButton.disabled = false;
+    renderInviteLanding();
+    updateAuthUi();
   }
-
-  state.guest.active = true;
-  state.guest.name1 = guestName;
-  persistGuestState();
-  player1NameInput.value = guestName;
 }
 
 async function openProfileFromInvite() {
