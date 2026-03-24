@@ -4503,6 +4503,7 @@ async function startOnlineMatch() {
   state.online.startBusy = true;
   updateAuthUi();
   showFeedback(onlineLobbyFeedback, 'Стартираме онлайн мача...', '');
+  updateHud('Стартираме онлайн мача...');
   const previousRoom = { ...room };
   try {
     const deck = createSerializedDeck(room.selected_theme);
@@ -4510,28 +4511,6 @@ async function startOnlineMatch() {
     if (!state.online.channel && state.auth.client) {
       await subscribeToRoom(room.id);
     }
-
-    const optimisticRoom = {
-      ...room,
-      status: 'playing',
-      deck,
-      scores: { '1': 0, '2': 0 },
-      current_player_slot: 1,
-      flipped_indices: [],
-      matched_indices: [],
-      lock_board: false,
-      winner_slot: null,
-      turn_started_at: nowIso,
-      updated_at: nowIso
-    };
-    state.online.room = optimisticRoom;
-    setPreferredRoomId(optimisticRoom.id);
-    state.online.playingGraceUntil = Date.now() + 20000;
-    state.playMode = 'online';
-    state.ui.onlineLobbyOpen = false;
-    renderModeSelector();
-    syncFromOnlineRoom();
-    updateHud('Онлайн мачът стартира. Зареждаме картите...');
 
     const response = await withTimeout(
       state.auth.client.from('rooms').update({
@@ -4545,7 +4524,7 @@ async function startOnlineMatch() {
         winner_slot: null,
         turn_started_at: nowIso,
         updated_at: nowIso
-      }).eq('id', room.id),
+      }).eq('id', room.id).select().single(),
       7000,
       'Старта на играта'
     );
@@ -4554,15 +4533,17 @@ async function startOnlineMatch() {
       throw new Error(`Не успях да стартирам онлайн мача: ${response.error.message || 'неочаквана грешка'}`);
     }
 
-    const freshStartedRoom = await fetchRoomById(room.id);
-    if (freshStartedRoom) {
-      adoptIncomingRoom(freshStartedRoom);
-      syncFromOnlineRoom();
+    const confirmedRoom = response.data || await fetchRoomById(room.id);
+    if (!confirmedRoom || confirmedRoom.status !== 'playing') {
+      throw new Error('Не успях да потвърдя старта на онлайн мача.');
     }
 
+    adoptIncomingRoom(confirmedRoom);
+    state.online.playingGraceUntil = Date.now() + 20000;
     state.playMode = 'online';
     state.ui.onlineLobbyOpen = false;
     renderModeSelector();
+    syncFromOnlineRoom();
     updateAuthUi();
 
     showFeedback(onlineLobbyFeedback, 'Онлайн мачът стартира успешно.', 'success');
