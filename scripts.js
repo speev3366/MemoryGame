@@ -1286,9 +1286,9 @@ function renderInviteLanding() {
   inviteLandingText.textContent = loading
     ? 'Проверяваме линка и подготвяме стаята. Това може да отнеме секунда.'
     : conflictMessage
-      ? conflictMessage
+      ? `${conflictMessage} Можеш да смениш профила или да продължиш като гост само за тази покана.`
       : validPreview
-        ? `Това е директна покана за конкретна стая. ${loggedIn ? 'След вход ще те добавим директно към стаята.' : 'Избери дали да влезеш с профил или като гост с еднократен псевдоним.'}`
+        ? `Това е директна покана за конкретна стая. ${loggedIn ? 'Натисни бутона и ще те добавим директно към стаята, или смени профила/продължи като гост.' : 'Избери дали да влезеш с профил или като гост с еднократен псевдоним.'}`
         : 'Не успяхме да заредим детайлите за поканата, но можеш да продължиш с профил или като гост. При опит за вход ще проверим линка отново.';
 
   inviteLandingMeta.innerHTML = validPreview
@@ -1303,13 +1303,14 @@ function renderInviteLanding() {
       <span class="meta-chip">Токен: ${escapeHtml(String(state.ui.inviteToken || '').slice(0, 8))}…</span>
     `;
 
-  const canShowGuestFlow = Boolean(state.ui.inviteToken && !loggedIn && !conflictMessage);
+  const canShowGuestFlow = Boolean(state.ui.inviteToken);
   const canShowJoinFlow = Boolean(state.ui.inviteToken && loggedIn && !conflictMessage);
 
   inviteLandingGuestField.classList.toggle('hidden', !canShowGuestFlow);
   inviteLandingGuestButton.classList.toggle('hidden', !canShowGuestFlow);
-  inviteLandingLoginButton.classList.toggle('hidden', loggedIn || Boolean(conflictMessage));
+  inviteLandingLoginButton.classList.remove('hidden');
   inviteLandingJoinButton.classList.toggle('hidden', !canShowJoinFlow);
+  inviteLandingLoginButton.textContent = loggedIn ? 'Смени профил' : 'Вход / регистрация';
 
   if (canShowGuestFlow && !inviteLandingGuestInput.value.trim()) inviteLandingGuestInput.value = createGuestName();
   inviteLandingJoinButton.disabled = loading && !validPreview;
@@ -1318,8 +1319,15 @@ function renderInviteLanding() {
 }
 
 function getInviteConflictMessage() {
-  if (!state.ui.inviteToken || !state.online.invitePreview || !state.online.room) return '';
-  if (state.online.room.id === state.online.invitePreview.id) return '';
+  const room = state.online.room;
+  const preview = state.online.invitePreview;
+  const user = state.auth.user;
+  if (!state.ui.inviteToken || !preview || !room || !user) return '';
+  if (room.id === preview.id) return '';
+  if (room.invite_token && room.invite_token === state.ui.inviteToken) return '';
+  if (!['waiting', 'playing'].includes(room.status)) return '';
+  const belongsToUser = room.host_user_id === user.id || room.guest_user_id === user.id;
+  if (!belongsToUser) return '';
   return 'Имаш друга активна стая. Затвори я, преди да използваш тази покана.';
 }
 
@@ -4055,6 +4063,21 @@ async function continueInviteAsGuest() {
     return;
   }
 
+  if (state.auth.user) {
+    try {
+      await withTimeout(state.auth.client.auth.signOut(), 5000, 'Смяната към гост сесия');
+      state.auth.user = null;
+      state.auth.profile = null;
+      state.auth.history = [];
+      state.auth.historyLoaded = false;
+      clearOnlineRoomLocalState();
+      updateAuthUi();
+    } catch (error) {
+      updateHud('Не успях да сменя текущия профил. Пробвай пак.');
+      return;
+    }
+  }
+
   const inviteInput = getInviteGuestInput();
   const guestName = sanitizeName(inviteInput?.value, createGuestName());
   if (inviteInput) inviteInput.value = guestName;
@@ -4101,8 +4124,23 @@ async function continueInviteAsGuest() {
   player1NameInput.value = guestName;
 }
 
-function openProfileFromInvite() {
+async function openProfileFromInvite() {
   state.ui.pendingOnlineIntent = false;
+  if (state.auth.user) {
+    try {
+      await withTimeout(state.auth.client.auth.signOut(), 5000, 'Смяната на профила');
+      state.auth.user = null;
+      state.auth.profile = null;
+      state.auth.history = [];
+      state.auth.historyLoaded = false;
+      clearOnlineRoomLocalState();
+      updateAuthUi();
+    } catch (error) {
+      updateHud('Не успях да изляза от текущия профил. Пробвай пак.');
+      return;
+    }
+  }
+  setAuthTab('login');
   toggleProfilePanel(true);
   renderInviteLanding();
   updateHud('Поканата е активна. Влез в профила си и ще те добавим директно в стаята.');
