@@ -486,6 +486,11 @@ async function withTimeout(promise, ms = 8000, label = 'Операцията') {
   }
 }
 
+
+function delay(ms = 0) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function removeOnlineChannel(channel = state.online.channel) {
   if (!channel || !state.auth.client) return;
   try {
@@ -3623,9 +3628,11 @@ async function loginUser(event) {
   state.ui.pendingOnlineIntent = false;
   showFeedback(loginFeedback, resolved.mode === 'username' ? 'Успешен вход с username.' : 'Успешен вход.', 'success');
   if (state.ui.inviteToken) {
+    state.ui.pendingInviteAutoJoin = true;
     toggleProfilePanel(false);
     await loadInvitePreview();
-    await joinInviteFromToken();
+    Promise.resolve().then(() => attemptInviteAutoJoinLoggedUser()).catch((error) => console.warn('Invite auto join failed', error));
+    updateHud('Успешен вход. Присъединяваме те към поканената стая...');
   } else {
     toggleProfilePanel(false);
     updateHud('Успешен вход. Остана на началния екран.');
@@ -3717,6 +3724,25 @@ async function subscribeToRoom(roomId) {
       scheduleOnlineRefreshBurst([0, 250, 900]);
     }
   });
+}
+
+
+async function attemptInviteAutoJoinLoggedUser() {
+  if (!state.ui.pendingInviteAutoJoin || !state.ui.inviteToken || !state.auth.user) return;
+  if (state.online.joinBusy || state.online.inviteAutoJoinBusy) return;
+  const sameInviteRoom = isSameInviteRoom();
+  if (sameInviteRoom && state.online.room) {
+    state.ui.pendingInviteAutoJoin = false;
+    clearInviteContext();
+    renderInviteLanding();
+    return;
+  }
+  if (hasActiveOnlineRoom() && !sameInviteRoom) {
+    renderInviteLanding();
+    return;
+  }
+  state.ui.pendingInviteAutoJoin = false;
+  await joinInviteFromToken();
 }
 
 async function loadInvitePreview() {
@@ -4524,8 +4550,8 @@ async function startOnlineMatch() {
         winner_slot: null,
         turn_started_at: nowIso,
         updated_at: nowIso
-      }).eq('id', room.id).select().single(),
-      7000,
+      }).eq('id', room.id),
+      4500,
       'Старта на играта'
     );
 
@@ -4533,8 +4559,16 @@ async function startOnlineMatch() {
       throw new Error(`Не успях да стартирам онлайн мача: ${response.error.message || 'неочаквана грешка'}`);
     }
 
-    const confirmedRoom = response.data || await fetchRoomById(room.id);
-    if (!confirmedRoom || confirmedRoom.status !== 'playing') {
+    let confirmedRoom = null;
+    for (const waitMs of [0, 250, 500, 900, 1400, 2200]) {
+      if (waitMs) await delay(waitMs);
+      const fresh = await fetchRoomById(room.id);
+      if (fresh && fresh.status === 'playing') {
+        confirmedRoom = fresh;
+        break;
+      }
+    }
+    if (!confirmedRoom) {
       throw new Error('Не успях да потвърдя старта на онлайн мача.');
     }
 
