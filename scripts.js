@@ -529,10 +529,13 @@ function ensureOnlineSyncLoop() {
   if (state.online.syncInterval) return;
   state.online.syncInterval = window.setInterval(() => {
     if (!state.auth.user || !state.auth.client) return;
-    if (state.online.room || state.ui.onlineLobbyOpen || state.playMode === 'online' || state.ui.inviteToken) {
+    const room = state.online.room;
+    // По време на активна игра избягваме агресивен polling, за да не връщаме клиента към lobby.
+    if (room?.status === 'playing') return;
+    if (room || state.ui.onlineLobbyOpen || state.playMode === 'online' || state.ui.inviteToken) {
       refreshOnlineState(true);
     }
-  }, 2200);
+  }, 1200);
 }
 
 function persistGuestState() {
@@ -895,7 +898,7 @@ async function refreshOnlineState(force = false) {
     state.online.refreshBusyAt = 0;
   }
   if (state.online.refreshBusy) return;
-  const minRefreshGap = state.online.room?.status === 'playing' ? 2500 : (state.online.room?.status === 'waiting' ? 800 : 1500);
+  const minRefreshGap = state.online.room?.status === 'playing' ? 8000 : (state.online.room?.status === 'waiting' ? 700 : 1500);
   if (!force && now - state.online.lastRefreshAt < minRefreshGap) return;
   state.online.refreshBusy = true;
   state.online.refreshBusyAt = now;
@@ -924,18 +927,21 @@ async function refreshOnlineState(force = false) {
         }
       } else if (state.online.room) {
         state.online.refreshMisses = (state.online.refreshMisses || 0) + 1;
-        const missLimit = previousRoom?.status === 'playing' ? 20 : (previousRoom?.guest_user_id ? 8 : 4);
+        // По време на игра не сриваме локалното състояние при временен пропуснат fetch.
+        if (previousRoom?.status === 'playing') {
+          if (!state.online.channel && previousRoom?.id) {
+            await subscribeToRoom(previousRoom.id);
+          }
+          return;
+        }
+        const missLimit = previousRoom?.guest_user_id ? 10 : 5;
         if (state.online.refreshMisses >= missLimit) {
           const active = await loadMyActiveRoom();
           if (active) {
             state.online.refreshMisses = 0;
-            if (previousRoom?.status === 'playing' && active.id === previousRoom?.id && active.status === 'waiting') {
-              // Игнорирай временен стар snapshot, който би върнал играта обратно в lobby.
-            } else {
-              if (active.id !== previousRoom?.id) await subscribeToRoom(active.id);
-              syncFromOnlineRoom();
-            }
-          } else if (previousRoom?.status !== 'playing' || Date.now() >= (state.online.playingGraceUntil || 0)) {
+            if (active.id !== previousRoom?.id) await subscribeToRoom(active.id);
+            syncFromOnlineRoom();
+          } else {
             clearOnlineRoomLocalState();
             if (state.playMode === 'online') {
               resetRoundState();
@@ -3684,7 +3690,7 @@ async function subscribeToRoom(roomId) {
         state.online.playingGraceUntil = Date.now() + 20000;
         queuePersistentNotice('Онлайн мачът започна. Успех!');
         updateHud('Онлайн мачът започна. Зареждаме картите...');
-        scheduleOnlineRefreshBurst([0, 250, 700, 1600, 2600]);
+        scheduleOnlineRefreshBurst([0, 400, 1200, 2600, 4200]);
       }
       if (isRoomInactive(payload.new)) {
         await autoFinishRoomForInactivity(payload.new, { keepLocalState: true });
@@ -4625,6 +4631,9 @@ function syncFromOnlineRoom() {
         updateHud(myRoomSlot() === 1
           ? 'И двамата играчи са в стаята. Можеш да дадеш „Старт онлайн“.'
           : 'Успешно присъединяване. Изчаква се домакинът да стартира играта.');
+        if (myRoomSlot() === 2) {
+          scheduleOnlineRefreshBurst([300, 900, 1800, 3200, 5000]);
+        }
       } else if (isOnlineMode() || state.ui.onlineLobbyOpen) {
         updateHud(myRoomSlot() === 2
           ? 'Успешно присъединяване. Изчаква се домакинът да стартира играта.'
