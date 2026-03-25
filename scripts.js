@@ -540,8 +540,9 @@ function ensureOnlineSyncLoop() {
     if (!state.auth.user || !state.auth.client) return;
     if (!(state.online.room || state.ui.onlineLobbyOpen || state.playMode === 'online' || state.ui.inviteToken)) return;
     refreshOnlineState(false).catch((error) => console.warn('online sync tick failed', error));
-  }, 3000);
+  }, 1000);
 }
+
 
 function persistGuestState() {
   localStorage.setItem('memory_duel_guest_state', JSON.stringify(state.guest));
@@ -875,6 +876,55 @@ function scheduleOnlineRefreshBurst(delays = [0, 600], options = {}) {
   });
 }
 
+async function forceUiResync(options = {}) {
+  if (!state.auth.client) {
+    updateAuthUi();
+    return;
+  }
+  const roomId = options.roomId || state.online.room?.id || state.online.preferredRoomId || null;
+  let changed = false;
+  if (state.auth.user && roomId) {
+    const fresh = await fetchRoomById(roomId);
+    if (fresh) {
+      changed = adoptIncomingRoom(fresh) || changed;
+      if (!state.online.channel || state.online.channel.topic !== `realtime:memory-duel-room:${fresh.id}`) {
+        await subscribeToRoom(fresh.id);
+      }
+    }
+  }
+  if (state.auth.user && !state.online.room) {
+    const active = await loadMyActiveRoom();
+    if (active) {
+      changed = true;
+      if (!state.online.channel || state.online.channel.topic !== `realtime:memory-duel-room:${active.id}`) {
+        await subscribeToRoom(active.id);
+      }
+    }
+  }
+  if (state.auth.user && canUseOnlineLobby()) {
+    loadLobbyRooms().catch((error) => console.warn('forceUiResync lobby failed', error));
+  }
+  if (state.online.room && state.online.room.status === 'playing') {
+    state.playMode = 'online';
+    state.ui.onlineLobbyOpen = false;
+  }
+  if (changed && state.online.room) syncFromOnlineRoom();
+  updateAuthUi();
+  renderModeSelector();
+  renderInviteLanding();
+}
+
+function scheduleHardUiSync(delays = [0, 400, 1200], options = {}) {
+  (state.online.hardSyncTimers || []).forEach((id) => clearTimeout(id));
+  state.online.hardSyncTimers = [];
+  delays.forEach((delayMs) => {
+    const id = window.setTimeout(() => {
+      forceUiResync(options).catch((error) => console.warn('hard UI sync failed', error));
+    }, delayMs);
+    state.online.hardSyncTimers.push(id);
+  });
+}
+
 function getTurnRemainingMs() {
   const onlineTurnAnchor = getOnlineTurnAnchor();
   if (state.playMode === 'online' && state.online.room?.status === 'playing' && onlineTurnAnchor) {
@@ -941,10 +991,8 @@ async function refreshOnlineState(force = false) {
   if (state.online.refreshBusy) return;
   const currentRoom = state.online.room;
   const inPlaying = currentRoom?.status === 'playing';
-  const hasRealtime = Boolean(state.online.channel);
-  const minGap = inPlaying ? (hasRealtime ? 5000 : 1800) : (currentRoom ? 1800 : 2500);
+  const minGap = inPlaying ? 900 : (currentRoom ? 900 : 1500);
   if (!force && now - (state.online.lastRefreshAt || 0) < minGap) return;
-  if (inPlaying && hasRealtime && !force) return;
   if (inPlaying && now < (state.online.suspendRefreshUntil || 0) && !force) return;
   state.online.refreshBusy = true;
   state.online.lastRefreshAt = now;
@@ -970,7 +1018,7 @@ async function refreshOnlineState(force = false) {
         }
       } else {
         state.online.refreshMisses = (state.online.refreshMisses || 0) + 1;
-        if (currentRoom.status === 'playing' && state.online.refreshMisses < 12) return;
+        if (currentRoom.status === 'playing' && state.online.refreshMisses < 25) return;
         if (currentRoom.status === 'waiting' && state.online.refreshMisses < 4) return;
         clearOnlineRoomLocalState();
         if (state.playMode === 'online') {
@@ -1025,6 +1073,7 @@ async function handleOnlineTurnTimeout() {
   }
   adoptIncomingRoom(updated);
   syncFromOnlineRoom();
+  scheduleHardUiSync([0, 300, 900], { roomId: updated.id || room.id });
   updateHud(`Времето за ход изтече. Ред е на ${getPlayerName(updated.current_player_slot || getOtherSlot(room.current_player_slot || 1))}.`);
   return true;
 }
@@ -3305,6 +3354,7 @@ async function initAuth() {
         state.ui.pendingInviteAutoJoin = false;
         if (!state.online.room || state.online.room.invite_token !== state.ui.inviteToken) {
           await joinInviteFromToken();
+    scheduleHardUiSync([0, 400, 1200, 2500], { roomId: state.online.room?.id || null });
         }
       }
       Promise.resolve().then(() => attemptInviteAutoJoinLoggedUser()).catch((error) => console.warn('Invite auto join failed', error));
@@ -3626,24 +3676,33 @@ async function loginUser(event) {
     return;
   }
 
-  await loadProfile();
-  await loadMatchHistory();
-  player1NameInput.value = sanitizeName(
-    state.auth.profile?.first_name || state.auth.profile?.username || resolved.matchedUsername || resolved.email.split('@')[0],
-    'Играч 1'
-  );
   state.ui.pendingOnlineIntent = false;
+  player1NameInput.value = sanitizeName(resolved.matchedUsername || resolved.email.split('@')[0], 'Играч 1');
   showFeedback(loginFeedback, resolved.mode === 'username' ? 'Успешен вход с username.' : 'Успешен вход.', 'success');
-  if (state.ui.inviteToken) {
-    state.ui.pendingInviteAutoJoin = true;
-    toggleProfilePanel(false);
-    await loadInvitePreview();
-    Promise.resolve().then(() => attemptInviteAutoJoinLoggedUser()).catch((error) => console.warn('Invite auto join failed', error));
-    updateHud('Успешен вход. Присъединяваме те към поканената стая...');
-  } else {
-    toggleProfilePanel(false);
-    updateHud('Успешен вход. Остана на началния екран.');
-  }
+  toggleProfilePanel(false);
+  updateAuthUi();
+  scheduleHardUiSync([0, 500, 1500]);
+  Promise.resolve().then(async () => {
+    try {
+      await loadProfile();
+      await loadMatchHistory();
+      player1NameInput.value = sanitizeName(
+        state.auth.profile?.first_name || state.auth.profile?.username || resolved.matchedUsername || resolved.email.split('@')[0],
+        'Играч 1'
+      );
+      if (state.ui.inviteToken) {
+        state.ui.pendingInviteAutoJoin = true;
+        await loadInvitePreview();
+        await attemptInviteAutoJoinLoggedUser();
+        updateHud('Успешен вход. Присъединяваме те към поканената стая...');
+      } else {
+        updateHud('Успешен вход. Остана на началния екран.');
+      }
+      await forceUiResync();
+    } catch (error) {
+      console.warn('post-login sync failed', error);
+    }
+  });
 }
 
 async function logoutUser() {
@@ -3925,6 +3984,7 @@ async function createRoom() {
     syncFromOnlineRoom();
     updateAuthUi();
     await subscribeToRoom(createdRoom.id);
+    scheduleHardUiSync([0, 400, 1200, 2500], { roomId: createdRoom.id });
     Promise.resolve().then(async () => {
       try {
         if (previousWaitingRoom?.id && previousWaitingRoom.id !== createdRoom.id) {
@@ -3998,6 +4058,7 @@ async function joinRoomByRecord(room) {
     setOnlineLobbyOpen(true);
     syncFromOnlineRoom();
     await subscribeToRoom(joined.id);
+    scheduleHardUiSync([0, 400, 1200, 2500], { roomId: joined.id });
     if (canUseOnlineLobby()) await loadLobbyRooms();
     updateHud(`Свързан си към стая ${joined.code}.`);
     setFieldError(joinRoomField, joinRoomError, '');
@@ -4101,6 +4162,7 @@ async function joinInviteFromToken() {
     renderInviteLanding();
     syncFromOnlineRoom();
     await subscribeToRoom(joinedRoom.id);
+    scheduleHardUiSync([0, 400, 1200, 2500], { roomId: joinedRoom.id });
     updateAuthUi();
     const joinedCode = joinedRoom.code || '—';
     showFeedback(onlineLobbyFeedback, `Влезе в поканената стая ${joinedCode}. Изчакай домакинът да натисне „Старт онлайн“.`, 'success');
@@ -4284,6 +4346,7 @@ async function leaveRoom(options = {}) {
   try {
     await rpcCall('leave_room_safe', { p_room_id: roomId }, 10000, wasHost ? 'Затварянето на стаята' : 'Напускането на стаята');
     if (stayOnline && canUseOnlineLobby()) await loadLobbyRooms();
+    scheduleHardUiSync([0, 400, 1200]);
     updateHud(wasPlaying ? 'Излезе от онлайн играта.' : (wasHost ? 'Стаята беше затворена.' : 'Напусна стаята.'));
   } catch (error) {
     updateHud(error?.message || 'Не успях да затворя/напусна стаята.');
@@ -4358,6 +4421,7 @@ async function startOnlineMatch() {
     renderModeSelector();
     syncFromOnlineRoom();
     updateAuthUi();
+    scheduleHardUiSync([0, 400, 1200, 2500], { roomId: startedRoom.id });
     showFeedback(onlineLobbyFeedback, 'Онлайн мачът стартира успешно.', 'success');
     updateHud('Онлайн мачът стартира. Играта започва.');
   } catch (error) {
@@ -4496,6 +4560,7 @@ function scheduleRoomUnlockResolution(roomId) {
       if (updated) {
         adoptIncomingRoom(updated);
         syncFromOnlineRoom();
+        scheduleHardUiSync([0, 300, 900], { roomId: updated.id || roomId });
       }
     } catch (error) {
       console.warn('clear_room_lock failed', error);
@@ -4518,6 +4583,7 @@ async function handleOnlineFlip(card) {
     if (!updated) return;
     adoptIncomingRoom(updated);
     syncFromOnlineRoom();
+    scheduleHardUiSync([0, 300, 900], { roomId: updated.id || room.id });
     if (updated.lock_board && Array.isArray(updated.flipped_indices) && updated.flipped_indices.length >= 2) {
       scheduleRoomUnlockResolution(updated.id || room.id);
     }
