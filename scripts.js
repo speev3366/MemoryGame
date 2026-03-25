@@ -887,8 +887,8 @@ async function forceUiResync(options = {}) {
     const fresh = await fetchRoomById(roomId);
     if (fresh) {
       changed = adoptIncomingRoom(fresh) || changed;
-      if (!state.online.channel || state.online.channel.topic !== `realtime:memory-duel-room:${fresh.id}`) {
-        await subscribeToRoom(fresh.id);
+      if (!state.online.channel || state.online.subscribedRoomId !== fresh.id) {
+        Promise.resolve().then(() => subscribeToRoom(fresh.id)).catch((error) => console.warn('forceUiResync subscribe failed', error));
       }
     }
   }
@@ -896,8 +896,8 @@ async function forceUiResync(options = {}) {
     const active = await loadMyActiveRoom();
     if (active) {
       changed = true;
-      if (!state.online.channel || state.online.channel.topic !== `realtime:memory-duel-room:${active.id}`) {
-        await subscribeToRoom(active.id);
+      if (!state.online.channel || state.online.subscribedRoomId !== active.id) {
+        Promise.resolve().then(() => subscribeToRoom(active.id)).catch((error) => console.warn('forceUiResync subscribe failed', error));
       }
     }
   }
@@ -923,6 +923,26 @@ function scheduleHardUiSync(delays = [0, 400, 1200], options = {}) {
     }, delayMs);
     state.online.hardSyncTimers.push(id);
   });
+}
+
+
+async function confirmRoomState(roomId, predicate, timeoutMs = 12000, intervalMs = 350) {
+  const startedAt = Date.now();
+  let lastRoom = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    const fresh = await fetchRoomById(roomId);
+    if (fresh) {
+      lastRoom = fresh;
+      const adopted = adoptIncomingRoom(fresh);
+      if (adopted) syncFromOnlineRoom();
+      if (!state.online.channel || state.online.subscribedRoomId !== fresh.id) {
+        Promise.resolve().then(() => subscribeToRoom(fresh.id)).catch((error) => console.warn('confirmRoomState subscribe failed', error));
+      }
+      if (predicate(fresh)) return fresh;
+    }
+    await delay(intervalMs);
+  }
+  return lastRoom;
 }
 
 function getTurnRemainingMs() {
@@ -3741,6 +3761,7 @@ async function logoutUser() {
 async function subscribeToRoom(roomId) {
   if (!roomId || !state.auth.client) return null;
   setPreferredRoomId(roomId);
+  state.online.subscribedRoomId = roomId;
   if (state.online.channel && state.auth.client) {
     removeOnlineChannel(state.online.channel);
     state.online.channel = null;
@@ -3807,6 +3828,7 @@ async function subscribeToRoom(roomId) {
   } catch (error) {
     console.warn('Room realtime subscribe failed', error);
     state.online.channel = null;
+    state.online.subscribedRoomId = null;
   }
 
   const fresh = await fetchRoomById(roomId);
@@ -3970,7 +3992,19 @@ async function createRoom() {
       p_access_type: state.online.accessType,
       p_plain_password: state.online.accessType === 'password' ? roomPasswordInput.value.trim() : null
     };
-    const createdRoom = normalizeRpcSingle(await rpcCall('create_room_secure', payload, 10000, 'Създаването на стая'));
+    let createdRoom = null;
+    try {
+      createdRoom = normalizeRpcSingle(await rpcCall('create_room_secure', payload, 30000, 'Създаването на стая'));
+    } catch (rpcError) {
+      console.warn('create_room_secure delayed', rpcError);
+    }
+    if (!createdRoom) {
+      createdRoom = await confirmRoomState(state.online.preferredRoomId || state.online.room?.id || null, (fresh) => fresh.status === 'waiting' && fresh.host_user_id === state.auth.user?.id, 5000);
+    }
+    if (!createdRoom) {
+      const activeRoom = await loadMyActiveRoom();
+      if (activeRoom && activeRoom.status === 'waiting' && activeRoom.host_user_id === state.auth.user?.id) createdRoom = activeRoom;
+    }
     if (!createdRoom) throw new Error('Неуспешно създаване на стая.');
 
     state.online.room = createdRoom;
@@ -3983,12 +4017,12 @@ async function createRoom() {
     if (createdRoom.access_type !== 'invite') clearInviteContext();
     syncFromOnlineRoom();
     updateAuthUi();
-    await subscribeToRoom(createdRoom.id);
-    scheduleHardUiSync([0, 400, 1200, 2500], { roomId: createdRoom.id });
+    Promise.resolve().then(() => subscribeToRoom(createdRoom.id)).catch((error) => console.warn('create subscribe failed', error));
+    scheduleHardUiSync([0, 300, 900, 1800], { roomId: createdRoom.id });
     Promise.resolve().then(async () => {
       try {
         if (previousWaitingRoom?.id && previousWaitingRoom.id !== createdRoom.id) {
-          await rpcCall('leave_room_safe', { p_room_id: previousWaitingRoom.id }, 10000, 'Затварянето на старата стая');
+          await rpcCall('leave_room_safe', { p_room_id: previousWaitingRoom.id }, 15000, 'Затварянето на старата стая');
         }
         await loadLobbyRooms();
       } catch (error) {
@@ -4149,7 +4183,16 @@ async function joinInviteFromToken() {
   if (inviteLandingJoinButton) inviteLandingJoinButton.disabled = true;
   showFeedback(onlineLobbyFeedback, 'Присъединяваме те към поканената стая...', '');
   try {
-    const joinedRoom = normalizeRpcSingle(await rpcCall('join_room_with_invite', { p_invite_token: state.ui.inviteToken, p_guest_name: getDisplayName() }, 10000, 'Приемането на поканата'));
+    let joinedRoom = null;
+    try {
+      joinedRoom = normalizeRpcSingle(await rpcCall('join_room_with_invite', { p_invite_token: state.ui.inviteToken, p_guest_name: getDisplayName() }, 30000, 'Приемането на поканата'));
+    } catch (rpcError) {
+      console.warn('join_room_with_invite delayed', rpcError);
+    }
+    if (!joinedRoom) {
+      const activeRoom = await loadMyActiveRoom();
+      if (activeRoom && activeRoom.status === 'waiting') joinedRoom = activeRoom;
+    }
     if (!joinedRoom) throw new Error('Не успяхме да приемем поканата.');
     state.playMode = 'online';
     setOnlineLobbyOpen(true);
@@ -4161,8 +4204,8 @@ async function joinInviteFromToken() {
     renderModeSelector();
     renderInviteLanding();
     syncFromOnlineRoom();
-    await subscribeToRoom(joinedRoom.id);
-    scheduleHardUiSync([0, 400, 1200, 2500], { roomId: joinedRoom.id });
+    Promise.resolve().then(() => subscribeToRoom(joinedRoom.id)).catch((error) => console.warn('invite subscribe failed', error));
+    scheduleHardUiSync([0, 300, 900, 1800], { roomId: joinedRoom.id });
     updateAuthUi();
     const joinedCode = joinedRoom.code || '—';
     showFeedback(onlineLobbyFeedback, `Влезе в поканената стая ${joinedCode}. Изчакай домакинът да натисне „Старт онлайн“.`, 'success');
@@ -4410,8 +4453,16 @@ async function startOnlineMatch() {
   updateHud('Стартираме онлайн мача...');
   try {
     const deck = createSerializedDeck(room.selected_theme);
-    const startedRoom = normalizeRpcSingle(await rpcCall('start_room_match', { p_room_id: room.id, p_deck: deck }, 15000, 'Старта на играта'));
-    if (!startedRoom) throw new Error('Не успях да стартирам онлайн мача.');
+    let startedRoom = null;
+    try {
+      startedRoom = normalizeRpcSingle(await rpcCall('start_room_match', { p_room_id: room.id, p_deck: deck }, 30000, 'Старта на играта'));
+    } catch (rpcError) {
+      console.warn('start_room_match delayed', rpcError);
+    }
+    if (!startedRoom) {
+      startedRoom = await confirmRoomState(room.id, (fresh) => fresh.status === 'playing' && Array.isArray(fresh.deck) && fresh.deck.length > 0, 12000);
+    }
+    if (!startedRoom) throw new Error('Старта на играта отне твърде дълго.');
     adoptIncomingRoom(startedRoom);
     state.online.playingGraceUntil = Date.now() + 30000;
     state.online.allowPlayingBurstUntil = Date.now() + 1500;
@@ -4421,7 +4472,7 @@ async function startOnlineMatch() {
     renderModeSelector();
     syncFromOnlineRoom();
     updateAuthUi();
-    scheduleHardUiSync([0, 400, 1200, 2500], { roomId: startedRoom.id });
+    scheduleHardUiSync([0, 300, 900, 1800], { roomId: startedRoom.id });
     showFeedback(onlineLobbyFeedback, 'Онлайн мачът стартира успешно.', 'success');
     updateHud('Онлайн мачът стартира. Играта започва.');
   } catch (error) {
@@ -4578,12 +4629,21 @@ async function handleOnlineFlip(card) {
   if (room.lock_board) return;
 
   const index = Number(card.dataset.index);
+  const beforeKey = roomSnapshotKey(room);
   try {
-    const updated = normalizeRpcSingle(await rpcCall('apply_room_flip', { p_room_id: room.id, p_index: index }, 10000, 'Обръщането на карта'));
+    let updated = null;
+    try {
+      updated = normalizeRpcSingle(await rpcCall('apply_room_flip', { p_room_id: room.id, p_index: index }, 20000, 'Обръщането на карта'));
+    } catch (rpcError) {
+      console.warn('apply_room_flip delayed', rpcError);
+    }
+    if (!updated) {
+      updated = await confirmRoomState(room.id, (fresh) => roomSnapshotKey(fresh) !== beforeKey, 5000, 250);
+    }
     if (!updated) return;
     adoptIncomingRoom(updated);
     syncFromOnlineRoom();
-    scheduleHardUiSync([0, 300, 900], { roomId: updated.id || room.id });
+    scheduleHardUiSync([0, 250, 700], { roomId: updated.id || room.id });
     if (updated.lock_board && Array.isArray(updated.flipped_indices) && updated.flipped_indices.length >= 2) {
       scheduleRoomUnlockResolution(updated.id || room.id);
     }
