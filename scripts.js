@@ -540,7 +540,7 @@ function ensureOnlineSyncLoop() {
     if (!state.auth.user || !state.auth.client) return;
     if (!(state.online.room || state.ui.onlineLobbyOpen || state.playMode === 'online' || state.ui.inviteToken)) return;
     refreshOnlineState(false).catch((error) => console.warn('online sync tick failed', error));
-  }, 900);
+  }, 3000);
 }
 
 function persistGuestState() {
@@ -941,8 +941,10 @@ async function refreshOnlineState(force = false) {
   if (state.online.refreshBusy) return;
   const currentRoom = state.online.room;
   const inPlaying = currentRoom?.status === 'playing';
-  const minGap = inPlaying ? 900 : (currentRoom ? 1200 : 1800);
+  const hasRealtime = Boolean(state.online.channel);
+  const minGap = inPlaying ? (hasRealtime ? 5000 : 1800) : (currentRoom ? 1800 : 2500);
   if (!force && now - (state.online.lastRefreshAt || 0) < minGap) return;
+  if (inPlaying && hasRealtime && !force) return;
   if (inPlaying && now < (state.online.suspendRefreshUntil || 0) && !force) return;
   state.online.refreshBusy = true;
   state.online.lastRefreshAt = now;
@@ -968,8 +970,8 @@ async function refreshOnlineState(force = false) {
         }
       } else {
         state.online.refreshMisses = (state.online.refreshMisses || 0) + 1;
-        if (currentRoom.status === 'playing' && state.online.refreshMisses < 8) return;
-        if (currentRoom.status === 'waiting' && state.online.refreshMisses < 3) return;
+        if (currentRoom.status === 'playing' && state.online.refreshMisses < 12) return;
+        if (currentRoom.status === 'waiting' && state.online.refreshMisses < 4) return;
         clearOnlineRoomLocalState();
         if (state.playMode === 'online') {
           resetRoundState();
@@ -1014,18 +1016,14 @@ function handleLocalTurnTimeout() {
 async function handleOnlineTurnTimeout() {
   const room = state.online.room;
   if (!room || room.status !== 'playing' || room.lock_board) return false;
-  const nextSlot = getOtherSlot(room.current_player_slot || 1);
-  const patched = await patchRoom({
-    flipped_indices: [],
-    lock_board: false,
-    current_player_slot: nextSlot,
-    turn_started_at: getNowIso()
-  }, { silent: false, refreshLobby: false });
-  if (!patched) {
+  const updated = normalizeRpcSingle(await rpcCall('pass_turn_if_expired', { p_room_id: room.id }, 2500, 'Смяната на хода'));
+  if (!updated) {
     state.online.lastTimeoutKey = null;
     return false;
   }
-  updateHud(`Времето за ход изтече. Ред е на ${getPlayerName(nextSlot)}.`);
+  adoptIncomingRoom(updated);
+  syncFromOnlineRoom();
+  updateHud(`Времето за ход изтече. Ред е на ${getPlayerName(updated.current_player_slot || getOtherSlot(room.current_player_slot || 1))}.`);
   return true;
 }
 
@@ -3680,12 +3678,74 @@ async function logoutUser() {
 }
 
 async function subscribeToRoom(roomId) {
-  if (!roomId) return null;
+  if (!roomId || !state.auth.client) return null;
   setPreferredRoomId(roomId);
   if (state.online.channel && state.auth.client) {
     removeOnlineChannel(state.online.channel);
     state.online.channel = null;
   }
+
+  const channel = state.auth.client
+    .channel(`memory-duel-room:${roomId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'rooms',
+      filter: `id=eq.${roomId}`
+    }, (payload) => {
+      const eventType = payload.eventType;
+      if (eventType === 'DELETE') {
+        if (state.online.room?.id === roomId) {
+          clearOnlineRoomLocalState();
+          if (state.playMode === 'online') {
+            resetRoundState();
+            setOnlineLobbyOpen(true);
+            updateHud('Онлайн стаята беше затворена.');
+            updateAuthUi();
+          }
+        }
+        return;
+      }
+      const nextRoom = payload.new || null;
+      if (!nextRoom) return;
+      const previous = state.online.room ? { ...state.online.room } : null;
+      const adopted = adoptIncomingRoom(nextRoom);
+      if (!adopted) return;
+      syncFromOnlineRoom();
+      if (previous && previous.status === 'waiting' && !previous.guest_user_id && nextRoom.guest_user_id && myRoomSlot() === 1) {
+        const guestLabel = sanitizeName(nextRoom.guest_name || 'Гост', 'Гост');
+        showFeedback(onlineLobbyFeedback, `Играч ${guestLabel} се присъедини. Вече можеш да натиснеш „Старт онлайн“.`, 'success');
+        updateHud(`Играч ${guestLabel} се присъедини към стаята. Натисни „Старт онлайн“.`);
+      }
+    });
+
+  try {
+    state.online.channel = channel;
+    await new Promise((resolve, reject) => {
+      let settled = false;
+      const timeoutId = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('Realtime subscription timeout'));
+      }, 3500);
+      channel.subscribe((status) => {
+        if (settled) return;
+        if (status === 'SUBSCRIBED') {
+          settled = true;
+          clearTimeout(timeoutId);
+          resolve(null);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          settled = true;
+          clearTimeout(timeoutId);
+          reject(new Error(status));
+        }
+      });
+    });
+  } catch (error) {
+    console.warn('Room realtime subscribe failed', error);
+    state.online.channel = null;
+  }
+
   const fresh = await fetchRoomById(roomId);
   if (fresh) {
     adoptIncomingRoom(fresh);
@@ -4283,7 +4343,7 @@ async function startOnlineMatch() {
   updateHud('Стартираме онлайн мача...');
   try {
     const deck = createSerializedDeck(room.selected_theme);
-    const startedRoom = normalizeRpcSingle(await rpcCall('start_room_match', { p_room_id: room.id, p_deck: deck }, 3500, 'Старта на играта'));
+    const startedRoom = normalizeRpcSingle(await rpcCall('start_room_match', { p_room_id: room.id, p_deck: deck }, 6000, 'Старта на играта'));
     if (!startedRoom) throw new Error('Не успях да стартирам онлайн мача.');
     adoptIncomingRoom(startedRoom);
     state.online.playingGraceUntil = Date.now() + 30000;
@@ -4296,7 +4356,6 @@ async function startOnlineMatch() {
     updateAuthUi();
     showFeedback(onlineLobbyFeedback, 'Онлайн мачът стартира успешно.', 'success');
     updateHud('Онлайн мачът стартира. Играта започва.');
-    scheduleOnlineRefreshBurst([350, 900], { allowDuringPlaying: true });
   } catch (error) {
     const msg = error?.message || 'Не успях да стартирам онлайн мача.';
     showFeedback(onlineLobbyFeedback, msg, 'error');
@@ -4423,64 +4482,44 @@ async function patchRoom(patch, options = {}) {
   }
 }
 
+
+function scheduleRoomUnlockResolution(roomId) {
+  if (!roomId) return;
+  if (state.online.pendingTimeout) clearTimeout(state.online.pendingTimeout);
+  state.online.pendingTimeout = setTimeout(async () => {
+    try {
+      const updated = normalizeRpcSingle(await rpcCall('clear_room_lock', { p_room_id: roomId }, 2500, 'Разкриването на картите'));
+      if (updated) {
+        adoptIncomingRoom(updated);
+        syncFromOnlineRoom();
+      }
+    } catch (error) {
+      console.warn('clear_room_lock failed', error);
+    } finally {
+      state.online.pendingTimeout = null;
+    }
+  }, 1200);
+}
+
 async function handleOnlineFlip(card) {
   const room = state.online.room;
   const slot = myRoomSlot();
   if (!room || room.status !== 'playing' || !slot) return;
   if (slot !== room.current_player_slot) return;
+  if (room.lock_board) return;
 
   const index = Number(card.dataset.index);
-  const flipped = [...(room.flipped_indices || [])];
-  const matched = new Set(room.matched_indices || []);
-  if (matched.has(index) || flipped.includes(index) || room.lock_board) return;
-
-  if (flipped.length === 0) {
-    await patchRoom({ flipped_indices: [index] }, { silent: false, refreshLobby: false });
-    return;
-  }
-
-  const firstIndex = flipped[0];
-  const deck = room.deck || [];
-  const isMatch = deck[firstIndex]?.pairId === deck[index]?.pairId;
-
-  if (isMatch) {
-    const newMatched = [...new Set([...(room.matched_indices || []), firstIndex, index])];
-    const scores = { ...(room.scores || { '1': 0, '2': 0 }) };
-    scores[String(slot)] = Number(scores[String(slot)] || 0) + 1;
-    const finished = newMatched.length === deck.length;
-    let winnerSlot = null;
-    if (finished) {
-      const s1 = Number(scores['1'] || 0);
-      const s2 = Number(scores['2'] || 0);
-      winnerSlot = s1 === s2 ? 0 : (s1 > s2 ? 1 : 2);
+  try {
+    const updated = normalizeRpcSingle(await rpcCall('apply_room_flip', { p_room_id: room.id, p_index: index }, 2500, 'Обръщането на карта'));
+    if (!updated) return;
+    adoptIncomingRoom(updated);
+    syncFromOnlineRoom();
+    if (updated.lock_board && Array.isArray(updated.flipped_indices) && updated.flipped_indices.length >= 2) {
+      scheduleRoomUnlockResolution(updated.id || room.id);
     }
-    await patchRoom({
-      flipped_indices: [],
-      matched_indices: newMatched,
-      scores,
-      lock_board: false,
-      status: finished ? 'finished' : 'playing',
-      winner_slot: winnerSlot,
-      turn_started_at: finished ? room.turn_started_at : getNowIso()
-    }, { silent: false, refreshLobby: false });
-    return;
+  } catch (error) {
+    updateHud(error?.message || 'Не успях да обърна карта.');
   }
-
-  const nextSlot = slot === 1 ? 2 : 1;
-  const updated = await patchRoom({ flipped_indices: [firstIndex, index], lock_board: true }, { silent: false, refreshLobby: false });
-  if (!updated) return;
-
-  if (state.online.pendingTimeout) clearTimeout(state.online.pendingTimeout);
-  state.online.pendingTimeout = setTimeout(async () => {
-    if (!state.online.room || state.online.room.id !== room.id) return;
-    await patchRoom({
-      flipped_indices: [],
-      lock_board: false,
-      current_player_slot: nextSlot,
-      turn_started_at: getNowIso()
-    }, { silent: false, refreshLobby: false });
-    state.online.pendingTimeout = null;
-  }, 2200);
 }
 
 function endOnlineGame() {
