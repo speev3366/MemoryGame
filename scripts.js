@@ -945,6 +945,49 @@ async function confirmRoomState(roomId, predicate, timeoutMs = 12000, intervalMs
   return lastRoom;
 }
 
+function trackAsync(promise) {
+  const tracker = { done: false, value: null, error: null };
+  Promise.resolve(promise)
+    .then((value) => {
+      tracker.value = value;
+      return value;
+    })
+    .catch((error) => {
+      tracker.error = error;
+      return null;
+    })
+    .finally(() => {
+      tracker.done = true;
+    });
+  return tracker;
+}
+
+async function waitForTrackedRoom(tracker, poller, predicate, timeoutMs = 12000, intervalMs = 250) {
+  const startedAt = Date.now();
+  let lastRoom = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    if (tracker?.value) {
+      lastRoom = tracker.value;
+      if (!predicate || predicate(lastRoom)) return lastRoom;
+    }
+    if (poller) {
+      try {
+        const candidate = await poller();
+        if (candidate) {
+          lastRoom = candidate;
+          if (!predicate || predicate(candidate)) return candidate;
+        }
+      } catch (error) {
+        console.warn('waitForTrackedRoom poll failed', error);
+      }
+    }
+    await delay(intervalMs);
+  }
+  if (tracker?.value) return tracker.value;
+  return lastRoom;
+}
+
+
 function getTurnRemainingMs() {
   const onlineTurnAnchor = getOnlineTurnAnchor();
   if (state.playMode === 'online' && state.online.room?.status === 'playing' && onlineTurnAnchor) {
@@ -3992,15 +4035,36 @@ async function createRoom() {
       p_access_type: state.online.accessType,
       p_plain_password: state.online.accessType === 'password' ? roomPasswordInput.value.trim() : null
     };
-    let createdRoom = null;
-    try {
-      createdRoom = normalizeRpcSingle(await rpcCall('create_room_secure', payload, 30000, 'Създаването на стая'));
-    } catch (rpcError) {
-      console.warn('create_room_secure delayed', rpcError);
-    }
-    if (!createdRoom) {
-      createdRoom = await confirmRoomState(state.online.preferredRoomId || state.online.room?.id || null, (fresh) => fresh.status === 'waiting' && fresh.host_user_id === state.auth.user?.id, 5000);
-    }
+    const createTracker = trackAsync(
+      state.auth.client.rpc('create_room_secure', payload).then(({ data, error }) => {
+        if (error) throw new Error(error.message || 'Създаването на стая се провали.');
+        return normalizeRpcSingle(data);
+      })
+    );
+
+    const pollCreatedRoom = async () => {
+      const { data, error } = await withTimeout(
+        state.auth.client
+          .from('rooms')
+          .select('*')
+          .eq('host_user_id', state.auth.user.id)
+          .eq('code', payload.p_code)
+          .maybeSingle(),
+        3000,
+        'Опресняването на новата стая'
+      );
+      if (error) return null;
+      return data || null;
+    };
+
+    let createdRoom = await waitForTrackedRoom(
+      createTracker,
+      pollCreatedRoom,
+      (fresh) => fresh && fresh.status === 'waiting' && fresh.host_user_id === state.auth.user?.id,
+      12000,
+      250
+    );
+
     if (!createdRoom) {
       const activeRoom = await loadMyActiveRoom();
       if (activeRoom && activeRoom.status === 'waiting' && activeRoom.host_user_id === state.auth.user?.id) createdRoom = activeRoom;
@@ -4387,7 +4451,16 @@ async function leaveRoom(options = {}) {
   updateAuthUi();
 
   try {
-    await rpcCall('leave_room_safe', { p_room_id: roomId }, 10000, wasHost ? 'Затварянето на стаята' : 'Напускането на стаята');
+    const leaveTracker = trackAsync(
+      state.auth.client.rpc('leave_room_safe', { p_room_id: roomId }).then(({ data, error }) => {
+        if (error) throw new Error(error.message || 'Не успях да напусна стаята.');
+        return data;
+      })
+    );
+    await waitForTrackedRoom(leaveTracker, async () => {
+      const fresh = await fetchRoomById(roomId);
+      return fresh ? null : { id: roomId, status: 'closed' };
+    }, (fresh) => Boolean(fresh && fresh.status === 'closed'), 6000, 200);
     if (stayOnline && canUseOnlineLobby()) await loadLobbyRooms();
     scheduleHardUiSync([0, 400, 1200]);
     updateHud(wasPlaying ? 'Излезе от онлайн играта.' : (wasHost ? 'Стаята беше затворена.' : 'Напусна стаята.'));
@@ -4453,15 +4526,20 @@ async function startOnlineMatch() {
   updateHud('Стартираме онлайн мача...');
   try {
     const deck = createSerializedDeck(room.selected_theme);
-    let startedRoom = null;
-    try {
-      startedRoom = normalizeRpcSingle(await rpcCall('start_room_match', { p_room_id: room.id, p_deck: deck }, 30000, 'Старта на играта'));
-    } catch (rpcError) {
-      console.warn('start_room_match delayed', rpcError);
-    }
-    if (!startedRoom) {
-      startedRoom = await confirmRoomState(room.id, (fresh) => fresh.status === 'playing' && Array.isArray(fresh.deck) && fresh.deck.length > 0, 12000);
-    }
+    const startTracker = trackAsync(
+      state.auth.client.rpc('start_room_match', { p_room_id: room.id, p_deck: deck }).then(({ data, error }) => {
+        if (error) throw new Error(error.message || 'Старта на играта се провали.');
+        return normalizeRpcSingle(data);
+      })
+    );
+
+    let startedRoom = await waitForTrackedRoom(
+      startTracker,
+      () => fetchRoomById(room.id),
+      (fresh) => fresh && fresh.status === 'playing' && Array.isArray(fresh.deck) && fresh.deck.length > 0,
+      12000,
+      220
+    );
     if (!startedRoom) throw new Error('Старта на играта отне твърде дълго.');
     adoptIncomingRoom(startedRoom);
     state.online.playingGraceUntil = Date.now() + 30000;
@@ -4631,15 +4709,19 @@ async function handleOnlineFlip(card) {
   const index = Number(card.dataset.index);
   const beforeKey = roomSnapshotKey(room);
   try {
-    let updated = null;
-    try {
-      updated = normalizeRpcSingle(await rpcCall('apply_room_flip', { p_room_id: room.id, p_index: index }, 20000, 'Обръщането на карта'));
-    } catch (rpcError) {
-      console.warn('apply_room_flip delayed', rpcError);
-    }
-    if (!updated) {
-      updated = await confirmRoomState(room.id, (fresh) => roomSnapshotKey(fresh) !== beforeKey, 5000, 250);
-    }
+    const flipTracker = trackAsync(
+      state.auth.client.rpc('apply_room_flip', { p_room_id: room.id, p_index: index }).then(({ data, error }) => {
+        if (error) throw new Error(error.message || 'Обръщането на карта се провали.');
+        return normalizeRpcSingle(data);
+      })
+    );
+    let updated = await waitForTrackedRoom(
+      flipTracker,
+      () => fetchRoomById(room.id),
+      (fresh) => fresh && roomSnapshotKey(fresh) !== beforeKey,
+      7000,
+      180
+    );
     if (!updated) return;
     adoptIncomingRoom(updated);
     syncFromOnlineRoom();
