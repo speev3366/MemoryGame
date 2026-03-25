@@ -472,7 +472,7 @@ function canUseOnlineLobby() {
   return isRealAccountUser();
 }
 
-async function withTimeout(promise, ms = 8000, label = 'Операцията') {
+async function withTimeout(promise, ms = 12000, label = 'Операцията') {
   let timeoutId;
   try {
     return await Promise.race([
@@ -640,7 +640,7 @@ async function fetchRoomById(roomId) {
   try {
     const { data, error } = await withTimeout(
       state.auth.client.from('rooms').select('*').eq('id', roomId).maybeSingle(),
-      3500,
+      10000,
       'Опресняването на стаята'
     );
     if (error) return null;
@@ -692,7 +692,7 @@ function hasMeaningfulRoomChange(current, incoming) {
   return roomSnapshotKey(current) !== roomSnapshotKey(incoming);
 }
 
-async function rpcCall(name, args = {}, timeoutMs = 4000, label = 'Операцията') {
+async function rpcCall(name, args = {}, timeoutMs = 10000, label = 'Операцията') {
   if (!state.auth.client) throw new Error('Няма активна Supabase връзка.');
   const response = await withTimeout(state.auth.client.rpc(name, args), timeoutMs, label);
   if (response.error) throw new Error(response.error.message || `${label} се провали.`);
@@ -1015,8 +1015,10 @@ function handleLocalTurnTimeout() {
 
 async function handleOnlineTurnTimeout() {
   const room = state.online.room;
+  const slot = myRoomSlot();
   if (!room || room.status !== 'playing' || room.lock_board) return false;
-  const updated = normalizeRpcSingle(await rpcCall('pass_turn_if_expired', { p_room_id: room.id }, 2500, 'Смяната на хода'));
+  if (!slot || slot !== room.current_player_slot) return false;
+  const updated = normalizeRpcSingle(await rpcCall('pass_turn_if_expired', { p_room_id: room.id }, 8000, 'Смяната на хода'));
   if (!updated) {
     state.online.lastTimeoutKey = null;
     return false;
@@ -3657,7 +3659,7 @@ async function logoutUser() {
       }
     }
     try {
-      await withTimeout(state.auth.client.auth.signOut(), 7000, 'Изходът от профила');
+      await withTimeout(state.auth.client.auth.signOut(), 12000, 'Изходът от профила');
     } catch (error) {
       console.warn('Sign out timeout', error);
       state.auth.user = null;
@@ -3726,15 +3728,17 @@ async function subscribeToRoom(roomId) {
       const timeoutId = window.setTimeout(() => {
         if (settled) return;
         settled = true;
-        reject(new Error('Realtime subscription timeout'));
-      }, 3500);
+        console.warn('Realtime subscription is slow; continuing with polling fallback for now.');
+        resolve(null);
+      }, 12000);
       channel.subscribe((status) => {
-        if (settled) return;
         if (status === 'SUBSCRIBED') {
+          if (settled) return;
           settled = true;
           clearTimeout(timeoutId);
           resolve(null);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          if (settled) return;
           settled = true;
           clearTimeout(timeoutId);
           reject(new Error(status));
@@ -3815,7 +3819,7 @@ async function loadMyActiveRoom() {
     if (!room) return null;
     if (room.status === 'finished') return null;
     if (isWaitingRoomExpired(room) && room.host_user_id === state.auth.user?.id) {
-      try { await rpcCall('leave_room_safe', { p_room_id: room.id }, 3000, 'Затварянето на старата стая'); } catch (e) { console.warn(e); }
+      try { await rpcCall('leave_room_safe', { p_room_id: room.id }, 10000, 'Затварянето на старата стая'); } catch (e) { console.warn(e); }
       return null;
     }
     if (room.status === 'playing' || shouldAutoRestoreWaitingRoom(room)) return room;
@@ -3832,7 +3836,7 @@ async function loadMyActiveRoom() {
 
   let room = null;
   try {
-    room = normalizeRpcSingle(await rpcCall('get_my_active_room', {}, 3200, 'Проверката за активна стая'));
+    room = normalizeRpcSingle(await rpcCall('get_my_active_room', {}, 10000, 'Проверката за активна стая'));
   } catch (error) {
     console.warn('get_my_active_room failed', error);
     return null;
@@ -3852,7 +3856,7 @@ async function loadLobbyRooms() {
 
   let data, error;
   try {
-    ({ data, error } = await withTimeout(state.auth.client.rpc('list_waiting_rooms'), 4000, 'Зареждането на свободните стаи'));
+    ({ data, error } = await withTimeout(state.auth.client.rpc('list_waiting_rooms'), 10000, 'Зареждането на свободните стаи'));
   } catch (rpcError) {
     state.online.publicRooms = [];
     showFeedback(roomListFeedback, rpcError.message || 'Лобито не се зареди навреме.', 'error');
@@ -3907,7 +3911,7 @@ async function createRoom() {
       p_access_type: state.online.accessType,
       p_plain_password: state.online.accessType === 'password' ? roomPasswordInput.value.trim() : null
     };
-    const createdRoom = normalizeRpcSingle(await rpcCall('create_room_secure', payload, 3500, 'Създаването на стая'));
+    const createdRoom = normalizeRpcSingle(await rpcCall('create_room_secure', payload, 10000, 'Създаването на стая'));
     if (!createdRoom) throw new Error('Неуспешно създаване на стая.');
 
     state.online.room = createdRoom;
@@ -3924,7 +3928,7 @@ async function createRoom() {
     Promise.resolve().then(async () => {
       try {
         if (previousWaitingRoom?.id && previousWaitingRoom.id !== createdRoom.id) {
-          await rpcCall('leave_room_safe', { p_room_id: previousWaitingRoom.id }, 2500, 'Затварянето на старата стая');
+          await rpcCall('leave_room_safe', { p_room_id: previousWaitingRoom.id }, 10000, 'Затварянето на старата стая');
         }
         await loadLobbyRooms();
       } catch (error) {
@@ -3977,9 +3981,9 @@ async function joinRoomByRecord(room) {
         setFieldError(joinPasswordField, joinPasswordError, 'Въведи валидна парола.');
         return;
       }
-      joined = normalizeRpcSingle(await rpcCall('join_room_with_password', { p_room_id: room.id, p_plain_password: password, p_guest_name: getDisplayName() }, 3500, 'Влизането в стаята'));
+      joined = normalizeRpcSingle(await rpcCall('join_room_with_password', { p_room_id: room.id, p_plain_password: password, p_guest_name: getDisplayName() }, 10000, 'Влизането в стаята'));
     } else {
-      joined = normalizeRpcSingle(await rpcCall('join_room_public', { p_room_id: room.id, p_guest_name: getDisplayName() }, 3500, 'Влизането в стаята'));
+      joined = normalizeRpcSingle(await rpcCall('join_room_public', { p_room_id: room.id, p_guest_name: getDisplayName() }, 10000, 'Влизането в стаята'));
     }
     if (!joined) throw new Error('Неуспешно присъединяване.');
 
@@ -4084,7 +4088,7 @@ async function joinInviteFromToken() {
   if (inviteLandingJoinButton) inviteLandingJoinButton.disabled = true;
   showFeedback(onlineLobbyFeedback, 'Присъединяваме те към поканената стая...', '');
   try {
-    const joinedRoom = normalizeRpcSingle(await rpcCall('join_room_with_invite', { p_invite_token: state.ui.inviteToken, p_guest_name: getDisplayName() }, 3500, 'Приемането на поканата'));
+    const joinedRoom = normalizeRpcSingle(await rpcCall('join_room_with_invite', { p_invite_token: state.ui.inviteToken, p_guest_name: getDisplayName() }, 10000, 'Приемането на поканата'));
     if (!joinedRoom) throw new Error('Не успяхме да приемем поканата.');
     state.playMode = 'online';
     setOnlineLobbyOpen(true);
@@ -4141,7 +4145,7 @@ async function continueInviteAsGuest() {
 
   try {
     if (state.auth.user) {
-      await withTimeout(state.auth.client.auth.signOut(), 5000, 'Смяната към гост сесия');
+      await withTimeout(state.auth.client.auth.signOut(), 12000, 'Смяната към гост сесия');
       state.auth.user = null;
       state.auth.profile = null;
       state.auth.history = [];
@@ -4217,7 +4221,7 @@ async function openProfileFromInvite() {
   state.ui.pendingInviteAutoJoin = true;
   if (state.auth.user) {
     try {
-      await withTimeout(state.auth.client.auth.signOut(), 5000, 'Смяната на профила');
+      await withTimeout(state.auth.client.auth.signOut(), 12000, 'Смяната на профила');
       state.auth.user = null;
       state.auth.profile = null;
       state.auth.history = [];
@@ -4278,7 +4282,7 @@ async function leaveRoom(options = {}) {
   updateAuthUi();
 
   try {
-    await rpcCall('leave_room_safe', { p_room_id: roomId }, 3500, wasHost ? 'Затварянето на стаята' : 'Напускането на стаята');
+    await rpcCall('leave_room_safe', { p_room_id: roomId }, 10000, wasHost ? 'Затварянето на стаята' : 'Напускането на стаята');
     if (stayOnline && canUseOnlineLobby()) await loadLobbyRooms();
     updateHud(wasPlaying ? 'Излезе от онлайн играта.' : (wasHost ? 'Стаята беше затворена.' : 'Напусна стаята.'));
   } catch (error) {
@@ -4343,7 +4347,7 @@ async function startOnlineMatch() {
   updateHud('Стартираме онлайн мача...');
   try {
     const deck = createSerializedDeck(room.selected_theme);
-    const startedRoom = normalizeRpcSingle(await rpcCall('start_room_match', { p_room_id: room.id, p_deck: deck }, 6000, 'Старта на играта'));
+    const startedRoom = normalizeRpcSingle(await rpcCall('start_room_match', { p_room_id: room.id, p_deck: deck }, 15000, 'Старта на играта'));
     if (!startedRoom) throw new Error('Не успях да стартирам онлайн мача.');
     adoptIncomingRoom(startedRoom);
     state.online.playingGraceUntil = Date.now() + 30000;
@@ -4468,7 +4472,7 @@ async function patchRoom(patch, options = {}) {
   state.online.suspendRefreshUntil = Date.now() + 1400;
   syncFromOnlineRoom();
   try {
-    const response = await withTimeout(state.auth.client.from('rooms').update(patch).eq('id', room.id), 3000, 'Синхронизацията на стаята');
+    const response = await withTimeout(state.auth.client.from('rooms').update(patch).eq('id', room.id), 10000, 'Синхронизацията на стаята');
     if (response.error) throw response.error;
     if (refreshLobby && state.ui.onlineLobbyOpen && canUseOnlineLobby()) {
       loadLobbyRooms().catch((error) => console.warn('Lobby refresh failed', error));
@@ -4488,7 +4492,7 @@ function scheduleRoomUnlockResolution(roomId) {
   if (state.online.pendingTimeout) clearTimeout(state.online.pendingTimeout);
   state.online.pendingTimeout = setTimeout(async () => {
     try {
-      const updated = normalizeRpcSingle(await rpcCall('clear_room_lock', { p_room_id: roomId }, 2500, 'Разкриването на картите'));
+      const updated = normalizeRpcSingle(await rpcCall('clear_room_lock', { p_room_id: roomId }, 8000, 'Разкриването на картите'));
       if (updated) {
         adoptIncomingRoom(updated);
         syncFromOnlineRoom();
@@ -4510,7 +4514,7 @@ async function handleOnlineFlip(card) {
 
   const index = Number(card.dataset.index);
   try {
-    const updated = normalizeRpcSingle(await rpcCall('apply_room_flip', { p_room_id: room.id, p_index: index }, 2500, 'Обръщането на карта'));
+    const updated = normalizeRpcSingle(await rpcCall('apply_room_flip', { p_room_id: room.id, p_index: index }, 10000, 'Обръщането на карта'));
     if (!updated) return;
     adoptIncomingRoom(updated);
     syncFromOnlineRoom();
