@@ -4523,18 +4523,26 @@ async function startOnlineMatch() {
   updateHud('Стартираме онлайн мача...');
   try {
     const deck = createSerializedDeck(room.selected_theme);
-    let startedRoom = normalizeRpcSingle(await rpcCall('start_room_match', { p_room_id: room.id, p_deck: deck }, 30000, 'Старта на играта'));
+    let startedRoom = null;
+    let rpcError = null;
+    try {
+      startedRoom = normalizeRpcSingle(await rpcCall('start_room_match', { p_room_id: room.id, p_deck: deck }, 18000, 'Старта на играта'));
+    } catch (error) {
+      rpcError = error;
+      console.warn('start_room_match rpc failed, confirming room state directly', error);
+    }
 
     if (!startedRoom || startedRoom.status !== 'playing') {
-      startedRoom = await waitForTrackedRoom(
-        null,
-        () => fetchRoomById(room.id),
+      startedRoom = await confirmRoomState(
+        room.id,
         (fresh) => fresh && fresh.status === 'playing' && Array.isArray(fresh.deck) && fresh.deck.length > 0,
         12000,
-        220
+        250
       );
     }
-    if (!startedRoom) throw new Error('Старта на играта отне твърде дълго.');
+    if (!startedRoom || startedRoom.status !== 'playing') {
+      throw (rpcError || new Error('Старта на играта отне твърде дълго.'));
+    }
     adoptIncomingRoom(startedRoom);
     state.online.playingGraceUntil = Date.now() + 30000;
     state.online.allowPlayingBurstUntil = Date.now() + 1500;
@@ -4544,7 +4552,7 @@ async function startOnlineMatch() {
     renderModeSelector();
     syncFromOnlineRoom();
     updateAuthUi();
-    scheduleHardUiSync([0, 300, 900, 1800], { roomId: startedRoom.id });
+    scheduleHardUiSync([0, 400, 1100], { roomId: startedRoom.id });
     showFeedback(onlineLobbyFeedback, 'Онлайн мачът стартира успешно.', 'success');
     updateHud('Онлайн мачът стартира. Играта започва.');
   } catch (error) {
@@ -4703,20 +4711,29 @@ async function handleOnlineFlip(card) {
   const index = Number(card.dataset.index);
   const beforeKey = roomSnapshotKey(room);
   try {
-    let updated = normalizeRpcSingle(await rpcCall('apply_room_flip', { p_room_id: room.id, p_index: index }, 15000, 'Обръщането на карта'));
+    let updated = null;
+    let rpcError = null;
+    try {
+      updated = normalizeRpcSingle(await rpcCall('apply_room_flip', { p_room_id: room.id, p_index: index }, 12000, 'Обръщането на карта'));
+    } catch (error) {
+      rpcError = error;
+      console.warn('apply_room_flip rpc failed, confirming room state directly', error);
+    }
     if (!updated || roomSnapshotKey(updated) === beforeKey) {
-      updated = await waitForTrackedRoom(
-        null,
-        () => fetchRoomById(room.id),
+      updated = await confirmRoomState(
+        room.id,
         (fresh) => fresh && roomSnapshotKey(fresh) !== beforeKey,
-        7000,
-        180
+        9000,
+        200
       );
     }
-    if (!updated) return;
+    if (!updated || roomSnapshotKey(updated) === beforeKey) {
+      if (rpcError) throw rpcError;
+      return;
+    }
     adoptIncomingRoom(updated);
     syncFromOnlineRoom();
-    scheduleHardUiSync([0, 250, 700], { roomId: updated.id || room.id });
+    scheduleHardUiSync([0, 300, 900], { roomId: updated.id || room.id });
     if (updated.lock_board && Array.isArray(updated.flipped_indices) && updated.flipped_indices.length >= 2) {
       scheduleRoomUnlockResolution(updated.id || room.id);
     }
