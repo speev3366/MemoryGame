@@ -25,6 +25,11 @@ const turnChip = document.getElementById('turnChip');
 const resultModal = document.getElementById('resultModal');
 const resultTitle = document.getElementById('resultTitle');
 const resultSummary = document.getElementById('resultSummary');
+const resultPlayer1Name = document.getElementById('resultPlayer1Name');
+const resultPlayer2Name = document.getElementById('resultPlayer2Name');
+const resultPlayer1Score = document.getElementById('resultPlayer1Score');
+const resultPlayer2Score = document.getElementById('resultPlayer2Score');
+const resultRematchStatus = document.getElementById('resultRematchStatus');
 
 const authPanel = document.getElementById('authPanel');
 const authBackdrop = document.getElementById('authBackdrop');
@@ -430,6 +435,8 @@ const state = {
     lobbyFetchInflight: null,
     activeRoomInflight: null,
     authSyncQueued: false,
+    rematchBusy: false,
+    lastRematchAutoKey: null,
     roomFetchCache: new Map()
   },
   timers: {
@@ -787,7 +794,10 @@ function roomSnapshotKey(room) {
     JSON.stringify(room.scores || {}),
     Array.isArray(room.deck) ? room.deck.length : 0,
     room.lock_board ? '1' : '0',
-    room.winner_slot ?? ''
+    room.winner_slot ?? '',
+    room.rematch_host_ready ? '1' : '0',
+    room.rematch_guest_ready ? '1' : '0',
+    room.rematch_nonce ?? 0
   ].join('|');
 }
 
@@ -2453,9 +2463,24 @@ function iconSport(key) {
   switch (key) {
     case 'football':
       return `
-        <circle cx="210" cy="170" r="92" fill="#ffffff"/>
-        <polygon points="210,120 242,142 230,179 190,179 178,142" fill="#111827"/>
-        <path d="M166 141l-32-19M254 141l32-19M190 179l-18 34M230 179l18 34M140 182l30-3M280 182l-30-3" ${commonStroke}/>
+        <defs>
+          <radialGradient id="__ID__-fb-base" cx="38%" cy="30%" r="72%">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="72%" stop-color="#f4f4f5"/>
+            <stop offset="100%" stop-color="#d4d4d8"/>
+          </radialGradient>
+          <radialGradient id="__ID__-fb-shadow" cx="50%" cy="45%" r="62%">
+            <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+            <stop offset="100%" stop-color="rgba(15,23,42,0.24)"/>
+          </radialGradient>
+        </defs>
+        <circle cx="210" cy="170" r="102" fill="url(#__ID__-fb-base)"/>
+        <circle cx="210" cy="170" r="102" fill="url(#__ID__-fb-shadow)"/>
+        <ellipse cx="182" cy="128" rx="46" ry="28" fill="rgba(255,255,255,0.58)"/>
+        <polygon points="210,126 242,148 230,186 190,186 178,148" fill="#111827"/>
+        <path d="M179 148l-34-20M243 148l34-20M189 186l-18 34M231 186l18 34M145 191l34-3M275 191l-34-3" stroke="#1f2937" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M144 128c16 12 34 19 55 22M277 128c-16 12-34 19-55 22M168 220c25-12 53-18 84-18" stroke="#6b7280" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.35"/>
+        <circle cx="210" cy="170" r="102" fill="none" stroke="rgba(15,23,42,0.14)" stroke-width="10"/>
       `;
     case 'basketball':
       return `
@@ -2476,8 +2501,27 @@ function iconSport(key) {
       `;
     case 'volleyball':
       return `
-        <circle cx="210" cy="170" r="98" fill="#f4f6fb"/>
-        <path d="M112 170c38-18 73-26 106-22M188 74c26 34 39 68 38 104M292 126c-29 21-62 34-99 40M174 264c11-35 33-64 68-90M120 220c31-1 61-9 90-22" stroke="#8ea5c0" stroke-width="13" fill="none" stroke-linecap="round"/>
+        <defs>
+          <radialGradient id="__ID__-vb-base" cx="34%" cy="28%" r="78%">
+            <stop offset="0%" stop-color="#fef08a"/>
+            <stop offset="48%" stop-color="#fde047"/>
+            <stop offset="49%" stop-color="#1d4ed8"/>
+            <stop offset="100%" stop-color="#1e40af"/>
+          </radialGradient>
+          <radialGradient id="__ID__-vb-gloss" cx="32%" cy="24%" r="56%">
+            <stop offset="0%" stop-color="rgba(255,255,255,0.85)"/>
+            <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+          </radialGradient>
+        </defs>
+        <circle cx="210" cy="170" r="102" fill="url(#__ID__-vb-base)"/>
+        <path d="M118 134c54-36 110-42 168-18" stroke="#fde047" stroke-width="40" fill="none" stroke-linecap="round"/>
+        <path d="M145 241c14-54 44-95 89-122" stroke="#fde047" stroke-width="34" fill="none" stroke-linecap="round"/>
+        <path d="M258 262c-11-44-32-78-62-103" stroke="#fde047" stroke-width="34" fill="none" stroke-linecap="round"/>
+        <path d="M130 108c40 20 73 52 98 97" stroke="#1e40af" stroke-width="28" fill="none" stroke-linecap="round" opacity="0.88"/>
+        <path d="M254 103c-23 41-33 86-28 136" stroke="#1e40af" stroke-width="28" fill="none" stroke-linecap="round" opacity="0.88"/>
+        <path d="M115 196c46-10 91-11 136-1" stroke="#1e40af" stroke-width="26" fill="none" stroke-linecap="round" opacity="0.88"/>
+        <circle cx="210" cy="170" r="102" fill="url(#__ID__-vb-gloss)" opacity="0.3"/>
+        <circle cx="210" cy="170" r="102" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="8"/>
       `;
     case 'baseball':
       return `
@@ -3140,9 +3184,9 @@ function createDeck(themeKey) {
   return shuffle(cards);
 }
 
-function createSerializedDeck(themeKey) {
+function createSerializedDeck(themeKey, cardCount = state.selectedCardCount) {
   const theme = THEMES[themeKey];
-  const pairCount = state.selectedCardCount / 2;
+  const pairCount = cardCount / 2;
   const selectedItems = shuffle(theme.items).slice(0, pairCount);
   const cards = selectedItems.flatMap((item) => ([
     { pairId: item.key, label: item.label, uid: `${item.key}-a-${Math.random().toString(36).slice(2, 7)}` },
@@ -3264,6 +3308,8 @@ function resetRoundState() {
   gameBoard.removeAttribute('style');
   emptyState.classList.remove('hidden');
   resultModal.classList.add('hidden');
+  setResultRematchStatus('', '');
+  updateResultActionButtons();
   setAppMode('setup');
   startButton.disabled = !state.selectedTheme || state.playMode === 'online';
   renderThemeSelector();
@@ -3298,6 +3344,8 @@ function startGame() {
     ? `Играта започна. ${getPlayerName(1)} започва срещу компютъра на ${AI_OPTIONS[state.aiDifficulty].name}.`
     : `Играта започна. ${getPlayerName(1)} е на ход. Карти: ${state.selectedCardCount}.`);
   resultModal.classList.add('hidden');
+  setResultRematchStatus('', '');
+  updateResultActionButtons();
   requestAnimationFrame(() => requestAnimationFrame(resizeBoardFit));
 }
 
@@ -3431,6 +3479,164 @@ function handleMiss(first, second) {
   }, 760);
 }
 
+function setResultSummaryContent({
+  title,
+  summary,
+  player1Name,
+  player2Name,
+  player1Score,
+  player2Score,
+  rematchMessage = '',
+  rematchTone = ''
+}) {
+  resultTitle.textContent = title;
+  resultSummary.textContent = summary;
+  resultPlayer1Name.textContent = player1Name;
+  resultPlayer2Name.textContent = player2Name;
+  resultPlayer1Score.textContent = String(player1Score);
+  resultPlayer2Score.textContent = String(player2Score);
+  setResultRematchStatus(rematchMessage, rematchTone);
+}
+
+function setResultRematchStatus(message = '', tone = '') {
+  if (!resultRematchStatus) return;
+  resultRematchStatus.textContent = message || '';
+  resultRematchStatus.classList.toggle('hidden', !message);
+  resultRematchStatus.classList.toggle('info', tone === 'info');
+  resultRematchStatus.classList.toggle('success', tone === 'success');
+}
+
+function getOnlineRematchFlags(room = state.online.room) {
+  return {
+    hostReady: Boolean(room?.rematch_host_ready),
+    guestReady: Boolean(room?.rematch_guest_ready)
+  };
+}
+
+function getOnlineRematchStatus(room = state.online.room) {
+  const slot = myRoomSlot();
+  const { hostReady, guestReady } = getOnlineRematchFlags(room);
+  const bothReady = hostReady && guestReady;
+  const myReady = slot === 1 ? hostReady : slot === 2 ? guestReady : false;
+
+  if (bothReady) {
+    return { text: 'И двамата играчи потвърдиха реванш. Подготвяме новата игра...', tone: 'success', myReady, bothReady };
+  }
+  if (myReady) {
+    return { text: 'Ти потвърди реванш. Изчаква се и другият играч.', tone: 'info', myReady, bothReady };
+  }
+  return { text: 'Натисни „Реванш“, за да заявиш нова онлайн игра.', tone: '', myReady, bothReady };
+}
+
+function updateResultActionButtons() {
+  if (state.playMode === 'online' && state.online.room?.status === 'finished') {
+    const rematch = getOnlineRematchStatus(state.online.room);
+    playAgainButton.textContent = rematch.bothReady ? 'Подготвяме реванш...' : (rematch.myReady ? 'Реванш заявен' : 'Реванш');
+    playAgainButton.disabled = Boolean(state.online.rematchBusy || rematch.bothReady || (rematch.myReady && !rematch.bothReady));
+    setResultRematchStatus(rematch.text, rematch.tone);
+    return;
+  }
+  playAgainButton.textContent = 'Играй пак';
+  playAgainButton.disabled = false;
+  setResultRematchStatus('', '');
+}
+
+async function maybeAutoStartOnlineRematch(room = state.online.room) {
+  if (!room || room.status !== 'finished' || state.online.rematchBusy) return;
+  if (!state.auth.user || room.host_user_id !== state.auth.user.id) return;
+  const { hostReady, guestReady } = getOnlineRematchFlags(room);
+  if (!(hostReady && guestReady)) return;
+  const key = `${room.id}:${room.rematch_nonce || 0}:${hostReady ? '1' : '0'}:${guestReady ? '1' : '0'}`;
+  if (state.online.lastRematchAutoKey === key) return;
+  state.online.lastRematchAutoKey = key;
+  await startOnlineRematchRound(room);
+}
+
+async function startOnlineRematchRound(room = state.online.room) {
+  if (!room || room.status !== 'finished') return null;
+  if (!state.auth.user || room.host_user_id !== state.auth.user.id) return null;
+  if (state.online.rematchBusy) return null;
+
+  state.online.rematchBusy = true;
+  updateResultActionButtons();
+  suppressBackgroundOnlineTraffic(4500);
+  try {
+    const deck = createSerializedDeck(room.selected_theme, room.selected_card_count);
+    const rematchNonce = Number(room.rematch_nonce || 0) + 1;
+    const updated = await updateRoomDirect(
+      {
+        status: 'playing',
+        deck,
+        scores: { '1': 0, '2': 0 },
+        current_player_slot: 1,
+        flipped_indices: [],
+        matched_indices: [],
+        lock_board: false,
+        winner_slot: null,
+        turn_started_at: getNowIso(),
+        rematch_host_ready: false,
+        rematch_guest_ready: false,
+        rematch_nonce: rematchNonce
+      },
+      {
+        expectedRoom: room,
+        roomId: room.id,
+        timeoutMs: 12000,
+        label: 'Стартирането на реванша'
+      }
+    );
+    if (!updated || updated.status !== 'playing') throw new Error('Не успях да стартирам реванша.');
+    adoptIncomingRoom(updated);
+    state.online.lastRematchAutoKey = null;
+    resultModal.classList.add('hidden');
+    syncFromOnlineRoom();
+    scheduleHardUiSync([0, 350, 900], { roomId: updated.id });
+    updateHud('Реваншът стартира. Успех!');
+    return updated;
+  } catch (error) {
+    state.online.lastRematchAutoKey = null;
+    updateHud(error?.message || 'Не успях да стартирам реванша.');
+    throw error;
+  } finally {
+    state.online.rematchBusy = false;
+    updateResultActionButtons();
+    if (slot === 1) {
+      Promise.resolve().then(() => maybeAutoStartOnlineRematch(state.online.room)).catch((error) => console.warn('Auto rematch after request failed', error));
+    }
+  }
+}
+
+async function requestOnlineRematch() {
+  const room = state.online.room;
+  const slot = myRoomSlot();
+  if (!room || room.status !== 'finished' || !slot) return;
+  if (state.online.rematchBusy) return;
+  const patch = slot === 1 ? { rematch_host_ready: true } : { rematch_guest_ready: true };
+  state.online.rematchBusy = true;
+  updateResultActionButtons();
+  try {
+    const updated = await updateRoomDirect(
+      patch,
+      {
+        expectedRoom: room,
+        roomId: room.id,
+        timeoutMs: 10000,
+        label: 'Заявката за реванш'
+      }
+    );
+    if (!updated) throw new Error('Не успях да запиша заявката за реванш.');
+    adoptIncomingRoom(updated);
+    endOnlineGame();
+    if (slot === 1) await maybeAutoStartOnlineRematch(updated);
+    else updateHud('Реваншът е заявен. Изчаква се домакинът да стартира новата игра.');
+  } catch (error) {
+    updateHud(error?.message || 'Не успях да заявя реванш.');
+  } finally {
+    state.online.rematchBusy = false;
+    updateResultActionButtons();
+  }
+}
+
 function endGame() {
   state.started = false;
   state.gameOver = true;
@@ -3446,10 +3652,17 @@ function endGame() {
     winnerSlot = 2;
   }
 
-  resultTitle.textContent = title;
-  resultSummary.textContent = `Краен резултат — ${getPlayerName(1)}: ${state.scores[1]} • ${getPlayerName(2)}: ${state.scores[2]} • Режим: ${getModeName()} • Тема: ${THEMES[state.selectedTheme].name} • Карти: ${state.selectedCardCount}.`;
+  setResultSummaryContent({
+    title,
+    summary: `Режим: ${getModeName()} • Тема: ${THEMES[state.selectedTheme].name} • Карти: ${state.selectedCardCount}.`,
+    player1Name: getPlayerName(1),
+    player2Name: getPlayerName(2),
+    player1Score: state.scores[1],
+    player2Score: state.scores[2]
+  });
   updatePlayerPanels();
   updateHud('Рундът приключи. Можеш да натиснеш „Играй пак“ или да се върнеш в началното меню.');
+  updateResultActionButtons();
   resultModal.classList.remove('hidden');
 
   if (state.auth.user && state.playMode !== 'online') {
@@ -4710,7 +4923,10 @@ function computeDirectStartPatch(room, deck) {
     matched_indices: [],
     lock_board: false,
     winner_slot: null,
-    turn_started_at: getNowIso()
+    turn_started_at: getNowIso(),
+    rematch_host_ready: false,
+    rematch_guest_ready: false,
+    rematch_nonce: Number(room?.rematch_nonce || 0)
   };
 }
 
@@ -4919,7 +5135,10 @@ function syncFromOnlineRoom() {
   if (room.status === 'playing' || room.status === 'finished') {
     state.playMode = 'online';
     state.ui.onlineLobbyOpen = false;
-    if (room.status === 'playing') state.online.playingGraceUntil = Date.now() + 20000;
+    if (room.status === 'playing') {
+      state.online.playingGraceUntil = Date.now() + 20000;
+      state.online.lastRematchAutoKey = null;
+    }
   }
 
   state.selectedTheme = room.selected_theme;
@@ -4983,7 +5202,9 @@ function syncFromOnlineRoom() {
     updateHud(`Онлайн мач: на ход е ${getPlayerName(state.currentPlayer)}.`);
   } else if (room.status === 'finished') {
     endOnlineGame();
+    Promise.resolve().then(() => maybeAutoStartOnlineRematch(room)).catch((error) => console.warn('Auto rematch failed', error));
   }
+  updateResultActionButtons();
 }
 
 function applyOnlineBoardState() {
@@ -5009,12 +5230,14 @@ async function patchRoom(patch, options = {}) {
   state.online.suspendRefreshUntil = Date.now() + 1400;
   syncFromOnlineRoom();
   try {
-    const response = await runSupabaseTimed((signal) => withAbortSignal(state.auth.client.from('rooms').update(patch).eq('id', room.id), signal), 10000, 'Синхронизацията на стаята');
+    const response = await runSupabaseTimed((signal) => withAbortSignal(state.auth.client.from('rooms').update(patch).eq('id', room.id).select().maybeSingle(), signal), 10000, 'Синхронизацията на стаята');
     if (response.error) throw response.error;
+    const serverRoom = response.data || optimistic;
+    adoptIncomingRoom(serverRoom);
     if (refreshLobby && state.ui.onlineLobbyOpen && canUseOnlineLobby()) {
       loadLobbyRooms().catch((error) => console.warn('Lobby refresh failed', error));
     }
-    return optimistic;
+    return serverRoom;
   } catch (error) {
     state.online.room = previous;
     syncFromOnlineRoom();
@@ -5128,15 +5351,23 @@ function endOnlineGame() {
   state.gameOver = true;
   const winner = Number(room.winner_slot);
   const autoFinished = winner === ONLINE_AUTO_FINISH_WINNER_SLOT;
-  resultTitle.textContent = autoFinished
-    ? 'Играта е приключена автоматично'
-    : (winner === 0 ? 'Равенство' : `Победител: ${getPlayerName(winner)}`);
-  resultSummary.textContent = autoFinished
-    ? `Онлайн играта беше прекратена автоматично поради липса на активност над 15 минути. Текущ резултат — ${getPlayerName(1)}: ${state.scores[1]} • ${getPlayerName(2)}: ${state.scores[2]} • Код стая: ${room.code} • Тема: ${THEMES[room.selected_theme]?.name || room.selected_theme} • Карти: ${room.selected_card_count}.`
-    : `Онлайн резултат — ${getPlayerName(1)}: ${state.scores[1]} • ${getPlayerName(2)}: ${state.scores[2]} • Код стая: ${room.code} • Тема: ${THEMES[room.selected_theme]?.name || room.selected_theme} • Карти: ${room.selected_card_count}.`;
+  setResultSummaryContent({
+    title: autoFinished
+      ? 'Играта е приключена автоматично'
+      : (winner === 0 ? 'Равенство' : `Победител: ${getPlayerName(winner)}`),
+    summary: autoFinished
+      ? `Онлайн играта беше прекратена автоматично поради липса на активност над 15 минути. Код стая: ${room.code} • Тема: ${THEMES[room.selected_theme]?.name || room.selected_theme} • Карти: ${room.selected_card_count}.`
+      : `Онлайн мачът приключи. Код стая: ${room.code} • Тема: ${THEMES[room.selected_theme]?.name || room.selected_theme} • Карти: ${room.selected_card_count}.`,
+    player1Name: getPlayerName(1),
+    player2Name: getPlayerName(2),
+    player1Score: state.scores[1],
+    player2Score: state.scores[2],
+    ...(autoFinished ? {} : getOnlineRematchStatus(room))
+  });
   updateHud(autoFinished
     ? 'Онлайн играта се приключва автоматично поради липса на активност.'
-    : 'Онлайн мачът приключи. Можеш да натиснеш „Играй пак“ или да се върнеш в началното меню.');
+    : 'Онлайн мачът приключи. Можеш да избереш „Реванш“ или да се върнеш в началното меню.');
+  updateResultActionButtons();
   resultModal.classList.remove('hidden');
   updatePlayerPanels();
   updateAuthUi();
@@ -5174,26 +5405,23 @@ player2NameInput.addEventListener('input', () => {
 startButton.addEventListener('click', startGame);
 newRoundButton.addEventListener('click', resetRoundState);
 playAgainButton.addEventListener('click', async () => {
-  resultModal.classList.add('hidden');
-  if (state.playMode === 'online' && state.online.room) {
-    if (myRoomSlot() === 1) {
-      await patchRoom({ status: 'waiting', deck: [], flipped_indices: [], matched_indices: [], scores: { '1': 0, '2': 0 }, current_player_slot: 1, winner_slot: null, lock_board: false, turn_started_at: getNowIso() });
-      updateHud('Онлайн рундът е върнат в режим за нов старт.');
-    } else {
-      updateHud('Изчакай домакина да подготви нов онлайн рунд или се върни в началното меню.');
-    }
+  if (state.playMode === 'online' && state.online.room?.status === 'finished') {
+    await requestOnlineRematch();
     return;
   }
+  resultModal.classList.add('hidden');
   startGame();
 });
 
 mainMenuButton?.addEventListener('click', async () => {
   if (state.playMode === 'online' && state.online.room?.status === 'finished') {
     resultModal.classList.add('hidden');
+    setResultRematchStatus('', '');
     returnToMainMenu('Върна се в началното меню.');
     return;
   }
   resultModal.classList.add('hidden');
+  setResultRematchStatus('', '');
   returnToMainMenu();
 });
 
@@ -5203,6 +5431,7 @@ window.addEventListener('orientationchange', () => requestAnimationFrame(resizeB
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !resultModal.classList.contains('hidden')) {
     resultModal.classList.add('hidden');
+    setResultRematchStatus('', '');
   }
 });
 
