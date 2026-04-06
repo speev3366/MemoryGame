@@ -229,7 +229,7 @@ button { font: inherit; }
   padding: 6px 10px;
   border-radius: 999px;
   background: rgba(255,255,255,0.08);
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.03em;
   color: var(--muted);
@@ -1340,8 +1340,8 @@ body.lobby-open { overflow: hidden; }
 .room-row-meta { color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
 .room-code-line { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .room-code-copy-btn {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.05);

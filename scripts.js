@@ -427,6 +427,9 @@ const state = {
     actionBusyUntil: 0,
     roomFetchInflight: null,
     roomFetchInflightId: null,
+    lobbyFetchInflight: null,
+    activeRoomInflight: null,
+    authSyncQueued: false,
     roomFetchCache: new Map()
   },
   timers: {
@@ -487,6 +490,28 @@ async function withTimeout(promise, ms = 12000, label = 'Операцията') 
         timeoutId = window.setTimeout(() => reject(new Error(`${label} отне твърде дълго.`)), ms);
       })
     ]);
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
+}
+
+function withAbortSignal(builder, signal) {
+  if (builder && typeof builder.abortSignal === 'function') return builder.abortSignal(signal);
+  return builder;
+}
+
+async function runSupabaseTimed(factory, ms = 12000, label = 'Операцията') {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  let timeoutId = null;
+  try {
+    if (controller) {
+      timeoutId = window.setTimeout(() => controller.abort(), ms);
+      return await factory(controller.signal);
+    }
+    return await withTimeout(factory(null), ms, label);
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error(`${label} отне твърде дълго.`);
+    throw error;
   } finally {
     if (timeoutId) window.clearTimeout(timeoutId);
   }
@@ -693,7 +718,7 @@ async function fetchRoomById(roomId, options = {}) {
   if (!state.auth.client || !roomId) return null;
   const { force = false, timeoutMs = 15000 } = options;
   if (!force) {
-    const cached = getCachedRoom(roomId, 350);
+    const cached = getCachedRoom(roomId, 500);
     if (cached) return cached;
     if (state.online.roomFetchInflight && state.online.roomFetchInflightId === roomId) {
       try {
@@ -706,16 +731,15 @@ async function fetchRoomById(roomId, options = {}) {
 
   const request = (async () => {
     try {
-      const { data, error } = await withTimeout(
+      const { data, error } = await runSupabaseTimed((signal) => withAbortSignal(
         state.auth.client.from('rooms').select('*').eq('id', roomId).maybeSingle(),
-        timeoutMs,
-        'Опресняването на стаята'
-      );
+        signal
+      ), timeoutMs, 'Опресняването на стаята');
       if (error) return null;
       return setCachedRoom(data || null);
     } catch (error) {
       console.warn('fetchRoomById failed', error);
-      return getCachedRoom(roomId, 2000) || null;
+      return getCachedRoom(roomId, 2500) || null;
     }
   })();
 
@@ -774,7 +798,7 @@ function hasMeaningfulRoomChange(current, incoming) {
 
 async function rpcCall(name, args = {}, timeoutMs = 10000, label = 'Операцията') {
   if (!state.auth.client) throw new Error('Няма активна Supabase връзка.');
-  const response = await withTimeout(state.auth.client.rpc(name, args), timeoutMs, label);
+  const response = await runSupabaseTimed((signal) => withAbortSignal(state.auth.client.rpc(name, args), signal), timeoutMs, label);
   if (response.error) throw new Error(response.error.message || `${label} се провали.`);
   return response.data;
 }
@@ -3463,6 +3487,37 @@ function getSupabaseConfig() {
   return { url, key, enabled: Boolean(url && key && url.includes('http')) };
 }
 
+function schedulePostAuthSync() {
+  if (state.online.authSyncQueued) return;
+  state.online.authSyncQueued = true;
+  window.setTimeout(async () => {
+    try {
+      if (!state.auth.user) return;
+      clearGuestState();
+      await loadProfile();
+      await loadMatchHistory();
+      await restoreOnlineSessionAfterAuth();
+      if (state.ui.pendingInviteAutoJoin && state.ui.inviteToken) {
+        state.ui.pendingInviteAutoJoin = false;
+        if (!state.online.room || state.online.room.invite_token !== state.ui.inviteToken) {
+          await joinInviteFromToken();
+          scheduleHardUiSync([0, 400, 1200, 2500], { roomId: state.online.room?.id || null });
+        }
+      }
+      Promise.resolve().then(() => attemptInviteAutoJoinLoggedUser()).catch((error) => console.warn('Invite auto join failed', error));
+    } catch (error) {
+      console.warn('Post-auth sync failed', error);
+    } finally {
+      state.online.authSyncQueued = false;
+      renderProfilePanel();
+      updateAuthUi();
+      renderModeSelector();
+      updateHud();
+      renderInviteLanding();
+    }
+  }, 0);
+}
+
 async function initAuth() {
   syncRememberMeUi();
   resolveInviteTokenFromUrl();
@@ -3500,36 +3555,38 @@ async function initAuth() {
     await restoreOnlineSessionAfterAuth();
   }
 
-  state.auth.client.auth.onAuthStateChange(async (_event, session) => {
+  state.auth.client.auth.onAuthStateChange((_event, session) => {
     state.auth.user = session?.user || null;
     if (state.auth.user) {
-      clearGuestState();
-      await loadProfile();
-      await loadMatchHistory();
-      await restoreOnlineSessionAfterAuth();
-      if (state.ui.pendingInviteAutoJoin && state.ui.inviteToken) {
-        state.ui.pendingInviteAutoJoin = false;
-        if (!state.online.room || state.online.room.invite_token !== state.ui.inviteToken) {
-          await joinInviteFromToken();
-    scheduleHardUiSync([0, 400, 1200, 2500], { roomId: state.online.room?.id || null });
-        }
-      }
-      Promise.resolve().then(() => attemptInviteAutoJoinLoggedUser()).catch((error) => console.warn('Invite auto join failed', error));
-    } else {
-      state.auth.profile = null;
-      state.auth.history = [];
-      state.auth.historyLoaded = false;
-      state.online.publicRooms = [];
-      state.ui.pendingInviteAutoJoin = false;
-      if (state.online.room) await leaveRoom();
-      state.ui.onlineLobbyOpen = false;
-      app.classList.remove('online-lobby-mode');
-      if (state.playMode === 'online') state.playMode = 'local';
+      schedulePostAuthSync();
+      renderProfilePanel();
+      updateAuthUi();
+      renderModeSelector();
+      updateHud();
+      return;
     }
-    renderProfilePanel();
-    updateAuthUi();
-    renderModeSelector();
-    updateHud();
+
+    window.setTimeout(async () => {
+      try {
+        state.auth.profile = null;
+        state.auth.history = [];
+        state.auth.historyLoaded = false;
+        state.online.publicRooms = [];
+        state.ui.pendingInviteAutoJoin = false;
+        if (state.online.room) await leaveRoom();
+        state.ui.onlineLobbyOpen = false;
+        app.classList.remove('online-lobby-mode');
+        if (state.playMode === 'online') state.playMode = 'local';
+      } catch (error) {
+        console.warn('Post-signout cleanup failed', error);
+      } finally {
+        renderProfilePanel();
+        updateAuthUi();
+        renderModeSelector();
+        updateHud();
+        renderInviteLanding();
+      }
+    }, 0);
   });
 
   if (state.ui.inviteToken) {
@@ -4006,7 +4063,7 @@ async function loadInvitePreview() {
   const hadPreview = Boolean(state.online.invitePreviewLoaded || state.online.invitePreview);
   state.online.invitePreviewLoaded = false;
   if (!hadPreview) renderInviteLanding();
-  const { data, error } = await state.auth.client.rpc('get_invite_room_preview', { p_invite_token: state.ui.inviteToken });
+  const { data, error } = await runSupabaseTimed((signal) => withAbortSignal(state.auth.client.rpc('get_invite_room_preview', { p_invite_token: state.ui.inviteToken }), signal), 10000, 'Зареждането на invite preview');
   if (error) {
     state.online.invitePreview = null;
     state.online.invitePreviewLoaded = true;
@@ -4023,6 +4080,14 @@ async function loadMyActiveRoom() {
   if (!state.auth.client || !state.auth.user) {
     clearOnlineRoomLocalState();
     return null;
+  }
+
+  if (state.online.activeRoomInflight) {
+    try {
+      return await state.online.activeRoomInflight;
+    } catch (error) {
+      return null;
+    }
   }
 
   const adoptRoom = (room) => {
@@ -4052,17 +4117,26 @@ async function loadMyActiveRoom() {
     clearPreferredRoomId();
   }
 
-  let room = null;
-  try {
-    room = normalizeRpcSingle(await rpcCall('get_my_active_room', {}, 10000, 'Проверката за активна стая'));
-  } catch (error) {
-    console.warn('get_my_active_room failed', error);
-    return null;
-  }
+  const request = (async () => {
+    let room = null;
+    try {
+      room = normalizeRpcSingle(await rpcCall('get_my_active_room', {}, 8000, 'Проверката за активна стая'));
+    } catch (error) {
+      console.warn('get_my_active_room failed', error);
+      return null;
+    }
 
-  room = await validateRoom(room);
-  if (!room) return null;
-  return adoptRoom(room);
+    room = await validateRoom(room);
+    if (!room) return null;
+    return adoptRoom(room);
+  })();
+
+  state.online.activeRoomInflight = request;
+  try {
+    return await request;
+  } finally {
+    if (state.online.activeRoomInflight === request) state.online.activeRoomInflight = null;
+  }
 }
 
 async function loadLobbyRooms() {
@@ -4072,24 +4146,42 @@ async function loadLobbyRooms() {
     return;
   }
 
-  let data, error;
-  try {
-    ({ data, error } = await withTimeout(state.auth.client.rpc('list_waiting_rooms'), 10000, 'Зареждането на свободните стаи'));
-  } catch (rpcError) {
-    state.online.publicRooms = [];
-    showFeedback(roomListFeedback, rpcError.message || 'Лобито не се зареди навреме.', 'error');
-    renderRoomList();
-    return;
-  }
-  if (error) {
-    state.online.publicRooms = [];
-    showFeedback(roomListFeedback, `Лобито не се зареди: ${error.message}`, 'error');
-    renderRoomList();
-    return;
+  if (state.online.lobbyFetchInflight) {
+    try {
+      return await state.online.lobbyFetchInflight;
+    } catch (error) {
+      return null;
+    }
   }
 
-  state.online.publicRooms = (Array.isArray(data) ? data : []).filter((room) => !isWaitingRoomExpired(room));
-  renderRoomList();
+  const request = (async () => {
+    let data, error;
+    try {
+      ({ data, error } = await runSupabaseTimed((signal) => withAbortSignal(state.auth.client.rpc('list_waiting_rooms'), signal), 8000, 'Зареждането на свободните стаи'));
+    } catch (rpcError) {
+      state.online.publicRooms = [];
+      showFeedback(roomListFeedback, rpcError.message || 'Лобито не се зареди навреме.', 'error');
+      renderRoomList();
+      return null;
+    }
+    if (error) {
+      state.online.publicRooms = [];
+      showFeedback(roomListFeedback, `Лобито не се зареди: ${error.message}`, 'error');
+      renderRoomList();
+      return null;
+    }
+
+    state.online.publicRooms = (Array.isArray(data) ? data : []).filter((room) => !isWaitingRoomExpired(room));
+    renderRoomList();
+    return state.online.publicRooms;
+  })();
+
+  state.online.lobbyFetchInflight = request;
+  try {
+    return await request;
+  } finally {
+    if (state.online.lobbyFetchInflight === request) state.online.lobbyFetchInflight = null;
+  }
 }
 
 async function createRoom() {
@@ -4294,7 +4386,7 @@ async function joinRoom() {
   }
   const code = joinRoomInput.value.trim().toUpperCase();
 
-  const { data: room, error } = await state.auth.client.from('rooms').select('*').eq('code', code).maybeSingle();
+  const { data: room, error } = await runSupabaseTimed((signal) => withAbortSignal(state.auth.client.from('rooms').select('*').eq('code', code).maybeSingle(), signal), 10000, 'Търсенето на стаята');
   if (error || !room) {
     setFieldError(joinRoomField, joinRoomError, 'Няма намерена стая с този код.');
     updateHud('Няма намерена стая с този код.');
@@ -4536,7 +4628,7 @@ async function leaveRoom(options = {}) {
 
   try {
     const leaveTracker = trackAsync(
-      state.auth.client.rpc('leave_room_safe', { p_room_id: roomId }).then(({ data, error }) => {
+      runSupabaseTimed((signal) => withAbortSignal(state.auth.client.rpc('leave_room_safe', { p_room_id: roomId }), signal), 10000, 'Напускането на стаята').then(({ data, error }) => {
         if (error) throw new Error(error.message || 'Не успях да напусна стаята.');
         return data;
       })
@@ -4603,7 +4695,7 @@ async function updateRoomDirect(patch, options = {}) {
     if (options.onlyIfGuestPresent) query = query.not('guest_user_id', 'is', null);
     else query = query.is('guest_user_id', null);
   }
-  const response = await withTimeout(query.select().maybeSingle(), options.timeoutMs || 12000, options.label || 'Синхронизацията на стаята');
+  const response = await runSupabaseTimed((signal) => withAbortSignal(query.select().maybeSingle(), signal), options.timeoutMs || 12000, options.label || 'Синхронизацията на стаята');
   if (response.error) throw new Error(response.error.message || 'Грешка при синхронизация на стаята.');
   return setCachedRoom(response.data || null);
 }
@@ -4755,8 +4847,11 @@ async function startOnlineMatch() {
   showFeedback(onlineLobbyFeedback, 'Стартираме онлайн мача...', '');
   updateHud('Стартираме онлайн мача...');
   try {
-    suppressBackgroundOnlineTraffic(3500);
-    const latestRoom = await fetchRoomById(room.id, { force: true, timeoutMs: 12000 }) || room;
+    suppressBackgroundOnlineTraffic(5000);
+    let latestRoom = room;
+    if (!latestRoom.guest_user_id || latestRoom.status !== 'waiting') {
+      latestRoom = await fetchRoomById(room.id, { force: true, timeoutMs: 6000 }) || room;
+    }
     if (!latestRoom.guest_user_id) {
       throw new Error('Нужен е втори играч, преди да стартираш онлайн мач.');
     }
@@ -4914,7 +5009,7 @@ async function patchRoom(patch, options = {}) {
   state.online.suspendRefreshUntil = Date.now() + 1400;
   syncFromOnlineRoom();
   try {
-    const response = await withTimeout(state.auth.client.from('rooms').update(patch).eq('id', room.id), 10000, 'Синхронизацията на стаята');
+    const response = await runSupabaseTimed((signal) => withAbortSignal(state.auth.client.from('rooms').update(patch).eq('id', room.id), signal), 10000, 'Синхронизацията на стаята');
     if (response.error) throw response.error;
     if (refreshLobby && state.ui.onlineLobbyOpen && canUseOnlineLobby()) {
       loadLobbyRooms().catch((error) => console.warn('Lobby refresh failed', error));
