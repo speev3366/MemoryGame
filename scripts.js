@@ -2457,168 +2457,363 @@ function selectCardCount(count) {
   updateHud();
 }
 
+
 function iconSport(key) {
   const commonStroke = 'stroke="#ffffff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"';
+  const metallicStroke = 'stroke="#dbe7f5" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none"';
 
   switch (key) {
     case 'football':
       return `
         <defs>
-          <radialGradient id="__ID__-fb-base" cx="38%" cy="30%" r="72%">
+          <radialGradient id="__ID__-fb-shell" cx="36%" cy="28%" r="72%">
             <stop offset="0%" stop-color="#ffffff"/>
-            <stop offset="72%" stop-color="#f4f4f5"/>
-            <stop offset="100%" stop-color="#d4d4d8"/>
+            <stop offset="62%" stop-color="#f8fafc"/>
+            <stop offset="100%" stop-color="#d0d7e2"/>
           </radialGradient>
-          <radialGradient id="__ID__-fb-shadow" cx="50%" cy="45%" r="62%">
-            <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
-            <stop offset="100%" stop-color="rgba(15,23,42,0.24)"/>
+          <radialGradient id="__ID__-fb-shade" cx="62%" cy="72%" r="58%">
+            <stop offset="0%" stop-color="rgba(15,23,42,0)"/>
+            <stop offset="100%" stop-color="rgba(15,23,42,0.28)"/>
           </radialGradient>
+          <filter id="__ID__-fb-drop" x="-40%" y="-40%" width="180%" height="180%">
+            <feDropShadow dx="0" dy="18" stdDeviation="14" flood-color="#07111d" flood-opacity="0.28"/>
+          </filter>
         </defs>
-        <circle cx="210" cy="170" r="102" fill="url(#__ID__-fb-base)"/>
-        <circle cx="210" cy="170" r="102" fill="url(#__ID__-fb-shadow)"/>
-        <ellipse cx="182" cy="128" rx="46" ry="28" fill="rgba(255,255,255,0.58)"/>
-        <polygon points="210,126 242,148 230,186 190,186 178,148" fill="#111827"/>
-        <path d="M179 148l-34-20M243 148l34-20M189 186l-18 34M231 186l18 34M145 191l34-3M275 191l-34-3" stroke="#1f2937" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M144 128c16 12 34 19 55 22M277 128c-16 12-34 19-55 22M168 220c25-12 53-18 84-18" stroke="#6b7280" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.35"/>
-        <circle cx="210" cy="170" r="102" fill="none" stroke="rgba(15,23,42,0.14)" stroke-width="10"/>
+        <g filter="url(#__ID__-fb-drop)">
+          <circle cx="210" cy="170" r="104" fill="url(#__ID__-fb-shell)"/>
+          <circle cx="210" cy="170" r="104" fill="url(#__ID__-fb-shade)"/>
+          <ellipse cx="175" cy="122" rx="52" ry="28" fill="rgba(255,255,255,0.72)"/>
+          <polygon points="210,118 243,142 231,180 189,180 177,142" fill="#1f2937"/>
+          <path d="M177 142l-42-24M243 142l42-24M189 180l-20 40M231 180l20 40M135 196l36-4M285 196l-36-4" stroke="#1f2937" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M135 118c18 16 40 26 68 29M285 118c-18 16-40 26-68 29M168 220c24-10 51-15 84-15" stroke="#64748b" stroke-width="7" fill="none" stroke-linecap="round" opacity="0.38"/>
+          <circle cx="210" cy="170" r="104" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="5"/>
+        </g>
       `;
     case 'basketball':
       return `
-        <circle cx="210" cy="170" r="98" fill="#ff8a21"/>
-        <path d="M112 170h196M210 72c36 22 54 60 54 98s-18 76-54 98M210 72c-36 22-54 60-54 98s18 76 54 98" stroke="#5c2500" stroke-width="14" fill="none"/>
-        <path d="M136 103c30 21 47 41 56 67M284 103c-30 21-47 41-56 67" stroke="#5c2500" stroke-width="12" fill="none"/>
+        <defs>
+          <radialGradient id="__ID__-bb-base" cx="34%" cy="30%" r="74%">
+            <stop offset="0%" stop-color="#ffb161"/>
+            <stop offset="48%" stop-color="#ff8d2a"/>
+            <stop offset="100%" stop-color="#c85a0b"/>
+          </radialGradient>
+          <filter id="__ID__-bb-drop" x="-40%" y="-40%" width="180%" height="180%">
+            <feDropShadow dx="0" dy="18" stdDeviation="14" flood-color="#07111d" flood-opacity="0.24"/>
+          </filter>
+        </defs>
+        <g filter="url(#__ID__-bb-drop)">
+          <circle cx="210" cy="170" r="100" fill="url(#__ID__-bb-base)"/>
+          <ellipse cx="174" cy="122" rx="50" ry="24" fill="rgba(255,255,255,0.24)"/>
+          <path d="M110 170h200M210 70c38 24 58 61 58 100s-20 76-58 100M210 70c-38 24-58 61-58 100s20 76 58 100" stroke="#5b2300" stroke-width="12" fill="none"/>
+          <path d="M132 106c28 18 48 40 60 64M288 106c-28 18-48 40-60 64" stroke="#5b2300" stroke-width="10" fill="none"/>
+          <circle cx="210" cy="170" r="100" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="4"/>
+        </g>
       `;
     case 'tennis':
       return `
-        <circle cx="210" cy="165" r="96" fill="#d6ff55"/>
-        <path d="M138 85c37 34 56 75 56 122M282 85c-37 34-56 75-56 122" stroke="#ffffff" stroke-width="14" fill="none"/>
+        <defs>
+          <radialGradient id="__ID__-tn-base" cx="34%" cy="30%" r="72%">
+            <stop offset="0%" stop-color="#f6ff8b"/>
+            <stop offset="56%" stop-color="#d7f24a"/>
+            <stop offset="100%" stop-color="#95bb16"/>
+          </radialGradient>
+          <filter id="__ID__-tn-drop" x="-40%" y="-40%" width="180%" height="180%">
+            <feDropShadow dx="0" dy="18" stdDeviation="14" flood-color="#07111d" flood-opacity="0.24"/>
+          </filter>
+        </defs>
+        <g filter="url(#__ID__-tn-drop)">
+          <circle cx="210" cy="170" r="98" fill="url(#__ID__-tn-base)"/>
+          <ellipse cx="172" cy="124" rx="48" ry="23" fill="rgba(255,255,255,0.22)"/>
+          <path d="M142 92c36 34 54 74 54 120M278 92c-36 34-54 74-54 120" stroke="#fffdf4" stroke-width="13" fill="none" stroke-linecap="round"/>
+          <circle cx="210" cy="170" r="98" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="4"/>
+        </g>
       `;
     case 'boxing':
       return `
-        <path d="M130 138c0-28 20-48 51-48h33c15 0 27 12 27 27v23h27c18 0 32 14 32 31v32c0 20-16 36-36 36H169c-22 0-39-17-39-39v-62z" fill="#ff5c61"/>
-        <path d="M214 140v-24c0-13 10-23 23-23h14" ${commonStroke}/>
-        <path d="M126 182h176" ${commonStroke}/>
+        <defs>
+          <linearGradient id="__ID__-bx-left" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ff8a7b"/>
+            <stop offset="65%" stop-color="#ea4335"/>
+            <stop offset="100%" stop-color="#991b1b"/>
+          </linearGradient>
+          <linearGradient id="__ID__-bx-right" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ff7067"/>
+            <stop offset="62%" stop-color="#dc2626"/>
+            <stop offset="100%" stop-color="#7f1d1d"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,6)">
+          <path d="M128 136c0-30 22-52 54-52h32c14 0 26 11 26 25v30h30c20 0 36 16 36 36v30c0 26-21 47-47 47H170c-24 0-42-18-42-42v-74z" fill="url(#__ID__-bx-left)"/>
+          <path d="M205 106c0-12 10-22 22-22h26c14 0 25 11 25 25v48h-73z" fill="url(#__ID__-bx-right)"/>
+          <path d="M156 174h140" stroke="rgba(255,255,255,0.82)" stroke-width="9" stroke-linecap="round"/>
+          <path d="M146 154c14-18 34-27 61-28M250 118c13 7 22 19 27 35" stroke="rgba(255,255,255,0.36)" stroke-width="7" fill="none" stroke-linecap="round"/>
+          <path d="M154 214c20 16 42 23 76 23h43" stroke="rgba(0,0,0,0.15)" stroke-width="8" fill="none" stroke-linecap="round"/>
+        </g>
       `;
     case 'volleyball':
       return `
         <defs>
-          <radialGradient id="__ID__-vb-base" cx="34%" cy="28%" r="78%">
-            <stop offset="0%" stop-color="#fef08a"/>
-            <stop offset="48%" stop-color="#fde047"/>
-            <stop offset="49%" stop-color="#1d4ed8"/>
-            <stop offset="100%" stop-color="#1e40af"/>
+          <radialGradient id="__ID__-vb-base" cx="34%" cy="28%" r="76%">
+            <stop offset="0%" stop-color="#fff59a"/>
+            <stop offset="32%" stop-color="#ffe44d"/>
+            <stop offset="33%" stop-color="#2d57df"/>
+            <stop offset="100%" stop-color="#1837a8"/>
           </radialGradient>
-          <radialGradient id="__ID__-vb-gloss" cx="32%" cy="24%" r="56%">
-            <stop offset="0%" stop-color="rgba(255,255,255,0.85)"/>
-            <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
-          </radialGradient>
+          <filter id="__ID__-vb-drop" x="-40%" y="-40%" width="180%" height="180%">
+            <feDropShadow dx="0" dy="18" stdDeviation="14" flood-color="#07111d" flood-opacity="0.26"/>
+          </filter>
         </defs>
-        <circle cx="210" cy="170" r="102" fill="url(#__ID__-vb-base)"/>
-        <path d="M118 134c54-36 110-42 168-18" stroke="#fde047" stroke-width="40" fill="none" stroke-linecap="round"/>
-        <path d="M145 241c14-54 44-95 89-122" stroke="#fde047" stroke-width="34" fill="none" stroke-linecap="round"/>
-        <path d="M258 262c-11-44-32-78-62-103" stroke="#fde047" stroke-width="34" fill="none" stroke-linecap="round"/>
-        <path d="M130 108c40 20 73 52 98 97" stroke="#1e40af" stroke-width="28" fill="none" stroke-linecap="round" opacity="0.88"/>
-        <path d="M254 103c-23 41-33 86-28 136" stroke="#1e40af" stroke-width="28" fill="none" stroke-linecap="round" opacity="0.88"/>
-        <path d="M115 196c46-10 91-11 136-1" stroke="#1e40af" stroke-width="26" fill="none" stroke-linecap="round" opacity="0.88"/>
-        <circle cx="210" cy="170" r="102" fill="url(#__ID__-vb-gloss)" opacity="0.3"/>
-        <circle cx="210" cy="170" r="102" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="8"/>
+        <g filter="url(#__ID__-vb-drop)">
+          <circle cx="210" cy="170" r="104" fill="url(#__ID__-vb-base)"/>
+          <ellipse cx="172" cy="118" rx="50" ry="25" fill="rgba(255,255,255,0.28)"/>
+          <path d="M120 132c52-34 108-41 166-20" stroke="#ffe24b" stroke-width="38" fill="none" stroke-linecap="round"/>
+          <path d="M146 246c12-54 42-94 88-122" stroke="#ffe24b" stroke-width="32" fill="none" stroke-linecap="round"/>
+          <path d="M256 258c-8-43-28-79-57-106" stroke="#ffe24b" stroke-width="32" fill="none" stroke-linecap="round"/>
+          <path d="M128 104c38 20 71 53 96 99" stroke="#2847ba" stroke-width="24" fill="none" stroke-linecap="round" opacity="0.85"/>
+          <path d="M256 102c-22 39-31 84-27 133" stroke="#2847ba" stroke-width="24" fill="none" stroke-linecap="round" opacity="0.85"/>
+          <path d="M116 194c46-10 91-11 137-1" stroke="#2847ba" stroke-width="22" fill="none" stroke-linecap="round" opacity="0.85"/>
+          <circle cx="210" cy="170" r="104" fill="none" stroke="rgba(255,255,255,0.24)" stroke-width="5"/>
+        </g>
       `;
     case 'baseball':
       return `
-        <circle cx="210" cy="170" r="96" fill="#fffaf5"/>
-        <path d="M154 99c-19 24-29 50-29 77s10 53 29 77" stroke="#d33a3a" stroke-width="10" fill="none" stroke-dasharray="2 14" stroke-linecap="round"/>
-        <path d="M266 99c19 24 29 50 29 77s-10 53-29 77" stroke="#d33a3a" stroke-width="10" fill="none" stroke-dasharray="2 14" stroke-linecap="round"/>
+        <defs>
+          <radialGradient id="__ID__-bs-base" cx="36%" cy="28%" r="74%">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="72%" stop-color="#fffaf5"/>
+            <stop offset="100%" stop-color="#ded6ce"/>
+          </radialGradient>
+        </defs>
+        <circle cx="210" cy="170" r="96" fill="url(#__ID__-bs-base)"/>
+        <ellipse cx="176" cy="124" rx="42" ry="20" fill="rgba(255,255,255,0.55)"/>
+        <path d="M154 100c-20 25-30 52-30 82s10 57 30 82" stroke="#cf2e2e" stroke-width="9" fill="none" stroke-linecap="round"/>
+        <path d="M266 100c20 25 30 52 30 82s-10 57-30 82" stroke="#cf2e2e" stroke-width="9" fill="none" stroke-linecap="round"/>
+        <path d="M143 122c11 7 17 17 19 29M143 155c11 7 17 17 19 29M143 188c11 7 17 17 19 29" stroke="#cf2e2e" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <path d="M277 122c-11 7-17 17-19 29M277 155c-11 7-17 17-19 29M277 188c-11 7-17 17-19 29" stroke="#cf2e2e" stroke-width="5" fill="none" stroke-linecap="round"/>
       `;
     case 'cycling':
       return `
-        <circle cx="138" cy="214" r="52" ${commonStroke}/>
-        <circle cx="290" cy="214" r="52" ${commonStroke}/>
-        <path d="M138 214l64-78 42 0M202 136l35 78M180 214h110M208 136l-30 78" ${commonStroke}/>
-        <circle cx="205" cy="106" r="18" fill="#ffffff"/>
-        <path d="M205 126l20 36M195 146l-30 34" ${commonStroke}/>
+        <defs>
+          <linearGradient id="__ID__-cy-frame" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#6de3ff"/>
+            <stop offset="100%" stop-color="#2563eb"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,10)">
+          <circle cx="136" cy="220" r="48" fill="none" stroke="#dbe7f5" stroke-width="10"/>
+          <circle cx="284" cy="220" r="48" fill="none" stroke="#dbe7f5" stroke-width="10"/>
+          <path d="M136 220l62-76 40 0M198 144l34 76M176 220h108M198 144l-30 76" stroke="url(#__ID__-cy-frame)" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M232 144h24M167 145l-18-18" stroke="#dbe7f5" stroke-width="8" fill="none" stroke-linecap="round"/>
+          <circle cx="198" cy="118" r="15" fill="#f8fafc"/>
+          <path d="M198 133l20 30M188 148l-25 28" stroke="#f8fafc" stroke-width="10" fill="none" stroke-linecap="round"/>
+        </g>
       `;
     case 'helmet':
       return `
-        <path d="M100 186c0-70 50-116 121-116 70 0 116 41 116 104 0 27-18 48-44 48H140c-23 0-40-16-40-36z" fill="#ffffff"/>
-        <path d="M286 129h58v36h-58z" fill="#ff4d6d"/>
-        <path d="M153 223c8 24 24 40 57 40" ${commonStroke}/>
-        <path d="M136 170h130" stroke="#d5dff1" stroke-width="14"/>
+        <defs>
+          <linearGradient id="__ID__-hl-shell" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="65%" stop-color="#eef4fb"/>
+            <stop offset="100%" stop-color="#cfd8e5"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,6)">
+          <path d="M100 192c0-72 50-118 122-118 71 0 118 42 118 104 0 28-18 48-45 48H140c-24 0-40-15-40-34z" fill="url(#__ID__-hl-shell)"/>
+          <path d="M286 130h58v38h-58z" fill="#ff5570"/>
+          <path d="M140 170h132" stroke="#cfd9e8" stroke-width="14" stroke-linecap="round"/>
+          <path d="M149 225c10 25 26 41 60 41" stroke="#ffffff" stroke-width="10" fill="none" stroke-linecap="round"/>
+          <path d="M138 134c24-27 60-40 107-38" stroke="rgba(255,255,255,0.7)" stroke-width="7" fill="none" stroke-linecap="round"/>
+        </g>
       `;
     case 'dumbbell':
       return `
-        <rect x="150" y="165" width="120" height="18" rx="9" fill="#ffffff"/>
-        <rect x="122" y="136" width="20" height="76" rx="6" fill="#ffffff"/>
-        <rect x="96" y="122" width="18" height="104" rx="6" fill="#ffffff"/>
-        <rect x="278" y="136" width="20" height="76" rx="6" fill="#ffffff"/>
-        <rect x="306" y="122" width="18" height="104" rx="6" fill="#ffffff"/>
+        <defs>
+          <linearGradient id="__ID__-db-metal" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#f8fbff"/>
+            <stop offset="50%" stop-color="#cfd7e3"/>
+            <stop offset="100%" stop-color="#7b8798"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,4)">
+          <rect x="142" y="165" width="136" height="20" rx="10" fill="url(#__ID__-db-metal)"/>
+          <rect x="118" y="136" width="20" height="78" rx="7" fill="#d6deea"/>
+          <rect x="92" y="120" width="20" height="110" rx="7" fill="#b8c2d1"/>
+          <rect x="280" y="136" width="20" height="78" rx="7" fill="#d6deea"/>
+          <rect x="306" y="120" width="20" height="110" rx="7" fill="#b8c2d1"/>
+          <path d="M142 168h136" stroke="rgba(255,255,255,0.5)" stroke-width="4" stroke-linecap="round"/>
+        </g>
       `;
     case 'trophy':
       return `
-        <path d="M145 95h130v32c0 34-24 63-58 70v31h47v28H156v-28h47v-31c-34-7-58-36-58-70V95z" fill="#ffd166"/>
-        <path d="M145 105h-28c0 43 17 70 51 80M275 105h28c0 43-17 70-51 80" stroke="#ffd166" stroke-width="16" fill="none" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="__ID__-tr-gold" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#fff2a8"/>
+            <stop offset="45%" stop-color="#ffd25e"/>
+            <stop offset="100%" stop-color="#cb8e17"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,4)">
+          <path d="M152 98h116v34c0 40-24 72-58 82-34-10-58-42-58-82V98z" fill="url(#__ID__-tr-gold)"/>
+          <path d="M152 110h-26c0 42 18 68 51 78M268 110h26c0 42-18 68-51 78" stroke="#f4bf42" stroke-width="14" fill="none" stroke-linecap="round"/>
+          <rect x="188" y="214" width="44" height="54" rx="12" fill="#d79a26"/>
+          <rect x="154" y="260" width="112" height="24" rx="12" fill="#b9761d"/>
+          <ellipse cx="192" cy="132" rx="34" ry="16" fill="rgba(255,255,255,0.35)"/>
+        </g>
       `;
     case 'running':
       return `
-        <circle cx="228" cy="88" r="20" fill="#ffffff"/>
-        <path d="M210 114l-34 42 38 14 28-34 24 24 34 10M214 170l-28 60M242 140l-14 46 42 60M164 232h46M268 228h58" ${commonStroke}/>
+        <defs>
+          <linearGradient id="__ID__-rn-shoe" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7dd3fc"/>
+            <stop offset="55%" stop-color="#3b82f6"/>
+            <stop offset="100%" stop-color="#1d4ed8"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,8)">
+          <path d="M116 216c18-14 31-32 39-54l18-49 45 26-12 44 34 25c18 13 38 21 60 25l36 6c10 2 17 11 17 22v8H121c-17 0-30-13-30-30 0-9 4-18 11-23l14-10z" fill="url(#__ID__-rn-shoe)"/>
+          <path d="M168 150h54M160 171h58M152 192h62" stroke="#c9efff" stroke-width="7" fill="none" stroke-linecap="round"/>
+          <path d="M108 268h238" stroke="#ffffff" stroke-width="10" fill="none" stroke-linecap="round" opacity="0.55"/>
+        </g>
       `;
     case 'swimming':
       return `
-        <circle cx="152" cy="132" r="24" fill="#ffffff"/>
-        <path d="M172 132h78l48 34" ${commonStroke}/>
-        <path d="M90 228c28-18 56-18 84 0 28 18 56 18 84 0 28-18 56-18 84 0" stroke="#ffffff" stroke-width="14" fill="none" stroke-linecap="round"/>
-        <path d="M124 180l50 18" ${commonStroke}/>
+        <defs>
+          <linearGradient id="__ID__-sw-water" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#8be8ff"/>
+            <stop offset="100%" stop-color="#1d9bf0"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,6)">
+          <path d="M126 166c0-18 14-32 32-32h34c10 0 19 4 25 11l12 14h22c18 0 32 14 32 32v28c0 18-14 32-32 32h-84c-18 0-32-14-32-32v-53z" fill="#f8fafc" opacity="0.95"/>
+          <circle cx="165" cy="190" r="28" fill="none" stroke="#94a3b8" stroke-width="10"/>
+          <circle cx="246" cy="190" r="28" fill="none" stroke="#94a3b8" stroke-width="10"/>
+          <path d="M95 260c26-16 52-16 78 0 26 16 52 16 78 0 26-16 52-16 78 0" stroke="url(#__ID__-sw-water)" stroke-width="14" fill="none" stroke-linecap="round"/>
+          <path d="M116 286c26-16 52-16 78 0 26 16 52 16 78 0 26-16 52-16 78 0" stroke="rgba(255,255,255,0.65)" stroke-width="8" fill="none" stroke-linecap="round"/>
+        </g>
       `;
     case 'skiing':
       return `
-        <circle cx="220" cy="90" r="18" fill="#ffffff"/>
-        <path d="M220 108l-34 42 30 28 50-8 42 36" ${commonStroke}/>
-        <path d="M104 268h174M146 240h176" stroke="#ffffff" stroke-width="12" fill="none" stroke-linecap="round"/>
-        <path d="M258 102v64" stroke="#ffffff" stroke-width="10" fill="none"/>
+        <defs>
+          <linearGradient id="__ID__-sk-ski" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#f8fafc"/>
+            <stop offset="100%" stop-color="#c7d2e0"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,4)">
+          <path d="M136 268c24-48 49-96 76-144" stroke="url(#__ID__-sk-ski)" stroke-width="12" fill="none" stroke-linecap="round"/>
+          <path d="M214 268c24-48 49-96 76-144" stroke="url(#__ID__-sk-ski)" stroke-width="12" fill="none" stroke-linecap="round"/>
+          <path d="M126 282h180" stroke="#ffffff" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.6"/>
+          <path d="M168 126l-10 120M256 126l10 120" stroke="#f8fafc" stroke-width="8" fill="none" stroke-linecap="round"/>
+          <path d="M158 126h20M246 126h20" stroke="#f8fafc" stroke-width="8" fill="none" stroke-linecap="round"/>
+        </g>
       `;
     case 'skate':
       return `
-        <rect x="110" y="170" width="200" height="36" rx="18" fill="#ffffff"/>
-        <circle cx="150" cy="230" r="24" fill="#10253f"/>
-        <circle cx="270" cy="230" r="24" fill="#10253f"/>
-        <path d="M136 166l26-30M286 166l-26-30" ${commonStroke}/>
+        <defs>
+          <linearGradient id="__ID__-skate-board" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="100%" stop-color="#d7e2ef"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,12)">
+          <rect x="106" y="164" width="208" height="36" rx="18" fill="url(#__ID__-skate-board)"/>
+          <circle cx="152" cy="226" r="22" fill="#10253f"/>
+          <circle cx="268" cy="226" r="22" fill="#10253f"/>
+          <path d="M136 162l18-28M284 162l-18-28" ${commonStroke}/>
+          <path d="M126 182h168" stroke="rgba(255,255,255,0.55)" stroke-width="5"/>
+        </g>
       `;
     case 'racket':
       return `
-        <ellipse cx="200" cy="138" rx="68" ry="88" fill="none" stroke="#ffffff" stroke-width="18"/>
-        <path d="M160 80v116M200 56v164M240 80v116M132 112h136M132 154h136" stroke="#ffffff" stroke-width="8"/>
-        <rect x="234" y="220" width="30" height="110" rx="14" fill="#ffffff" transform="rotate(-30 249 275)"/>
+        <defs>
+          <linearGradient id="__ID__-rk-frame" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#eff6ff"/>
+            <stop offset="100%" stop-color="#d6e3f3"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,4)">
+          <ellipse cx="196" cy="136" rx="72" ry="92" fill="none" stroke="url(#__ID__-rk-frame)" stroke-width="16"/>
+          <path d="M160 76v122M196 52v170M232 76v122M126 108h140M126 144h140M132 180h128" stroke="#dfe8f3" stroke-width="6"/>
+          <rect x="232" y="216" width="30" height="120" rx="14" fill="#eff6ff" transform="rotate(-32 247 276)"/>
+          <circle cx="292" cy="222" r="22" fill="#d8f354" stroke="#bdd230" stroke-width="6"/>
+          <path d="M280 206c8 8 8 24 0 32M304 206c-8 8-8 24 0 32" stroke="#fffef3" stroke-width="4" fill="none"/>
+        </g>
       `;
     case 'whistle':
       return `
-        <path d="M116 176c0-28 22-50 50-50h60c44 0 80 36 80 80s-36 80-80 80c-31 0-56-25-56-56 0-24 18-42 42-42 20 0 34 14 34 34" ${commonStroke}/>
-        <circle cx="230" cy="206" r="18" fill="#ffffff"/>
+        <defs>
+          <linearGradient id="__ID__-wh-body" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#f8fbff"/>
+            <stop offset="48%" stop-color="#d9e4f0"/>
+            <stop offset="100%" stop-color="#8e9aad"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,8)">
+          <path d="M118 176c0-29 23-52 52-52h58c45 0 82 37 82 82s-37 82-82 82c-31 0-57-26-57-57 0-24 18-42 42-42 20 0 35 15 35 35" fill="url(#__ID__-wh-body)"/>
+          <circle cx="232" cy="206" r="18" fill="#ffffff" opacity="0.9"/>
+          <path d="M148 150c18-11 36-16 55-15" stroke="rgba(255,255,255,0.72)" stroke-width="7" fill="none" stroke-linecap="round"/>
+        </g>
       `;
     case 'goal':
       return `
-        <path d="M112 264V112h184v152" ${commonStroke}/>
-        <path d="M150 264V146h146v118" stroke="#ffffff" stroke-width="10" fill="none"/>
-        <path d="M112 112l38 34M296 112l-38 34M150 146l146 118" stroke="#ffffff" stroke-width="10" fill="none"/>
+        <g transform="translate(0,10)">
+          <path d="M116 258V112h184v146" ${commonStroke}/>
+          <path d="M150 258V146h150v112" stroke="#e7f0fb" stroke-width="10" fill="none"/>
+          <path d="M116 112l34 34M300 112l-34 34M150 146l150 112" stroke="#dbe7f5" stroke-width="8" fill="none"/>
+          <circle cx="244" cy="226" r="32" fill="#ffffff" stroke="#1f2937" stroke-width="6"/>
+          <polygon points="244,212 254,219 250,231 238,231 234,219" fill="#111827"/>
+        </g>
       `;
     case 'medal':
       return `
-        <path d="M154 72h46l18 62h-44z" fill="#2563eb"/>
-        <path d="M220 72h46l-18 62h-44z" fill="#ef4444"/>
-        <circle cx="210" cy="202" r="64" fill="#ffd166"/>
-        <polygon points="210,162 224,191 256,196 232,219 238,252 210,236 182,252 188,219 164,196 196,191" fill="#fff7c2"/>
+        <defs>
+          <linearGradient id="__ID__-md-gold" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#fff5be"/>
+            <stop offset="50%" stop-color="#ffd75b"/>
+            <stop offset="100%" stop-color="#e0a924"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,4)">
+          <path d="M154 70h44l22 70h-48z" fill="#2563eb"/>
+          <path d="M220 70h46l-22 70h-48z" fill="#ef4444"/>
+          <circle cx="210" cy="204" r="64" fill="url(#__ID__-md-gold)"/>
+          <polygon points="210,164 224,192 256,197 232,219 238,250 210,235 182,250 188,219 164,197 196,192" fill="#fff7c7"/>
+          <ellipse cx="188" cy="174" rx="28" ry="13" fill="rgba(255,255,255,0.42)"/>
+        </g>
       `;
     case 'cup':
       return `
-        <path d="M140 124h140v34c0 42-28 76-70 84-42-8-70-42-70-84v-34z" fill="#ffffff"/>
-        <path d="M140 136h-26c0 34 14 56 42 66M280 136h26c0 34-14 56-42 66" stroke="#ffffff" stroke-width="14" fill="none" stroke-linecap="round"/>
-        <rect x="190" y="242" width="40" height="54" rx="12" fill="#ffffff"/>
-        <rect x="152" y="284" width="116" height="24" rx="12" fill="#ffffff"/>
+        <defs>
+          <linearGradient id="__ID__-cp-silver" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="52%" stop-color="#dce5f1"/>
+            <stop offset="100%" stop-color="#9aa6b8"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,6)">
+          <path d="M142 124h136v34c0 42-28 76-68 84-40-8-68-42-68-84v-34z" fill="url(#__ID__-cp-silver)"/>
+          <path d="M142 136h-26c0 36 14 58 42 68M278 136h26c0 36-14 58-42 68" stroke="#dfe8f3" stroke-width="12" fill="none" stroke-linecap="round"/>
+          <rect x="192" y="242" width="36" height="54" rx="12" fill="#d1d9e6"/>
+          <rect x="154" y="286" width="112" height="22" rx="11" fill="#bcc7d6"/>
+          <ellipse cx="190" cy="154" rx="30" ry="14" fill="rgba(255,255,255,0.4)"/>
+        </g>
       `;
     case 'tabletennis':
       return `
-        <circle cx="280" cy="120" r="26" fill="#ffffff"/>
-        <path d="M122 126c0-34 28-62 62-62 42 0 94 42 94 88 0 34-28 62-62 62-42 0-94-42-94-88z" fill="#ef4444"/>
-        <rect x="194" y="212" width="24" height="94" rx="10" fill="#ffe3a3" transform="rotate(24 206 259)"/>
+        <defs>
+          <linearGradient id="__ID__-tt-pad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ff7a73"/>
+            <stop offset="58%" stop-color="#ef4444"/>
+            <stop offset="100%" stop-color="#b91c1c"/>
+          </linearGradient>
+        </defs>
+        <g transform="translate(0,6)">
+          <circle cx="282" cy="118" r="22" fill="#ffffff" opacity="0.96"/>
+          <ellipse cx="192" cy="154" rx="82" ry="62" fill="url(#__ID__-tt-pad)" transform="rotate(20 192 154)"/>
+          <ellipse cx="196" cy="150" rx="66" ry="48" fill="rgba(255,255,255,0.08)" transform="rotate(20 196 150)"/>
+          <rect x="198" y="204" width="28" height="108" rx="12" fill="#deb887" transform="rotate(24 212 258)"/>
+          <path d="M150 118c25-13 54-14 86-5" stroke="rgba(255,255,255,0.28)" stroke-width="8" fill="none" stroke-linecap="round" transform="rotate(20 192 154)"/>
+        </g>
       `;
     default:
       return `<circle cx="210" cy="176" r="88" fill="#ffffff"/>`;
@@ -2627,276 +2822,348 @@ function iconSport(key) {
 
 function iconSoldier(key) {
   const commonStroke = 'stroke="#f8f6eb" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"';
+  const defs = `
+    <defs>
+      <linearGradient id="__ID__-mil-olive" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#dce5c2"/>
+        <stop offset="55%" stop-color="#99ab68"/>
+        <stop offset="100%" stop-color="#5f6d38"/>
+      </linearGradient>
+      <linearGradient id="__ID__-mil-olive-dark" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#91a264"/>
+        <stop offset="100%" stop-color="#3f4c25"/>
+      </linearGradient>
+      <linearGradient id="__ID__-mil-metal" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#f5f3e8"/>
+        <stop offset="55%" stop-color="#cdd6ca"/>
+        <stop offset="100%" stop-color="#7f8c7a"/>
+      </linearGradient>
+      <linearGradient id="__ID__-mil-brown" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#b98f64"/>
+        <stop offset="100%" stop-color="#5f4126"/>
+      </linearGradient>
+      <filter id="__ID__-mil-drop" x="-35%" y="-35%" width="170%" height="170%">
+        <feDropShadow dx="0" dy="18" stdDeviation="14" flood-color="#04090d" flood-opacity="0.30"/>
+      </filter>
+    </defs>
+  `;
+  const wrap = (inner) => `${defs}<g filter="url(#__ID__-mil-drop)">${inner}</g>`;
 
   switch (key) {
     case 'helmet':
-      return `
-        <path d="M102 187c0-64 48-106 108-106 59 0 108 38 108 96 0 28-22 49-50 49H144c-24 0-42-15-42-39z" fill="#b7c38d"/>
-        <path d="M145 176h130" stroke="#87915c" stroke-width="15"/>
-      `;
+      return wrap(`
+        <path d="M102 187c0-64 48-106 108-106 59 0 108 38 108 96 0 28-22 49-50 49H144c-24 0-42-15-42-39z" fill="url(#__ID__-mil-olive)"/>
+        <path d="M136 136c30-28 64-42 116-38 18 2 35 8 51 18" stroke="rgba(255,255,255,0.20)" stroke-width="12" fill="none" stroke-linecap="round"/>
+        <path d="M144 176h130" stroke="#6d774a" stroke-width="15" stroke-linecap="round"/>
+        <path d="M116 198c12 18 28 28 52 28" stroke="#3d4924" stroke-width="10" fill="none" stroke-linecap="round"/>
+      `);
     case 'tank':
-      return `
-        <rect x="96" y="175" width="220" height="52" rx="22" fill="#a4b279"/>
-        <rect x="150" y="130" width="96" height="50" rx="18" fill="#b7c38d"/>
-        <rect x="228" y="145" width="92" height="14" rx="7" fill="#e7efc3"/>
-        <circle cx="140" cy="227" r="18" fill="#5f6944"/>
-        <circle cx="192" cy="227" r="18" fill="#5f6944"/>
-        <circle cx="244" cy="227" r="18" fill="#5f6944"/>
-        <circle cx="296" cy="227" r="18" fill="#5f6944"/>
-      `;
+      return wrap(`
+        <rect x="92" y="182" width="226" height="48" rx="20" fill="url(#__ID__-mil-olive-dark)"/>
+        <rect x="142" y="138" width="104" height="52" rx="18" fill="url(#__ID__-mil-olive)"/>
+        <path d="M234 150h88c8 0 14 6 14 14s-6 14-14 14h-88z" fill="#dfe7c8"/>
+        <path d="M102 184c42-22 84-31 128-26" stroke="rgba(255,255,255,0.16)" stroke-width="10" fill="none" stroke-linecap="round"/>
+        <g fill="#354022">
+          <circle cx="138" cy="230" r="18"/><circle cx="190" cy="230" r="18"/><circle cx="242" cy="230" r="18"/><circle cx="294" cy="230" r="18"/>
+        </g>
+        <g fill="#768455">
+          <circle cx="138" cy="230" r="8"/><circle cx="190" cy="230" r="8"/><circle cx="242" cy="230" r="8"/><circle cx="294" cy="230" r="8"/>
+        </g>
+      `);
     case 'drone':
-      return `
-        <circle cx="210" cy="185" r="28" fill="#dfe7d2"/>
-        <path d="M210 185L140 125M210 185l70-60M210 185l-70 60M210 185l70 60" ${commonStroke}/>
-        <circle cx="124" cy="112" r="24" fill="#c7d19f"/>
-        <circle cx="296" cy="112" r="24" fill="#c7d19f"/>
-        <circle cx="124" cy="258" r="24" fill="#c7d19f"/>
-        <circle cx="296" cy="258" r="24" fill="#c7d19f"/>
-      `;
+      return wrap(`
+        <circle cx="210" cy="185" r="30" fill="url(#__ID__-mil-metal)"/>
+        <path d="M210 185L138 124M210 185l72-61M210 185l-72 61M210 185l72 61" stroke="#dfe7d2" stroke-width="14" fill="none" stroke-linecap="round"/>
+        <g fill="url(#__ID__-mil-olive)">
+          <circle cx="122" cy="110" r="24"/><circle cx="298" cy="110" r="24"/><circle cx="122" cy="260" r="24"/><circle cx="298" cy="260" r="24"/>
+        </g>
+        <g stroke="#425033" stroke-width="8" fill="none" stroke-linecap="round">
+          <path d="M102 110h40M278 110h40M102 260h40M278 260h40"/>
+        </g>
+      `);
     case 'binoculars':
-      return `
-        <rect x="118" y="122" width="64" height="108" rx="28" fill="#c4ccb4"/>
-        <rect x="238" y="122" width="64" height="108" rx="28" fill="#c4ccb4"/>
-        <rect x="170" y="108" width="80" height="40" rx="14" fill="#e2e8d4"/>
-        <circle cx="150" cy="218" r="36" fill="#49513c"/>
-        <circle cx="270" cy="218" r="36" fill="#49513c"/>
-      `;
+      return wrap(`
+        <rect x="116" y="120" width="68" height="112" rx="30" fill="url(#__ID__-mil-metal)"/>
+        <rect x="236" y="120" width="68" height="112" rx="30" fill="url(#__ID__-mil-metal)"/>
+        <rect x="168" y="108" width="84" height="42" rx="18" fill="url(#__ID__-mil-olive)"/>
+        <circle cx="150" cy="218" r="38" fill="#2f3828"/>
+        <circle cx="270" cy="218" r="38" fill="#2f3828"/>
+        <circle cx="150" cy="218" r="22" fill="#78a3b1" opacity="0.55"/>
+        <circle cx="270" cy="218" r="22" fill="#78a3b1" opacity="0.55"/>
+      `);
     case 'radio':
-      return `
-        <rect x="132" y="92" width="156" height="188" rx="24" fill="#b9c58a"/>
-        <rect x="154" y="122" width="112" height="76" rx="14" fill="#2c3b2d"/>
+      return wrap(`
+        <rect x="132" y="92" width="156" height="188" rx="28" fill="url(#__ID__-mil-olive)"/>
+        <rect x="154" y="122" width="112" height="76" rx="14" fill="#1e2c2a"/>
+        <rect x="164" y="132" width="92" height="22" rx="8" fill="#8fd0a2" opacity="0.55"/>
         <circle cx="182" cy="234" r="18" fill="#728050"/>
         <circle cx="238" cy="234" r="28" fill="#728050"/>
         <path d="M210 92V50" stroke="#f8f6eb" stroke-width="12" stroke-linecap="round"/>
-      `;
+        <path d="M194 72c14 4 22 14 26 30" stroke="rgba(255,255,255,0.22)" stroke-width="8" fill="none" stroke-linecap="round"/>
+      `);
     case 'medic':
-      return `
-        <rect x="124" y="98" width="172" height="164" rx="28" fill="#f7efe7"/>
+      return wrap(`
+        <rect x="124" y="98" width="172" height="164" rx="32" fill="url(#__ID__-mil-metal)"/>
         <rect x="190" y="122" width="40" height="116" rx="10" fill="#ef4444"/>
         <rect x="152" y="160" width="116" height="40" rx="10" fill="#ef4444"/>
         <rect x="162" y="74" width="96" height="34" rx="16" fill="#d8c3ab"/>
-      `;
+        <path d="M146 120c28-14 70-18 118-8" stroke="rgba(255,255,255,0.20)" stroke-width="10" fill="none" stroke-linecap="round"/>
+      `);
     case 'shield':
-      return `
-        <path d="M210 74l100 36v60c0 72-42 118-100 154-58-36-100-82-100-154v-60l100-36z" fill="#cfd7b7"/>
+      return wrap(`
+        <path d="M210 74l100 36v60c0 72-42 118-100 154-58-36-100-82-100-154v-60l100-36z" fill="url(#__ID__-mil-metal)"/>
         <path d="M210 106v180M132 168h156" stroke="#76815c" stroke-width="16"/>
-      `;
+        <path d="M210 84c22 12 44 18 66 22" stroke="rgba(255,255,255,0.20)" stroke-width="10" fill="none" stroke-linecap="round"/>
+      `);
     case 'boots':
-      return `
-        <path d="M104 214h92c18 0 32 15 32 33v17H104c-16 0-28-12-28-28v-6c0-9 8-16 28-16z" fill="#7b5b3b"/>
-        <path d="M216 214h92c18 0 32 15 32 33v17H216c-16 0-28-12-28-28v-6c0-9 8-16 28-16z" fill="#8f6942"/>
+      return wrap(`
+        <path d="M104 214h92c18 0 32 15 32 33v17H104c-16 0-28-12-28-28v-6c0-9 8-16 28-16z" fill="url(#__ID__-mil-brown)"/>
+        <path d="M216 214h92c18 0 32 15 32 33v17H216c-16 0-28-12-28-28v-6c0-9 8-16 28-16z" fill="#7d5635"/>
         <path d="M170 214v-64h38v64M282 214v-64h38v64" stroke="#d8c49e" stroke-width="12" stroke-linecap="round"/>
-      `;
+        <path d="M122 238h82M234 238h82" stroke="rgba(255,255,255,0.14)" stroke-width="8" stroke-linecap="round"/>
+      `);
     case 'medal':
-      return `
+      return wrap(`
         <path d="M152 72h44l18 60h-44z" fill="#ef4444"/>
         <path d="M224 72h44l-18 60h-44z" fill="#2563eb"/>
         <circle cx="210" cy="196" r="64" fill="#f3c54c"/>
+        <circle cx="210" cy="196" r="54" fill="url(#__ID__-mil-metal)" opacity="0.35"/>
         <polygon points="210,152 224,184 258,187 232,210 240,244 210,226 180,244 188,210 162,187 196,184" fill="#fff2b3"/>
-      `;
+      `);
     case 'goggles':
-      return `
-        <rect x="104" y="144" width="90" height="72" rx="26" fill="#d7dcc7"/>
-        <rect x="226" y="144" width="90" height="72" rx="26" fill="#d7dcc7"/>
+      return wrap(`
+        <rect x="104" y="144" width="90" height="72" rx="26" fill="url(#__ID__-mil-metal)"/>
+        <rect x="226" y="144" width="90" height="72" rx="26" fill="url(#__ID__-mil-metal)"/>
         <rect x="188" y="166" width="44" height="28" rx="14" fill="#d7dcc7"/>
         <path d="M78 176h28M314 176h28" stroke="#f8f6eb" stroke-width="14" stroke-linecap="round"/>
         <rect x="122" y="160" width="54" height="40" rx="14" fill="#46503b"/>
         <rect x="244" y="160" width="54" height="40" rx="14" fill="#46503b"/>
-      `;
+        <rect x="130" y="168" width="38" height="24" rx="10" fill="#88b38c" opacity="0.35"/>
+        <rect x="252" y="168" width="38" height="24" rx="10" fill="#88b38c" opacity="0.35"/>
+      `);
     case 'submarine':
-      return `
-        <path d="M98 212c0-42 34-76 76-76h92c34 0 64 18 80 46v30H98z" fill="#9cad72"/>
+      return wrap(`
+        <path d="M98 212c0-42 34-76 76-76h92c34 0 64 18 80 46v30H98z" fill="url(#__ID__-mil-olive)"/>
         <rect x="188" y="108" width="54" height="34" rx="12" fill="#d6dfb7"/>
-        <circle cx="148" cy="212" r="16" fill="#425033"/>
-        <circle cx="212" cy="212" r="16" fill="#425033"/>
-        <circle cx="276" cy="212" r="16" fill="#425033"/>
+        <g fill="#425033"><circle cx="148" cy="212" r="16"/><circle cx="212" cy="212" r="16"/><circle cx="276" cy="212" r="16"/></g>
         <path d="M320 196h34" stroke="#f8f6eb" stroke-width="12" stroke-linecap="round"/>
-      `;
+        <path d="M122 170c54-20 114-24 172-8" stroke="rgba(255,255,255,0.14)" stroke-width="10" fill="none" stroke-linecap="round"/>
+      `);
     case 'jet':
-      return `
-        <path d="M74 194l118-34 96-82 30 6-52 90 48 14-14 20-66-8-34 44-20-2 8-40-84 18z" fill="#dfe7d2"/>
-      `;
+      return wrap(`
+        <path d="M74 194l118-34 96-82 30 6-52 90 48 14-14 20-66-8-34 44-20-2 8-40-84 18z" fill="url(#__ID__-mil-metal)"/>
+        <path d="M182 158l64-34" stroke="rgba(255,255,255,0.22)" stroke-width="10" stroke-linecap="round"/>
+      `);
     case 'compass':
-      return `
-        <circle cx="210" cy="176" r="104" fill="#c8d1ab"/>
+      return wrap(`
+        <circle cx="210" cy="176" r="104" fill="url(#__ID__-mil-metal)"/>
         <circle cx="210" cy="176" r="72" fill="#46503b"/>
         <polygon points="210,92 240,176 210,260 180,176" fill="#f8f6eb"/>
         <polygon points="210,116 228,176 210,236 192,176" fill="#ef4444"/>
         <circle cx="210" cy="176" r="16" fill="#f8f6eb"/>
-      `;
+        <circle cx="210" cy="176" r="92" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="6"/>
+      `);
     case 'watchtower':
-      return `
-        <rect x="148" y="92" width="124" height="52" rx="12" fill="#d7dcc7"/>
+      return wrap(`
+        <rect x="148" y="92" width="124" height="52" rx="12" fill="url(#__ID__-mil-metal)"/>
         <path d="M162 144l-30 128M258 144l30 128M188 144l-18 128M232 144l18 128" ${commonStroke}/>
         <path d="M120 272h180" stroke="#f8f6eb" stroke-width="12" stroke-linecap="round"/>
-      `;
+        <path d="M148 120h124" stroke="rgba(255,255,255,0.20)" stroke-width="8" stroke-linecap="round"/>
+      `);
     case 'parachute':
-      return `
-        <path d="M102 154c18-58 64-92 108-92s90 34 108 92H102z" fill="#dfe7d2"/>
+      return wrap(`
+        <path d="M102 154c18-58 64-92 108-92s90 34 108 92H102z" fill="url(#__ID__-mil-metal)"/>
         <path d="M136 154l34 74M210 154v94M284 154l-34 74" ${commonStroke}/>
         <circle cx="210" cy="278" r="18" fill="#f8f6eb"/>
         <path d="M210 296v34M210 314l-26 34M210 314l26 34" ${commonStroke}/>
-      `;
+      `);
     case 'ammo':
-      return `
+      return wrap(`
         <rect x="122" y="128" width="54" height="132" rx="18" fill="#d9c282"/>
         <rect x="184" y="108" width="54" height="152" rx="18" fill="#e7d59c"/>
         <rect x="246" y="142" width="54" height="118" rx="18" fill="#d9c282"/>
         <path d="M149 128l-8-26h16zM211 108l-8-26h16zM273 142l-8-26h16z" fill="#f8f6eb"/>
-      `;
+        <path d="M136 156h26M198 138h26M260 168h26" stroke="rgba(255,255,255,0.20)" stroke-width="8" stroke-linecap="round"/>
+      `);
     case 'map':
-      return `
-        <path d="M92 120l76-24 84 28 76-24v180l-76 24-84-28-76 24z" fill="#d7dcc7"/>
+      return wrap(`
+        <path d="M92 120l76-24 84 28 76-24v180l-76 24-84-28-76 24z" fill="url(#__ID__-mil-metal)"/>
         <path d="M168 96v180M252 124v180" stroke="#77825a" stroke-width="12"/>
         <path d="M118 170c24-20 46-26 72-18 18 6 28 14 48 12 18-2 28-10 52-24" stroke="#ef4444" stroke-width="10" fill="none" stroke-linecap="round"/>
-      `;
+        <path d="M116 122c30 12 62 14 98 10" stroke="rgba(255,255,255,0.20)" stroke-width="10" fill="none" stroke-linecap="round"/>
+      `);
     case 'nightvision':
-      return `
-        <rect x="106" y="144" width="90" height="72" rx="24" fill="#cad4aa"/>
-        <rect x="224" y="144" width="90" height="72" rx="24" fill="#cad4aa"/>
+      return wrap(`
+        <rect x="106" y="144" width="90" height="72" rx="24" fill="url(#__ID__-mil-olive)"/>
+        <rect x="224" y="144" width="90" height="72" rx="24" fill="url(#__ID__-mil-olive)"/>
         <rect x="184" y="112" width="52" height="28" rx="10" fill="#e3ecd0"/>
         <circle cx="150" cy="180" r="26" fill="#57ff79" opacity="0.55"/>
         <circle cx="270" cy="180" r="26" fill="#57ff79" opacity="0.55"/>
         <path d="M106 182h-24M314 182h24" stroke="#f8f6eb" stroke-width="12" stroke-linecap="round"/>
-      `;
+      `);
     case 'case':
-      return `
-        <rect x="108" y="126" width="204" height="144" rx="24" fill="#7a8458"/>
+      return wrap(`
+        <rect x="108" y="126" width="204" height="144" rx="24" fill="url(#__ID__-mil-olive-dark)"/>
         <rect x="178" y="96" width="64" height="28" rx="12" fill="#dfe7d2"/>
         <rect x="138" y="160" width="144" height="20" rx="10" fill="#dfe7d2"/>
         <rect x="184" y="188" width="52" height="18" rx="9" fill="#dfe7d2"/>
-      `;
+        <path d="M126 144h168" stroke="rgba(255,255,255,0.16)" stroke-width="10" stroke-linecap="round"/>
+      `);
     case 'star':
-      return `
+      return wrap(`
         <polygon points="210,74 246,150 330,160 268,216 286,298 210,256 134,298 152,216 90,160 174,150" fill="#f0d36f"/>
-      `;
+        <polygon points="210,98 236,154 296,162 250,204 264,262 210,232 156,262 170,204 124,162 184,154" fill="#fff3b3" opacity="0.5"/>
+      `);
     default:
-      return `<circle cx="210" cy="176" r="88" fill="#d9dfc2"/>`;
+      return wrap(`<circle cx="210" cy="176" r="88" fill="url(#__ID__-mil-metal)"/>`);
   }
 }
 
 function iconBrand(key) {
+  const badge = (inner, options = {}) => {
+    const { shape = 'circle', base = '#121826', ring = 'rgba(255,255,255,0.32)', accent = 'rgba(91,192,255,0.32)' } = options;
+    const shell = shape === 'rect'
+      ? `<rect x="92" y="88" width="236" height="176" rx="42" fill="url(#__ID__-brand-shell)"/><rect x="104" y="100" width="212" height="152" rx="34" fill="rgba(255,255,255,0.06)"/><rect x="92" y="88" width="236" height="176" rx="42" fill="none" stroke="${ring}" stroke-width="4"/>`
+      : `<circle cx="210" cy="176" r="108" fill="url(#__ID__-brand-shell)"/><circle cx="210" cy="176" r="92" fill="rgba(255,255,255,0.05)"/><circle cx="210" cy="176" r="108" fill="none" stroke="${ring}" stroke-width="4"/>`;
+    return `
+      <defs>
+        <radialGradient id="__ID__-brand-shell" cx="34%" cy="28%" r="74%">
+          <stop offset="0%" stop-color="#2a3449"/>
+          <stop offset="58%" stop-color="${base}"/>
+          <stop offset="100%" stop-color="#060b14"/>
+        </radialGradient>
+        <filter id="__ID__-brand-drop" x="-35%" y="-35%" width="170%" height="170%">
+          <feDropShadow dx="0" dy="18" stdDeviation="14" flood-color="#030711" flood-opacity="0.30"/>
+        </filter>
+      </defs>
+      <g filter="url(#__ID__-brand-drop)">
+        ${shell}
+        <ellipse cx="170" cy="116" rx="78" ry="34" fill="rgba(255,255,255,0.16)"/>
+        <ellipse cx="210" cy="264" rx="84" ry="14" fill="${accent}" opacity="0.55"/>
+        ${inner}
+      </g>
+    `;
+  };
+
   switch (key) {
     case 'apple':
-      return `
+      return badge(`
         <path d="M236 86c11-17 14-29 13-41-16 1-34 12-43 25-8 11-14 25-12 39 17 2 31-8 42-23z" fill="#ffffff"/>
-        <path d="M272 136c-13-22-32-32-50-32-21 0-30 10-44 10-15 0-25-10-45-10-34 0-69 28-69 80 0 32 11 66 27 89 14 20 29 42 50 42 19 0 26-12 49-12 24 0 29 12 49 12 22 0 36-20 50-40 11-17 16-30 24-49-52-21-59-93-12-130-10-15-18-25-29-36z" fill="#ffffff"/>
-      `;
+        <path d="M272 136c-13-22-32-32-50-32-21 0-30 10-44 10-15 0-25-10-45-10-34 0-69 28-69 80 0 32 11 66 27 89 14 20 29 42 50 42 19 0 26-12 49-12 24 0 29 12 49 12 22 0 36-20 50-40 11-17 16-30 24-49-52-21-59-93-12-130-10-15-18-25-29-36z" fill="#ffffff" transform="translate(0,-12) scale(0.82) translate(46,30)"/>
+      `, { base: '#0e121a' });
     case 'nike':
-      return `<path d="M102 222c67-15 140-66 216-120-31 59-91 138-185 150-28 4-42-5-31-30z" fill="#ffffff"/>`;
+      return badge(`<path d="M102 222c67-15 140-66 216-120-31 59-91 138-185 150-28 4-42-5-31-30z" fill="#ffffff"/>`, { shape: 'rect', base: '#0e131b' });
     case 'bmw':
-      return `
-        <circle cx="210" cy="176" r="104" fill="#ffffff"/>
-        <circle cx="210" cy="176" r="78" fill="#111827"/>
-        <path d="M210 98A78 78 0 0 1 288 176H210z" fill="#5bc0ff"/>
-        <path d="M132 176A78 78 0 0 1 210 98v78z" fill="#ffffff"/>
-        <path d="M210 254A78 78 0 0 1 132 176h78z" fill="#5bc0ff"/>
-        <path d="M288 176A78 78 0 0 1 210 254v-78z" fill="#ffffff"/>
-        <circle cx="210" cy="176" r="46" fill="#111827"/>
-      `;
+      return badge(`
+        <circle cx="210" cy="176" r="74" fill="#ffffff"/>
+        <circle cx="210" cy="176" r="58" fill="#111827"/>
+        <path d="M210 118A58 58 0 0 1 268 176H210z" fill="#5bc0ff"/>
+        <path d="M152 176A58 58 0 0 1 210 118v58z" fill="#ffffff"/>
+        <path d="M210 234A58 58 0 0 1 152 176h58z" fill="#5bc0ff"/>
+        <path d="M268 176A58 58 0 0 1 210 234v-58z" fill="#ffffff"/>
+        <circle cx="210" cy="176" r="34" fill="#111827"/>
+      `, { base: '#0e1319' });
     case 'lego':
-      return `
-        <rect x="102" y="102" width="216" height="148" rx="28" fill="#ef4444"/>
-        <rect x="126" y="84" width="38" height="30" rx="12" fill="#ffd166"/>
-        <rect x="182" y="84" width="38" height="30" rx="12" fill="#ffd166"/>
-        <rect x="238" y="84" width="38" height="30" rx="12" fill="#ffd166"/>
-        <text x="210" y="195" text-anchor="middle" font-size="58" font-weight="900" fill="#ffffff" font-family="Arial, sans-serif">LEGO</text>
-      `;
+      return badge(`
+        <rect x="126" y="118" width="168" height="110" rx="24" fill="#ef4444"/>
+        <rect x="142" y="102" width="28" height="24" rx="10" fill="#ffd166"/><rect x="182" y="102" width="28" height="24" rx="10" fill="#ffd166"/><rect x="222" y="102" width="28" height="24" rx="10" fill="#ffd166"/><rect x="262" y="102" width="28" height="24" rx="10" fill="#ffd166"/>
+        <text x="210" y="191" text-anchor="middle" font-size="48" font-weight="900" fill="#ffffff" font-family="Arial, sans-serif">LEGO</text>
+      `, { shape: 'rect', base: '#3c0f12', accent: 'rgba(239,68,68,0.38)' });
     case 'tesla':
-      return `
+      return badge(`
         <path d="M110 108c26-14 61-22 100-22s74 8 100 22c-8 9-20 15-34 18-17-9-40-13-66-13s-49 4-66 13c-14-3-26-9-34-18z" fill="#ffffff"/>
         <path d="M195 116h30l-14 140h-2z" fill="#ffffff"/>
         <path d="M150 146c17-11 38-16 60-16s43 5 60 16" stroke="#ffffff" stroke-width="14" fill="none" stroke-linecap="round"/>
-      `;
+      `, { base: '#2c1116', accent: 'rgba(239,68,68,0.28)' });
     case 'pepsi':
-      return `
-        <circle cx="210" cy="176" r="102" fill="#ffffff"/>
-        <path d="M108 176c0-48 47-86 102-86 43 0 77 16 92 43-17-10-38-15-63-15-56 0-101 26-131 58z" fill="#ef4444"/>
-        <path d="M112 195c31-33 74-53 129-53 25 0 46 4 63 12-6 44-48 88-94 101-45 13-89 1-120-28 20 2 42 0 61-9 26-12 46-20 61-23-39 0-71 1-100 0z" fill="#2563eb"/>
-      `;
+      return badge(`
+        <circle cx="210" cy="176" r="84" fill="#ffffff"/>
+        <path d="M126 176c0-40 39-72 84-72 35 0 64 13 77 36-14-8-31-13-52-13-47 0-84 22-109 49z" fill="#ef4444"/>
+        <path d="M130 192c26-28 61-45 107-45 21 0 38 3 53 10-5 36-40 74-78 84-37 10-73 1-99-24 17 2 35 0 51-8 22-10 39-17 51-19-33 0-59 1-85 0z" fill="#2563eb"/>
+      `, { base: '#101827' });
     case 'adidas':
-      return `
-        <path d="M110 236l58-102 36 18-44 84z" fill="#ffffff"/>
-        <path d="M178 236l48-88 36 18-34 70z" fill="#ffffff"/>
-        <path d="M242 236l36-66 34 18-22 48z" fill="#ffffff"/>
-      `;
+      return badge(`
+        <path d="M120 230l46-82 30 16-36 66z" fill="#ffffff"/>
+        <path d="M176 230l40-72 30 16-30 56z" fill="#ffffff"/>
+        <path d="M230 230l32-58 28 16-22 42z" fill="#ffffff"/>
+      `, { shape: 'rect', base: '#10151f' });
     case 'amazon':
-      return `
+      return badge(`
         <text x="192" y="178" text-anchor="middle" font-size="142" font-weight="800" fill="#ffffff" font-family="Arial, sans-serif">a</text>
         <path d="M142 226c30 18 102 18 136-4" stroke="#ffb703" stroke-width="14" fill="none" stroke-linecap="round"/>
         <path d="M266 214l22 4-11 20" fill="none" stroke="#ffb703" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
-      `;
+      `, { base: '#131922', accent: 'rgba(255,183,3,0.26)' });
     case 'microsoft':
-      return `
-        <rect x="110" y="96" width="88" height="88" rx="14" fill="#f25022"/>
-        <rect x="222" y="96" width="88" height="88" rx="14" fill="#7fba00"/>
-        <rect x="110" y="208" width="88" height="88" rx="14" fill="#00a4ef"/>
-        <rect x="222" y="208" width="88" height="88" rx="14" fill="#ffb900"/>
-      `;
+      return badge(`
+        <rect x="132" y="118" width="64" height="64" rx="12" fill="#f25022"/>
+        <rect x="224" y="118" width="64" height="64" rx="12" fill="#7fba00"/>
+        <rect x="132" y="210" width="64" height="64" rx="12" fill="#00a4ef"/>
+        <rect x="224" y="210" width="64" height="64" rx="12" fill="#ffb900"/>
+      `, { shape: 'rect', base: '#16202d' });
     case 'shell':
-      return `
-        <path d="M210 88c68 0 114 52 114 114H96c0-62 46-114 114-114z" fill="#ffd54f"/>
-        <path d="M210 96v104M142 116l32 84M278 116l-32 84M112 154h196M138 190h144" stroke="#ef4444" stroke-width="12" stroke-linecap="round"/>
-      `;
+      return badge(`
+        <path d="M210 96c68 0 114 52 114 114H96c0-62 46-114 114-114z" fill="#ffd54f"/>
+        <path d="M210 104v98M146 122l28 78M274 122l-28 78M118 158h184M142 190h136" stroke="#ef4444" stroke-width="12" stroke-linecap="round"/>
+      `, { base: '#2a1415', accent: 'rgba(255,213,79,0.28)' });
     case 'google':
-      return `
+      return badge(`
         <text x="210" y="212" text-anchor="middle" font-size="92" font-weight="800" fill="#ffffff" font-family="Arial, sans-serif">G</text>
         <path d="M236 126c-12-8-26-12-44-12-40 0-72 28-72 62s32 62 72 62c32 0 56-14 66-38h-66" stroke="#4285F4" stroke-width="18" fill="none" stroke-linecap="round"/>
         <path d="M136 188c4 18 16 32 34 42" stroke="#34A853" stroke-width="18" fill="none" stroke-linecap="round"/>
         <path d="M164 118c14-10 30-16 50-16" stroke="#EA4335" stroke-width="18" fill="none" stroke-linecap="round"/>
         <path d="M258 182h46" stroke="#FBBC05" stroke-width="18" fill="none" stroke-linecap="round"/>
-      `;
+      `, { base: '#111827' });
     case 'spotify':
-      return `
-        <circle cx="210" cy="176" r="104" fill="#1ed760"/>
+      return badge(`
+        <circle cx="210" cy="176" r="90" fill="#1ed760"/>
         <path d="M146 152c44-12 88-8 132 12M154 188c34-10 68-7 102 8M162 222c26-6 49-4 74 6" stroke="#0d1117" stroke-width="16" fill="none" stroke-linecap="round"/>
-      `;
+      `, { base: '#07140e', accent: 'rgba(30,215,96,0.30)' });
     case 'youtube':
-      return `
-        <rect x="92" y="104" width="236" height="144" rx="36" fill="#ff3030"/>
-        <polygon points="184,136 184,216 254,176" fill="#ffffff"/>
-      `;
+      return badge(`
+        <rect x="116" y="122" width="188" height="108" rx="30" fill="#ff3030"/>
+        <polygon points="192,144 192,208 248,176" fill="#ffffff"/>
+      `, { shape: 'rect', base: '#2a1215', accent: 'rgba(255,48,48,0.28)' });
     case 'starbucks':
-      return `
-        <circle cx="210" cy="176" r="104" fill="#0f9d58"/>
-        <circle cx="210" cy="176" r="72" fill="#ffffff"/>
-        <path d="M210 118c20 0 38 18 38 38 0 8-2 16-8 22 6 8 10 18 10 30 0 22-18 40-40 40s-40-18-40-40c0-12 4-22 10-30-6-6-8-14-8-22 0-20 18-38 38-38z" fill="#0f9d58"/>
-        <path d="M162 120l18-26M258 120l-18-26" stroke="#0f9d58" stroke-width="10" stroke-linecap="round"/>
-      `;
+      return badge(`
+        <circle cx="210" cy="176" r="88" fill="#0f9d58"/>
+        <circle cx="210" cy="176" r="60" fill="#ffffff"/>
+        <path d="M210 124c18 0 34 16 34 34 0 7-2 14-7 20 5 7 9 16 9 26 0 20-16 36-36 36s-36-16-36-36c0-10 4-19 9-26-5-6-7-13-7-20 0-18 16-34 34-34z" fill="#0f9d58"/>
+        <path d="M168 126l14-20M252 126l-14-20" stroke="#0f9d58" stroke-width="10" stroke-linecap="round"/>
+      `, { base: '#0c1713', accent: 'rgba(15,157,88,0.28)' });
     case 'intel':
-      return `
-        <ellipse cx="210" cy="176" rx="118" ry="82" fill="none" stroke="#5bc0ff" stroke-width="14"/>
-        <text x="210" y="196" text-anchor="middle" font-size="76" font-weight="800" fill="#ffffff" font-family="Arial, sans-serif">intel</text>
-      `;
+      return badge(`
+        <ellipse cx="210" cy="176" rx="104" ry="72" fill="none" stroke="#5bc0ff" stroke-width="12"/>
+        <text x="210" y="196" text-anchor="middle" font-size="68" font-weight="800" fill="#ffffff" font-family="Arial, sans-serif">intel</text>
+      `, { shape: 'rect', base: '#0d1a28', accent: 'rgba(91,192,255,0.28)' });
     case 'toyota':
-      return `
-        <ellipse cx="210" cy="176" rx="118" ry="88" fill="none" stroke="#ffffff" stroke-width="14"/>
-        <ellipse cx="210" cy="176" rx="38" ry="72" fill="none" stroke="#ffffff" stroke-width="14"/>
-        <ellipse cx="210" cy="176" rx="86" ry="38" fill="none" stroke="#ffffff" stroke-width="14"/>
-      `;
+      return badge(`
+        <ellipse cx="210" cy="176" rx="108" ry="80" fill="none" stroke="#ffffff" stroke-width="12"/>
+        <ellipse cx="210" cy="176" rx="34" ry="64" fill="none" stroke="#ffffff" stroke-width="12"/>
+        <ellipse cx="210" cy="176" rx="78" ry="34" fill="none" stroke="#ffffff" stroke-width="12"/>
+      `, { base: '#11161f' });
     case 'nasa':
-      return `
-        <circle cx="210" cy="176" r="104" fill="#1d4ed8"/>
-        <text x="210" y="196" text-anchor="middle" font-size="70" font-weight="900" fill="#ffffff" font-family="Arial, sans-serif">NASA</text>
-        <path d="M120 220c54-42 108-56 176-46" stroke="#ef4444" stroke-width="12" fill="none" stroke-linecap="round"/>
-      `;
+      return badge(`
+        <circle cx="210" cy="176" r="90" fill="#1d4ed8"/>
+        <text x="210" y="196" text-anchor="middle" font-size="64" font-weight="900" fill="#ffffff" font-family="Arial, sans-serif">NASA</text>
+        <path d="M130 220c50-38 98-52 160-44" stroke="#ef4444" stroke-width="10" fill="none" stroke-linecap="round"/>
+      `, { base: '#09111e', accent: 'rgba(29,78,216,0.28)' });
     case 'gucci':
-      return `
-        <text x="180" y="212" text-anchor="middle" font-size="110" font-weight="700" fill="#ffffff" font-family="Georgia, serif">G</text>
-        <text x="242" y="212" text-anchor="middle" font-size="110" font-weight="700" fill="#ffffff" font-family="Georgia, serif">G</text>
-      `;
+      return badge(`
+        <text x="182" y="212" text-anchor="middle" font-size="98" font-weight="700" fill="#ffffff" font-family="Georgia, serif">G</text>
+        <text x="240" y="212" text-anchor="middle" font-size="98" font-weight="700" fill="#ffffff" font-family="Georgia, serif">G</text>
+      `, { shape: 'rect', base: '#1b1420', accent: 'rgba(255,255,255,0.14)' });
     case 'playstation':
-      return `
+      return badge(`
         <path d="M176 92c34 6 60 28 60 58v118c0 14-10 24-24 24-12 0-24-6-36-18V92z" fill="#ffffff"/>
         <path d="M198 188l102-32c12-4 24 4 24 16 0 8-6 16-16 20l-104 38c-14 4-28-6-28-20 0-10 8-18 22-22z" fill="#ffffff"/>
         <path d="M118 242l54 20 46-16-52-20z" fill="#5bc0ff"/>
-      `;
+      `, { shape: 'rect', base: '#131b2a' });
     case 'mcdonalds':
-      return `
+      return badge(`
         <path d="M126 272c0-92 20-154 52-154 16 0 28 16 32 42 4-26 16-42 32-42 32 0 52 62 52 154h-32c0-66-8-104-20-104-8 0-16 18-20 46h-24c-4-28-12-46-20-46-12 0-20 38-20 104z" fill="#ffd166"/>
-      `;
+      `, { base: '#2a1911', accent: 'rgba(255,209,102,0.26)' });
     default:
-      return `<circle cx="210" cy="176" r="88" fill="#ffffff"/>`;
+      return badge(`<circle cx="210" cy="176" r="88" fill="#ffffff"/>`);
   }
 }
 
@@ -3058,10 +3325,39 @@ function flagMarkup(key) {
   }
 }
 
+
+function realisticFlagMarkup(key) {
+  return `
+    <defs>
+      <filter id="__ID__-flag-drop" x="-25%" y="-25%" width="150%" height="150%">
+        <feDropShadow dx="0" dy="14" stdDeviation="10" flood-color="#07111d" flood-opacity="0.24"/>
+      </filter>
+      <clipPath id="__ID__-flag-clip">
+        <rect x="54" y="74" width="312" height="204" rx="24"/>
+      </clipPath>
+      <linearGradient id="__ID__-flag-sheen" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="rgba(255,255,255,0.28)"/>
+        <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+      </linearGradient>
+    </defs>
+    <g filter="url(#__ID__-flag-drop)">
+      ${flagMarkup(key)}
+      <g clip-path="url(#__ID__-flag-clip)">
+        <path d="M38 98c56 22 118 26 184 10s116-18 168-4v38c-58-18-112-16-176 0s-122 12-176-8z" fill="url(#__ID__-flag-sheen)" opacity="0.85"/>
+        <path d="M42 164c54 18 110 18 168 4 64-16 122-16 180 6v42c-58-20-116-20-178-4-62 14-120 12-170-4z" fill="rgba(255,255,255,0.12)"/>
+        <path d="M36 226c58 18 118 20 184 8s118-14 170-2v30c-56-18-112-18-176-6-66 12-124 10-178-8z" fill="rgba(0,0,0,0.08)"/>
+      </g>
+      <rect x="54" y="74" width="312" height="204" rx="24" fill="none" stroke="rgba(255,255,255,0.26)" stroke-width="3"/>
+    </g>
+  `;
+}
+
 function cardFrame({ palette, label, inner, fullBleed = false, idSeed = '__ID__' }) {
   const footerY = fullBleed ? 298 : 300;
   const bgId = `${idSeed}-bg`;
   const shadowId = `${idSeed}-shadow`;
+  const stageId = `${idSeed}-stage`;
+  const artGlowId = `${idSeed}-art-glow`;
 
   return `
     <svg viewBox="0 0 420 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${label}">
@@ -3070,6 +3366,14 @@ function cardFrame({ palette, label, inner, fullBleed = false, idSeed = '__ID__'
           <stop offset="0%" stop-color="${palette.accent}"/>
           <stop offset="100%" stop-color="${palette.accent2}"/>
         </linearGradient>
+        <linearGradient id="${stageId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.16)"/>
+          <stop offset="100%" stop-color="rgba(7,13,26,0.20)"/>
+        </linearGradient>
+        <radialGradient id="${artGlowId}" cx="50%" cy="38%" r="58%">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.24)"/>
+          <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+        </radialGradient>
         <filter id="${shadowId}" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="rgba(0,0,0,0.28)"/>
         </filter>
@@ -3078,7 +3382,12 @@ function cardFrame({ palette, label, inner, fullBleed = false, idSeed = '__ID__'
       <rect x="16" y="16" width="388" height="388" rx="32" fill="url(#${bgId})"/>
       <circle cx="320" cy="98" r="82" fill="rgba(255,255,255,0.14)"/>
       <circle cx="100" cy="332" r="100" fill="rgba(255,255,255,0.08)"/>
-      ${fullBleed ? `<rect x="44" y="58" width="332" height="228" rx="30" fill="#ffffff" filter="url(#${shadowId})"/>` : ''}
+      ${fullBleed ? `<rect x="44" y="58" width="332" height="228" rx="30" fill="#ffffff" filter="url(#${shadowId})"/>` : `
+        <rect x="46" y="62" width="328" height="222" rx="30" fill="rgba(8,15,30,0.18)" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+        <ellipse cx="210" cy="272" rx="112" ry="22" fill="rgba(0,0,0,0.24)"/>
+        <ellipse cx="210" cy="138" rx="132" ry="88" fill="url(#${artGlowId})"/>
+        <rect x="58" y="76" width="304" height="188" rx="28" fill="url(#${stageId})" opacity="0.55"/>
+      `}
       <g>${inner}</g>
       <rect x="42" y="${footerY}" width="336" height="78" rx="24" fill="rgba(9,18,34,0.30)"/>
       <text x="210" y="${footerY + 48}" text-anchor="middle" font-size="32" font-weight="800" fill="#ffffff" font-family="Inter, Arial, sans-serif">${label}</text>
@@ -3095,7 +3404,7 @@ function buildFrontMarkup(themeKey, item) {
       palette,
       label: item.label,
       fullBleed: true,
-      inner: flagMarkup(item.key),
+      inner: realisticFlagMarkup(item.key),
       idSeed: `__ID__-${themeKey}-${item.key}`
     });
   }
