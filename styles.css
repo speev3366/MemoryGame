@@ -1338,6 +1338,31 @@ body.lobby-open { overflow: hidden; }
 .room-state-pill.invite { background: rgba(125, 131, 255, 0.16); color: #b0b4ff; }
 .room-row-title { font-size: 1rem; font-weight: 800; }
 .room-row-meta { color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
+.room-code-line { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.room-code-copy-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+.room-code-copy-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(125, 211, 252, 0.14);
+  border-color: rgba(125, 211, 252, 0.34);
+}
+.room-code-copy-btn.copied {
+  background: rgba(93, 227, 177, 0.18);
+  border-color: rgba(93, 227, 177, 0.38);
+}
 .room-join-btn { min-width: 120px; }
 @media (max-width: 1024px) {
   .online-lobby-shell { width: min(100vw - 28px, 1200px); min-height: calc(100dvh - 28px); }
