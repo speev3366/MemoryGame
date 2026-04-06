@@ -419,6 +419,11 @@ const state = {
     inviteAutoJoinAttemptedToken: null,
     inviteAutoJoinBusy: false,
     preferredRoomId: sessionStorage.getItem('memory_duel_preferred_room_id') || null,
+    subscribedRoomId: null,
+    subscriptionStatus: 'idle',
+    subscriptionFailures: 0,
+    lastRealtimeAt: 0,
+    pendingMutationUntil: 0,
     playingGraceUntil: 0,
     allowPlayingBurstUntil: 0,
     lastGuestWaitingBurstKey: null
@@ -526,6 +531,10 @@ function clearOnlineRoomLocalState() {
     removeOnlineChannel(state.online.channel);
   }
   state.online.channel = null;
+  state.online.subscribedRoomId = null;
+  state.online.subscriptionStatus = 'idle';
+  state.online.lastRealtimeAt = 0;
+  state.online.pendingMutationUntil = 0;
   if (state.online.pendingTimeout) {
     clearTimeout(state.online.pendingTimeout);
     state.online.pendingTimeout = null;
@@ -538,9 +547,9 @@ function ensureOnlineSyncLoop() {
   if (state.online.syncInterval) return;
   state.online.syncInterval = window.setInterval(() => {
     if (!state.auth.user || !state.auth.client) return;
-    if (!(state.online.room || state.ui.onlineLobbyOpen || state.playMode === 'online' || state.ui.inviteToken)) return;
+    if (!(state.online.room || state.ui.onlineLobbyOpen || state.playMode === 'online' || state.ui.inviteToken || state.online.preferredRoomId)) return;
     refreshOnlineState(false).catch((error) => console.warn('online sync tick failed', error));
-  }, 1000);
+  }, 650);
 }
 
 
@@ -672,17 +681,31 @@ function getRoomFreshnessTime(room) {
 
 function roomSnapshotKey(room) {
   if (!room) return '';
+  const deckKey = Array.isArray(room.deck)
+    ? room.deck.map((card) => `${card?.pairId || ''}:${card?.uid || ''}`).join(';')
+    : JSON.stringify(room.deck || []);
+  const flippedKey = Array.isArray(room.flipped_indices)
+    ? room.flipped_indices.join(',')
+    : JSON.stringify(room.flipped_indices || []);
+  const matchedKey = Array.isArray(room.matched_indices)
+    ? room.matched_indices.join(',')
+    : JSON.stringify(room.matched_indices || []);
   return [
     room.id || '',
     room.status || '',
     room.host_user_id || '',
     room.guest_user_id || '',
     room.current_player_slot || 0,
+    room.selected_theme || '',
+    room.selected_card_count || 0,
+    room.updated_at || '',
+    room.turn_started_at || '',
+    room.created_at || '',
     getRoomFreshnessTime(room),
-    Array.isArray(room.flipped_indices) ? room.flipped_indices.join(',') : '',
-    Array.isArray(room.matched_indices) ? room.matched_indices.length : 0,
+    flippedKey,
+    matchedKey,
     JSON.stringify(room.scores || {}),
-    Array.isArray(room.deck) ? room.deck.length : 0,
+    deckKey,
     room.lock_board ? '1' : '0',
     room.winner_slot ?? ''
   ].join('|');
@@ -866,7 +889,7 @@ function scheduleOnlineRefreshBurst(delays = [0, 600], options = {}) {
   state.online.refreshBurstTimers.forEach((id) => clearTimeout(id));
   state.online.refreshBurstTimers = [];
   if (allowDuringPlaying) state.online.allowPlayingBurstUntil = Date.now() + 2500;
-  delays.slice(0, 2).forEach((delayMs) => {
+  delays.forEach((delayMs) => {
     const id = window.setTimeout(() => {
       const isPlaying = state.online.room?.status === 'playing';
       if (isPlaying && !allowDuringPlaying && Date.now() > (state.online.allowPlayingBurstUntil || 0)) return;
@@ -939,6 +962,45 @@ async function confirmRoomState(roomId, predicate, timeoutMs = 12000, intervalMs
         Promise.resolve().then(() => subscribeToRoom(fresh.id)).catch((error) => console.warn('confirmRoomState subscribe failed', error));
       }
       if (predicate(fresh)) return fresh;
+    }
+    await delay(intervalMs);
+  }
+  return lastRoom;
+}
+
+function markOnlineMutationPending(ms = 6000) {
+  state.online.pendingMutationUntil = Math.max(state.online.pendingMutationUntil || 0, Date.now() + ms);
+  state.online.allowPlayingBurstUntil = Math.max(state.online.allowPlayingBurstUntil || 0, Date.now() + Math.min(ms, 2500));
+}
+
+async function fetchAndSyncRoom(roomId, options = {}) {
+  if (!roomId) return null;
+  const { subscribe = true, sync = true } = options;
+  const fresh = await fetchRoomById(roomId);
+  if (!fresh) return null;
+  const adopted = adoptIncomingRoom(fresh);
+  if (sync && (adopted || state.online.room?.id === fresh.id)) syncFromOnlineRoom();
+  if (subscribe && (!state.online.channel || state.online.subscribedRoomId !== fresh.id || state.online.subscriptionStatus === 'CHANNEL_ERROR' || state.online.subscriptionStatus === 'TIMED_OUT' || state.online.subscriptionStatus === 'CLOSED')) {
+    try {
+      await subscribeToRoom(fresh.id);
+    } catch (error) {
+      console.warn('fetchAndSyncRoom subscribe failed', error);
+    }
+  }
+  return fresh;
+}
+
+async function settleRoomAfterMutation(roomId, predicate, options = {}) {
+  const { timeoutMs = 9000, intervalMs = 180 } = options;
+  if (!roomId) return null;
+  markOnlineMutationPending(timeoutMs);
+  const startedAt = Date.now();
+  let lastRoom = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    const fresh = await fetchAndSyncRoom(roomId, { subscribe: true, sync: true });
+    if (fresh) {
+      lastRoom = fresh;
+      if (!predicate || predicate(fresh)) return fresh;
     }
     await delay(intervalMs);
   }
@@ -1054,9 +1116,12 @@ async function refreshOnlineState(force = false) {
   if (state.online.refreshBusy) return;
   const currentRoom = state.online.room;
   const inPlaying = currentRoom?.status === 'playing';
-  const minGap = inPlaying ? 900 : (currentRoom ? 900 : 1500);
+  const mutationPending = now < (state.online.pendingMutationUntil || 0);
+  const subscriptionUnhealthy = Boolean(currentRoom?.id && (!state.online.channel || state.online.subscribedRoomId !== currentRoom.id || ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(state.online.subscriptionStatus)));
+  let minGap = mutationPending ? 220 : (inPlaying ? 700 : (currentRoom ? 900 : 1500));
+  if (subscriptionUnhealthy) minGap = Math.min(minGap, 320);
   if (!force && now - (state.online.lastRefreshAt || 0) < minGap) return;
-  if (inPlaying && now < (state.online.suspendRefreshUntil || 0) && !force) return;
+  if (inPlaying && now < (state.online.suspendRefreshUntil || 0) && !force && !mutationPending) return;
   state.online.refreshBusy = true;
   state.online.lastRefreshAt = now;
   try {
@@ -1078,6 +1143,9 @@ async function refreshOnlineState(force = false) {
             updateHud(`Играч ${guestLabel} се присъедини към стаята. Натисни „Старт онлайн“.`);
           }
           syncFromOnlineRoom();
+        }
+        if (!state.online.channel || state.online.subscribedRoomId !== fresh.id || ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(state.online.subscriptionStatus)) {
+          Promise.resolve().then(() => subscribeToRoom(fresh.id)).catch((error) => console.warn('refresh subscribe failed', error));
         }
       } else {
         state.online.refreshMisses = (state.online.refreshMisses || 0) + 1;
@@ -1125,18 +1193,33 @@ function handleLocalTurnTimeout() {
 }
 
 async function handleOnlineTurnTimeout() {
-  const room = state.online.room;
+  let room = state.online.room;
   const slot = myRoomSlot();
   if (!room || room.status !== 'playing' || room.lock_board) return false;
-  if (!slot || slot !== room.current_player_slot) return false;
-  const updated = normalizeRpcSingle(await rpcCall('pass_turn_if_expired', { p_room_id: room.id }, 8000, 'Смяната на хода'));
+  if (!slot) return false;
+
+  const latestRoom = await fetchAndSyncRoom(room.id, { subscribe: true, sync: true }) || room;
+  room = latestRoom;
+  if (!room || room.status !== 'playing' || room.lock_board) return false;
+  if (slot !== room.current_player_slot) return false;
+
+  const beforeKey = roomSnapshotKey(room);
+  markOnlineMutationPending(7000);
+  let updated = normalizeRpcSingle(await rpcCall('pass_turn_if_expired', { p_room_id: room.id }, 8000, 'Смяната на хода'));
+  if (!updated || roomSnapshotKey(updated) === beforeKey) {
+    updated = await settleRoomAfterMutation(
+      room.id,
+      (fresh) => fresh && roomSnapshotKey(fresh) !== beforeKey,
+      { timeoutMs: 7000, intervalMs: 180 }
+    );
+  }
   if (!updated) {
     state.online.lastTimeoutKey = null;
     return false;
   }
   adoptIncomingRoom(updated);
   syncFromOnlineRoom();
-  scheduleHardUiSync([0, 300, 900], { roomId: updated.id || room.id });
+  scheduleHardUiSync([0, 250, 700, 1400], { roomId: updated.id || room.id });
   updateHud(`Времето за ход изтече. Ред е на ${getPlayerName(updated.current_player_slot || getOtherSlot(room.current_player_slot || 1))}.`);
   return true;
 }
@@ -3022,9 +3105,9 @@ function createDeck(themeKey) {
   return shuffle(cards);
 }
 
-function createSerializedDeck(themeKey) {
+function createSerializedDeck(themeKey, cardCount = state.selectedCardCount) {
   const theme = THEMES[themeKey];
-  const pairCount = state.selectedCardCount / 2;
+  const pairCount = Number(cardCount) / 2;
   const selectedItems = shuffle(theme.items).slice(0, pairCount);
   const cards = selectedItems.flatMap((item) => ([
     { pairId: item.key, label: item.label, uid: `${item.key}-a-${Math.random().toString(36).slice(2, 7)}` },
@@ -3805,6 +3888,7 @@ async function subscribeToRoom(roomId) {
   if (!roomId || !state.auth.client) return null;
   setPreferredRoomId(roomId);
   state.online.subscribedRoomId = roomId;
+  state.online.subscriptionStatus = 'SUBSCRIBING';
   if (state.online.channel && state.auth.client) {
     removeOnlineChannel(state.online.channel);
     state.online.channel = null;
@@ -3818,6 +3902,7 @@ async function subscribeToRoom(roomId) {
       table: 'rooms',
       filter: `id=eq.${roomId}`
     }, (payload) => {
+      state.online.lastRealtimeAt = Date.now();
       const eventType = payload.eventType;
       if (eventType === 'DELETE') {
         if (state.online.room?.id === roomId) {
@@ -3835,8 +3920,12 @@ async function subscribeToRoom(roomId) {
       if (!nextRoom) return;
       const previous = state.online.room ? { ...state.online.room } : null;
       const adopted = adoptIncomingRoom(nextRoom);
-      if (!adopted) return;
+      if (!adopted) {
+        scheduleOnlineRefreshBurst([0, 250, 700], { allowDuringPlaying: true });
+        return;
+      }
       syncFromOnlineRoom();
+      scheduleOnlineRefreshBurst([0, 250, 700], { allowDuringPlaying: true });
       if (previous && previous.status === 'waiting' && !previous.guest_user_id && nextRoom.guest_user_id && myRoomSlot() === 1) {
         const guestLabel = sanitizeName(nextRoom.guest_name || 'Гост', 'Гост');
         showFeedback(onlineLobbyFeedback, `Играч ${guestLabel} се присъедини. Вече можеш да натиснеш „Старт онлайн“.`, 'success');
@@ -3851,16 +3940,22 @@ async function subscribeToRoom(roomId) {
       const timeoutId = window.setTimeout(() => {
         if (settled) return;
         settled = true;
+        state.online.subscriptionStatus = 'TIMED_OUT';
+        state.online.subscriptionFailures = (state.online.subscriptionFailures || 0) + 1;
         console.warn('Realtime subscription is slow; continuing with polling fallback for now.');
         resolve(null);
       }, 12000);
       channel.subscribe((status) => {
+        state.online.subscriptionStatus = status;
         if (status === 'SUBSCRIBED') {
+          state.online.subscriptionFailures = 0;
+          state.online.lastRealtimeAt = Date.now();
           if (settled) return;
           settled = true;
           clearTimeout(timeoutId);
           resolve(null);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          state.online.subscriptionFailures = (state.online.subscriptionFailures || 0) + 1;
           if (settled) return;
           settled = true;
           clearTimeout(timeoutId);
@@ -3872,6 +3967,7 @@ async function subscribeToRoom(roomId) {
     console.warn('Room realtime subscribe failed', error);
     state.online.channel = null;
     state.online.subscribedRoomId = null;
+    state.online.subscriptionStatus = 'CHANNEL_ERROR';
   }
 
   const fresh = await fetchRoomById(roomId);
@@ -4504,8 +4600,11 @@ async function resumeOnlineSession() {
 
 async function startOnlineMatch() {
   if (state.online.startBusy) return;
-  const room = state.online.room;
+  let room = state.online.room;
   if (!room) return updateHud('Няма активна онлайн стая за стартиране.');
+
+  const latestRoom = await fetchAndSyncRoom(room.id, { subscribe: true, sync: true }) || room;
+  room = latestRoom;
   if (myRoomSlot() !== 1) {
     const msg = 'Само домакинът може да стартира онлайн мача.';
     showFeedback(onlineLobbyFeedback, msg, 'error');
@@ -4518,11 +4617,13 @@ async function startOnlineMatch() {
   }
 
   state.online.startBusy = true;
+  markOnlineMutationPending(12000);
   updateAuthUi();
   showFeedback(onlineLobbyFeedback, 'Стартираме онлайн мача...', '');
   updateHud('Стартираме онлайн мача...');
   try {
-    const deck = createSerializedDeck(room.selected_theme);
+    const beforeKey = roomSnapshotKey(room);
+    const deck = createSerializedDeck(room.selected_theme, room.selected_card_count);
     let startedRoom = null;
     let rpcError = null;
     try {
@@ -4532,12 +4633,11 @@ async function startOnlineMatch() {
       console.warn('start_room_match rpc failed, confirming room state directly', error);
     }
 
-    if (!startedRoom || startedRoom.status !== 'playing') {
-      startedRoom = await confirmRoomState(
+    if (!startedRoom || startedRoom.status !== 'playing' || roomSnapshotKey(startedRoom) === beforeKey) {
+      startedRoom = await settleRoomAfterMutation(
         room.id,
-        (fresh) => fresh && fresh.status === 'playing' && Array.isArray(fresh.deck) && fresh.deck.length > 0,
-        12000,
-        250
+        (fresh) => fresh && fresh.status === 'playing' && Array.isArray(fresh.deck) && fresh.deck.length > 0 && roomSnapshotKey(fresh) !== beforeKey,
+        { timeoutMs: 12000, intervalMs: 180 }
       );
     }
     if (!startedRoom || startedRoom.status !== 'playing') {
@@ -4546,13 +4646,13 @@ async function startOnlineMatch() {
     adoptIncomingRoom(startedRoom);
     state.online.playingGraceUntil = Date.now() + 30000;
     state.online.allowPlayingBurstUntil = Date.now() + 1500;
-    state.online.suspendRefreshUntil = Date.now() + 1200;
+    state.online.suspendRefreshUntil = Date.now() + 800;
     state.playMode = 'online';
     state.ui.onlineLobbyOpen = false;
     renderModeSelector();
     syncFromOnlineRoom();
     updateAuthUi();
-    scheduleHardUiSync([0, 400, 1100], { roomId: startedRoom.id });
+    scheduleHardUiSync([0, 250, 700, 1400], { roomId: startedRoom.id });
     showFeedback(onlineLobbyFeedback, 'Онлайн мачът стартира успешно.', 'success');
     updateHud('Онлайн мачът стартира. Играта започва.');
   } catch (error) {
@@ -4687,11 +4787,25 @@ function scheduleRoomUnlockResolution(roomId) {
   if (state.online.pendingTimeout) clearTimeout(state.online.pendingTimeout);
   state.online.pendingTimeout = setTimeout(async () => {
     try {
-      const updated = normalizeRpcSingle(await rpcCall('clear_room_lock', { p_room_id: roomId }, 8000, 'Разкриването на картите'));
+      markOnlineMutationPending(5000);
+      const beforeKey = roomSnapshotKey(state.online.room);
+      let updated = null;
+      try {
+        updated = normalizeRpcSingle(await rpcCall('clear_room_lock', { p_room_id: roomId }, 8000, 'Разкриването на картите'));
+      } catch (error) {
+        console.warn('clear_room_lock rpc failed, confirming room state directly', error);
+      }
+      if (!updated || roomSnapshotKey(updated) === beforeKey) {
+        updated = await settleRoomAfterMutation(
+          roomId,
+          (fresh) => fresh && roomSnapshotKey(fresh) !== beforeKey && !fresh.lock_board,
+          { timeoutMs: 7000, intervalMs: 180 }
+        );
+      }
       if (updated) {
         adoptIncomingRoom(updated);
         syncFromOnlineRoom();
-        scheduleHardUiSync([0, 300, 900], { roomId: updated.id || roomId });
+        scheduleHardUiSync([0, 250, 700, 1400], { roomId: updated.id || roomId });
       }
     } catch (error) {
       console.warn('clear_room_lock failed', error);
@@ -4702,14 +4816,19 @@ function scheduleRoomUnlockResolution(roomId) {
 }
 
 async function handleOnlineFlip(card) {
-  const room = state.online.room;
+  let room = state.online.room;
   const slot = myRoomSlot();
   if (!room || room.status !== 'playing' || !slot) return;
+
+  const latestRoom = await fetchAndSyncRoom(room.id, { subscribe: true, sync: true }) || room;
+  room = latestRoom;
+  if (room.status !== 'playing') return;
   if (slot !== room.current_player_slot) return;
   if (room.lock_board) return;
 
   const index = Number(card.dataset.index);
   const beforeKey = roomSnapshotKey(room);
+  markOnlineMutationPending(9000);
   try {
     let updated = null;
     let rpcError = null;
@@ -4720,11 +4839,10 @@ async function handleOnlineFlip(card) {
       console.warn('apply_room_flip rpc failed, confirming room state directly', error);
     }
     if (!updated || roomSnapshotKey(updated) === beforeKey) {
-      updated = await confirmRoomState(
+      updated = await settleRoomAfterMutation(
         room.id,
         (fresh) => fresh && roomSnapshotKey(fresh) !== beforeKey,
-        9000,
-        200
+        { timeoutMs: 9000, intervalMs: 150 }
       );
     }
     if (!updated || roomSnapshotKey(updated) === beforeKey) {
@@ -4733,7 +4851,7 @@ async function handleOnlineFlip(card) {
     }
     adoptIncomingRoom(updated);
     syncFromOnlineRoom();
-    scheduleHardUiSync([0, 300, 900], { roomId: updated.id || room.id });
+    scheduleHardUiSync([0, 220, 650, 1300], { roomId: updated.id || room.id });
     if (updated.lock_board && Array.isArray(updated.flipped_indices) && updated.flipped_indices.length >= 2) {
       scheduleRoomUnlockResolution(updated.id || room.id);
     }
@@ -4917,6 +5035,19 @@ document.addEventListener('click', (event) => {
   const insidePanel = authPanel.contains(event.target);
   const insideButton = profileButton.contains(event.target);
   if (!insidePanel && !insideButton) toggleProfilePanel(false);
+});
+
+window.addEventListener('focus', () => {
+  if (!state.auth.user || !state.auth.client) return;
+  if (!(state.online.room || state.ui.onlineLobbyOpen || state.ui.inviteToken || state.online.preferredRoomId)) return;
+  forceUiResync({ roomId: state.online.room?.id || state.online.preferredRoomId || null }).catch((error) => console.warn('focus resync failed', error));
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!state.auth.user || !state.auth.client) return;
+  if (!(state.online.room || state.ui.onlineLobbyOpen || state.ui.inviteToken || state.online.preferredRoomId)) return;
+  forceUiResync({ roomId: state.online.room?.id || state.online.preferredRoomId || null }).catch((error) => console.warn('visibility resync failed', error));
 });
 
 ensureTurnLoop();
