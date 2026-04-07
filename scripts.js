@@ -278,9 +278,9 @@ const THEMES = {
     ]
   },
   soldiers: {
-    name: 'Войници',
+    name: 'Отбрана',
     icon: '🛡️',
-    description: 'Военна техника, екипировка и полеви символи.',
+    description: 'Отбранителна техника, екипировка и тактически символи.',
     palette: {
       bg1: '#11160b',
       bg2: '#2d371d',
@@ -3352,6 +3352,39 @@ function realisticFlagMarkup(key) {
   `;
 }
 
+
+function rasterAssetMarkup(themeKey, itemKey) {
+  const folder = themeKey === 'brands' ? 'brands' : themeKey;
+  const href = `assets/premium/${folder}/${itemKey}.png?v=825`;
+  const isBrand = themeKey === 'brands';
+  const x = isBrand ? 72 : 64;
+  const y = isBrand ? 82 : 74;
+  const width = isBrand ? 276 : 292;
+  const height = isBrand ? 170 : 182;
+
+  return `
+    <defs>
+      <clipPath id="__ID__-raster-clip">
+        <rect x="68" y="78" width="284" height="182" rx="24"/>
+      </clipPath>
+      <filter id="__ID__-raster-shadow" x="-25%" y="-25%" width="150%" height="150%">
+        <feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#07111d" flood-opacity="0.20"/>
+      </filter>
+    </defs>
+    <g clip-path="url(#__ID__-raster-clip)">
+      <image
+        href="${href}"
+        x="${x}"
+        y="${y}"
+        width="${width}"
+        height="${height}"
+        preserveAspectRatio="xMidYMid meet"
+        filter="url(#__ID__-raster-shadow)"
+      />
+    </g>
+  `;
+}
+
 function cardFrame({ palette, label, inner, fullBleed = false, idSeed = '__ID__' }) {
   const footerY = fullBleed ? 298 : 300;
   const bgId = `${idSeed}-bg`;
@@ -3409,20 +3442,11 @@ function buildFrontMarkup(themeKey, item) {
     });
   }
 
-  if (themeKey === 'sport') {
+  if (themeKey === 'sport' || themeKey === 'brands') {
     return cardFrame({
       palette,
       label: item.label,
-      inner: iconSport(item.key),
-      idSeed: `__ID__-${themeKey}-${item.key}`
-    });
-  }
-
-  if (themeKey === 'soldiers') {
-    return cardFrame({
-      palette,
-      label: item.label,
-      inner: iconSoldier(item.key),
+      inner: rasterAssetMarkup(themeKey, item.key),
       idSeed: `__ID__-${themeKey}-${item.key}`
     });
   }
@@ -3430,7 +3454,7 @@ function buildFrontMarkup(themeKey, item) {
   return cardFrame({
     palette,
     label: item.label,
-    inner: iconBrand(item.key),
+    inner: iconSoldier(item.key),
     idSeed: `__ID__-${themeKey}-${item.key}`
   });
 }
