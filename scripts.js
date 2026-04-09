@@ -2215,6 +2215,25 @@ function applyThemePalette(themeKey) {
   root.style.setProperty('--card-glow', theme.palette.glow);
 }
 
+
+function bindUiPress(target, handler) {
+  if (!target || typeof handler !== 'function') return;
+  let touchTriggered = false;
+  target.addEventListener('touchend', (event) => {
+    touchTriggered = true;
+    event.preventDefault();
+    handler();
+    window.setTimeout(() => {
+      touchTriggered = false;
+    }, 320);
+  }, { passive: false });
+  target.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (touchTriggered) return;
+    handler();
+  });
+}
+
 function renderThemeSelector() {
   themeSelector.innerHTML = Object.entries(THEMES)
     .map(([key, theme]) => `
@@ -2227,7 +2246,7 @@ function renderThemeSelector() {
     .join('');
 
   document.querySelectorAll('.theme-card').forEach((button) => {
-    button.addEventListener('click', () => selectTheme(button.dataset.theme));
+    bindUiPress(button, () => selectTheme(button.dataset.theme));
   });
   renderOnlineThemeSelector();
 }
@@ -2242,7 +2261,7 @@ function renderCountSelector() {
     .join('');
 
   document.querySelectorAll('.count-option').forEach((button) => {
-    button.addEventListener('click', () => selectCardCount(Number(button.dataset.count)));
+    bindUiPress(button, () => selectCardCount(Number(button.dataset.count)));
   });
   renderOnlineCountSelector();
 }
@@ -2265,7 +2284,7 @@ function renderOnlineThemeSelector(force = false) {
     .join('');
 
   onlineThemeSelector.querySelectorAll('[data-online-theme]').forEach((button) => {
-    button.addEventListener('click', () => selectOnlineTheme(button.dataset.onlineTheme));
+    bindUiPress(button, () => selectOnlineTheme(button.dataset.onlineTheme));
   });
 }
 
@@ -2284,7 +2303,7 @@ function renderOnlineCountSelector(force = false) {
     .join('');
 
   onlineCountSelector.querySelectorAll('[data-online-count]').forEach((button) => {
-    button.addEventListener('click', () => selectOnlineCardCount(Number(button.dataset.onlineCount)));
+    bindUiPress(button, () => selectOnlineCardCount(Number(button.dataset.onlineCount)));
   });
 }
 
@@ -3352,36 +3371,29 @@ function realisticFlagMarkup(key) {
   `;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
 
-function rasterAssetMarkup(themeKey, itemKey) {
-  const folder = themeKey === 'brands' ? 'brands' : themeKey;
-  const href = `assets/premium/${folder}/${itemKey}.png?v=825`;
-  const isBrand = themeKey === 'brands';
-  const x = isBrand ? 72 : 64;
-  const y = isBrand ? 82 : 74;
-  const width = isBrand ? 276 : 292;
-  const height = isBrand ? 170 : 182;
-
+function buildRasterFrontMarkup(themeKey, item) {
+  const palette = THEMES[themeKey].palette;
+  const folder = themeKey === 'brands' ? 'brands' : 'sport';
+  const version = 826;
   return `
-    <defs>
-      <clipPath id="__ID__-raster-clip">
-        <rect x="68" y="78" width="284" height="182" rx="24"/>
-      </clipPath>
-      <filter id="__ID__-raster-shadow" x="-25%" y="-25%" width="150%" height="150%">
-        <feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#07111d" flood-opacity="0.20"/>
-      </filter>
-    </defs>
-    <g clip-path="url(#__ID__-raster-clip)">
-      <image
-        href="${href}"
-        x="${x}"
-        y="${y}"
-        width="${width}"
-        height="${height}"
-        preserveAspectRatio="xMidYMid meet"
-        filter="url(#__ID__-raster-shadow)"
-      />
-    </g>
+    <div class="raster-front raster-front-${themeKey}" style="--accent:${palette.accent};--accent2:${palette.accent2};--theme-bg1:${palette.bg1};--theme-bg2:${palette.bg2};--theme-glow:${palette.glow};">
+      <div class="raster-front__orb raster-front__orb--one"></div>
+      <div class="raster-front__orb raster-front__orb--two"></div>
+      <div class="raster-front__stage"></div>
+      <div class="raster-front__art">
+        <img src="assets/final/${folder}/${item.key}.png?v=${version}" alt="${escapeHtml(item.label)}" draggable="false" loading="eager" />
+      </div>
+      <div class="raster-front__label">${escapeHtml(item.label)}</div>
+    </div>
   `;
 }
 
@@ -3443,12 +3455,7 @@ function buildFrontMarkup(themeKey, item) {
   }
 
   if (themeKey === 'sport' || themeKey === 'brands') {
-    return cardFrame({
-      palette,
-      label: item.label,
-      inner: rasterAssetMarkup(themeKey, item.key),
-      idSeed: `__ID__-${themeKey}-${item.key}`
-    });
+    return buildRasterFrontMarkup(themeKey, item);
   }
 
   return cardFrame({
@@ -3933,8 +3940,8 @@ async function startOnlineRematchRound(room = state.online.room) {
   } finally {
     state.online.rematchBusy = false;
     updateResultActionButtons();
-    if (slot === 1) {
-      Promise.resolve().then(() => maybeAutoStartOnlineRematch(state.online.room)).catch((error) => console.warn('Auto rematch after request failed', error));
+    if (myRoomSlot() === 1 && state.online.room?.status === 'finished') {
+      Promise.resolve().then(() => maybeAutoStartOnlineRematch(state.online.room)).catch((error) => console.warn('Auto rematch after start attempt failed', error));
     }
   }
 }
@@ -3945,6 +3952,7 @@ async function requestOnlineRematch() {
   if (!room || room.status !== 'finished' || !slot) return;
   if (state.online.rematchBusy) return;
   const patch = slot === 1 ? { rematch_host_ready: true } : { rematch_guest_ready: true };
+  let shouldAutoStart = false;
   state.online.rematchBusy = true;
   updateResultActionButtons();
   try {
@@ -3960,13 +3968,18 @@ async function requestOnlineRematch() {
     if (!updated) throw new Error('Не успях да запиша заявката за реванш.');
     adoptIncomingRoom(updated);
     endOnlineGame();
-    if (slot === 1) await maybeAutoStartOnlineRematch(updated);
-    else updateHud('Реваншът е заявен. Изчаква се домакинът да стартира новата игра.');
+    scheduleHardUiSync([200, 550, 1100, 2200], { roomId: updated.id });
+    const flags = getOnlineRematchFlags(updated);
+    shouldAutoStart = slot === 1 && flags.hostReady && flags.guestReady;
+    if (slot !== 1) updateHud('Реваншът е заявен. Изчаква се домакинът да стартира новата игра.');
   } catch (error) {
     updateHud(error?.message || 'Не успях да заявя реванш.');
   } finally {
     state.online.rematchBusy = false;
     updateResultActionButtons();
+    if (shouldAutoStart) {
+      Promise.resolve().then(() => maybeAutoStartOnlineRematch(state.online.room)).catch((error) => console.warn('Auto rematch after request failed', error));
+    }
   }
 }
 
