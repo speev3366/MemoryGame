@@ -278,7 +278,7 @@ const THEMES = {
     ]
   },
   soldiers: {
-    name: 'Отбрана',
+    name: 'Войници',
     icon: '🛡️',
     description: 'Отбранителна техника, екипировка и тактически символи.',
     palette: {
@@ -442,7 +442,7 @@ const state = {
   timers: {
     interval: null,
     localTurnStartedAt: null,
-    durationMs: 10000
+    durationMs: 30000
   },
   aiTurnTimeout: null
 };
@@ -3382,15 +3382,18 @@ function escapeHtml(value) {
 
 function buildRasterFrontMarkup(themeKey, item) {
   const palette = THEMES[themeKey].palette;
-  const folder = themeKey === 'brands' ? 'brands' : 'sport';
-  const version = 826;
+  const folderMap = {
+    sport: 'sport',
+    brands: 'brands',
+    soldiers: 'defense'
+  };
+  const folder = folderMap[themeKey] || themeKey;
+  const version = '829p3';
   return `
     <div class="raster-front raster-front-${themeKey}" style="--accent:${palette.accent};--accent2:${palette.accent2};--theme-bg1:${palette.bg1};--theme-bg2:${palette.bg2};--theme-glow:${palette.glow};">
-      <div class="raster-front__orb raster-front__orb--one"></div>
-      <div class="raster-front__orb raster-front__orb--two"></div>
-      <div class="raster-front__stage"></div>
+      <div class="raster-front__art-panel"></div>
       <div class="raster-front__art">
-        <img src="assets/final/${folder}/${item.key}.png?v=${version}" alt="${escapeHtml(item.label)}" draggable="false" loading="eager" />
+        <img src="assets/${folder}/${item.key}.webp?v=${version}" alt="${escapeHtml(item.label)}" draggable="false" loading="eager" />
       </div>
       <div class="raster-front__label">${escapeHtml(item.label)}</div>
     </div>
@@ -3454,7 +3457,7 @@ function buildFrontMarkup(themeKey, item) {
     });
   }
 
-  if (themeKey === 'sport' || themeKey === 'brands') {
+  if (themeKey === 'sport' || themeKey === 'brands' || themeKey === 'soldiers') {
     return buildRasterFrontMarkup(themeKey, item);
   }
 
