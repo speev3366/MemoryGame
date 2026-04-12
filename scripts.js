@@ -344,7 +344,7 @@ const THEMES = {
       { key: 'nasa', label: 'NASA' },
       { key: 'gucci', label: 'Gucci' },
       { key: 'playstation', label: 'PlayStation' },
-      { key: 'mcdonalds', label: 'McDonald's' }
+      { key: 'mcdonalds', label: "McDonald's" }
     ]
   },
   music: {
