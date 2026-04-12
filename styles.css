@@ -430,13 +430,17 @@ button { font: inherit; }
 }
 .raster-front__art-panel {
   position: absolute;
-  left: 34px;
-  right: 34px;
-  top: 34px;
-  height: 242px;
+  left: 28px;
+  right: 28px;
+  top: 28px;
+  bottom: 128px;
   border-radius: 28px;
   background: rgba(255,255,255,0.98);
   box-shadow: inset 0 0 0 2px rgba(201, 214, 231, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 .raster-front-brands .raster-front__art-panel {
   background: rgba(255,255,255,0.99);
@@ -444,17 +448,16 @@ button { font: inherit; }
 }
 .raster-front__art {
   position: absolute;
-  left: 42px;
-  right: 42px;
-  top: 48px;
-  height: 214px;
+  inset: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .raster-front__art img {
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   object-position: center center;
   image-rendering: auto;
@@ -462,10 +465,7 @@ button { font: inherit; }
   display: block;
 }
 .raster-front-brands .raster-front__art {
-  left: 48px;
-  right: 48px;
-  top: 52px;
-  height: 206px;
+  inset: 22px;
 }
 .raster-front__label {
   position: absolute;
@@ -1936,3 +1936,71 @@ body.lobby-open { overflow: hidden; }
 }
 
 .raster-front-brands .raster-front__art img{filter:none;}
+
+
+@media (max-width: 768px) {
+  .raster-front__art-panel { left: 18px; right: 18px; top: 18px; bottom: 104px; border-radius: 22px; }
+  .raster-front__art { inset: 14px; }
+  .raster-front-brands .raster-front__art { inset: 16px; }
+  .raster-front__label { left: 24px; right: 24px; bottom: 24px; height: 64px; font-size: 1rem; }
+}
+
+
+/* ==== 8.3 render + new category prep ==== */
+.theme-selector {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.online-theme-selector {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.raster-front__art-panel {
+  left: 24px;
+  right: 24px;
+  top: 24px;
+  bottom: 118px;
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(244,248,252,0.98));
+  box-shadow: inset 0 0 0 2px rgba(201, 214, 231, 0.75), 0 12px 28px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.raster-front__image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  filter: none;
+}
+.raster-front-brands .raster-front__image {
+  max-width: 88%;
+  max-height: 88%;
+}
+.raster-front-sport .raster-front__image,
+.raster-front-soldiers .raster-front__image {
+  max-width: 92%;
+  max-height: 92%;
+}
+.raster-front__label {
+  left: 30px;
+  right: 30px;
+  bottom: 30px;
+  height: 68px;
+  font-size: 1rem;
+}
+@media (max-width: 1024px) {
+  .theme-selector,
+  .online-theme-selector { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .theme-selector,
+  .online-theme-selector { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .raster-front__art-panel { left: 18px; right: 18px; top: 18px; bottom: 102px; border-radius: 22px; padding: 14px; }
+  .raster-front__label { left: 22px; right: 22px; bottom: 22px; height: 62px; font-size: 0.96rem; }
+}

@@ -3388,16 +3388,70 @@ function buildRasterFrontMarkup(themeKey, item) {
     soldiers: 'defense'
   };
   const folder = folderMap[themeKey] || themeKey;
-  const version = '829p3';
+  const version = '830';
   return `
     <div class="raster-front raster-front-${themeKey}" style="--accent:${palette.accent};--accent2:${palette.accent2};--theme-bg1:${palette.bg1};--theme-bg2:${palette.bg2};--theme-glow:${palette.glow};">
-      <div class="raster-front__art-panel"></div>
-      <div class="raster-front__art">
-        <img src="assets/${folder}/${item.key}.webp?v=${version}" alt="${escapeHtml(item.label)}" draggable="false" loading="eager" />
+      <div class="raster-front__art-panel">
+        <img class="raster-front__image" src="assets/${folder}/${item.key}.webp?v=${version}" alt="${escapeHtml(item.label)}" draggable="false" loading="eager" />
       </div>
       <div class="raster-front__label">${escapeHtml(item.label)}</div>
     </div>
   `;
+}
+
+function getItemMonogram(label) {
+  const words = String(label || '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return 'MD';
+  if (words.length >= 2) return `${words[0][0] || ''}${words[1][0] || ''}`.toUpperCase();
+  return words[0].slice(0, 2).toUpperCase();
+}
+
+function buildMonogramFrontMarkup(themeKey, item) {
+  const palette = THEMES[themeKey].palette;
+  const monogram = escapeHtml(getItemMonogram(item.label));
+  const motifs = {
+    music: `
+      <g transform="translate(124 84)">
+        <circle cx="84" cy="84" r="84" fill="rgba(255,255,255,0.20)"/>
+        <path d="M116 28v96c0 18-14 32-32 32s-32-14-32-32 14-32 32-32c6 0 12 2 16 4V46l74-18v78c0 18-14 32-32 32s-32-14-32-32 14-32 32-32c6 0 12 2 16 4V28z" fill="rgba(255,255,255,0.92)"/>
+      </g>`,
+    landmarks: `
+      <g transform="translate(90 92)">
+        <rect x="40" y="88" width="160" height="72" rx="16" fill="rgba(255,255,255,0.92)"/>
+        <rect x="58" y="52" width="28" height="108" rx="12" fill="rgba(255,255,255,0.92)"/>
+        <rect x="154" y="36" width="30" height="124" rx="12" fill="rgba(255,255,255,0.92)"/>
+        <path d="M24 152h192" stroke="rgba(255,255,255,0.92)" stroke-width="16" stroke-linecap="round"/>
+        <path d="M56 60l22-34 20 34M150 42l20-34 20 34" fill="none" stroke="rgba(255,255,255,0.92)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>`,
+    history: `
+      <g transform="translate(104 74)">
+        <path d="M106 10c34 0 68 12 68 12v70c0 52-30 96-68 124-38-28-68-72-68-124V22s34-12 68-12z" fill="rgba(255,255,255,0.92)"/>
+        <path d="M74 30h64l8 22-20 12v18H86V64L66 52z" fill="${palette.accent2}" opacity="0.9"/>
+        <path d="M68 110h76M84 128h44" stroke="${palette.bg1}" stroke-width="12" stroke-linecap="round"/>
+      </g>`,
+    animals: `
+      <g transform="translate(112 84)">
+        <ellipse cx="98" cy="118" rx="72" ry="56" fill="rgba(255,255,255,0.92)"/>
+        <circle cx="44" cy="64" r="24" fill="rgba(255,255,255,0.92)"/>
+        <circle cx="86" cy="38" r="24" fill="rgba(255,255,255,0.92)"/>
+        <circle cx="128" cy="38" r="24" fill="rgba(255,255,255,0.92)"/>
+        <circle cx="170" cy="64" r="24" fill="rgba(255,255,255,0.92)"/>
+      </g>`
+  };
+  const inner = `
+    <g>
+      <circle cx="210" cy="170" r="112" fill="rgba(255,255,255,0.10)"/>
+      ${motifs[themeKey] || motifs.music}
+      <rect x="126" y="118" width="168" height="104" rx="30" fill="rgba(9,18,34,0.26)"/>
+      <text x="210" y="184" text-anchor="middle" font-size="60" font-weight="900" fill="#ffffff" font-family="Inter, Arial, sans-serif">${monogram}</text>
+    </g>
+  `;
+  return cardFrame({
+    palette,
+    label: item.label,
+    inner,
+    idSeed: `__ID__-${themeKey}-${item.key}`
+  });
 }
 
 function cardFrame({ palette, label, inner, fullBleed = false, idSeed = '__ID__' }) {
@@ -3459,6 +3513,10 @@ function buildFrontMarkup(themeKey, item) {
 
   if (themeKey === 'sport' || themeKey === 'brands' || themeKey === 'soldiers') {
     return buildRasterFrontMarkup(themeKey, item);
+  }
+
+  if (themeKey === 'music' || themeKey === 'landmarks' || themeKey === 'history' || themeKey === 'animals') {
+    return buildMonogramFrontMarkup(themeKey, item);
   }
 
   return cardFrame({
