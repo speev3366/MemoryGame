@@ -3529,12 +3529,12 @@ function buildRasterFrontMarkup(themeKey, item) {
     soldiers: 'defense'
   };
   const folder = folderMap[themeKey] || themeKey;
-  const version = '834';
+  const version = '836';
   const isBrand = themeKey === 'brands';
-  const imageX = isBrand ? 74 : 58;
-  const imageY = isBrand ? 84 : 76;
-  const imageW = isBrand ? 272 : 304;
-  const imageH = isBrand ? 170 : 186;
+  const imageX = isBrand ? 60 : 58;
+  const imageY = isBrand ? 76 : 76;
+  const imageW = isBrand ? 300 : 304;
+  const imageH = isBrand ? 186 : 186;
   const inner = `
     <image href="assets/${folder}/${item.key}.png?v=${version}"
            x="${imageX}" y="${imageY}" width="${imageW}" height="${imageH}"
