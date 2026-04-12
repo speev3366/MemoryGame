@@ -3520,6 +3520,7 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+
 function buildRasterFrontMarkup(themeKey, item) {
   const palette = THEMES[themeKey].palette;
   const folderMap = {
@@ -3528,15 +3529,23 @@ function buildRasterFrontMarkup(themeKey, item) {
     soldiers: 'defense'
   };
   const folder = folderMap[themeKey] || themeKey;
-  const version = '833';
-  return `
-    <div class="raster-front raster-front-${themeKey}" style="--accent:${palette.accent};--accent2:${palette.accent2};--theme-bg1:${palette.bg1};--theme-bg2:${palette.bg2};--theme-glow:${palette.glow};">
-      <div class="raster-front__art-panel">
-        <img class="raster-front__image" src="assets/${folder}/${item.key}.png?v=${version}" alt="${escapeHtml(item.label)}" draggable="false" loading="eager" />
-      </div>
-      <div class="raster-front__label">${escapeHtml(item.label)}</div>
-    </div>
+  const version = '834';
+  const isBrand = themeKey === 'brands';
+  const imageX = isBrand ? 74 : 58;
+  const imageY = isBrand ? 84 : 76;
+  const imageW = isBrand ? 272 : 304;
+  const imageH = isBrand ? 170 : 186;
+  const inner = `
+    <image href="assets/${folder}/${item.key}.png?v=${version}"
+           x="${imageX}" y="${imageY}" width="${imageW}" height="${imageH}"
+           preserveAspectRatio="xMidYMid meet"/>
   `;
+  return cardFrame({
+    palette,
+    label: item.label,
+    inner,
+    idSeed: `__ID__-${themeKey}-${item.key}`
+  });
 }
 
 function getItemMonogram(label) {
