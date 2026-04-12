@@ -344,7 +344,147 @@ const THEMES = {
       { key: 'nasa', label: 'NASA' },
       { key: 'gucci', label: 'Gucci' },
       { key: 'playstation', label: 'PlayStation' },
-      { key: 'mcdonalds', label: 'McDonald\'s' }
+      { key: 'mcdonalds', label: 'McDonald's' }
+    ]
+  },
+  music: {
+    name: 'Музика',
+    icon: '🎵',
+    description: 'Инструменти и музикални символи.',
+    palette: {
+      bg1: '#140b1d',
+      bg2: '#45205f',
+      bg3: '#0c0811',
+      accent: '#a855f7',
+      accent2: '#f472b6',
+      glow: 'rgba(168, 85, 247, 0.24)'
+    },
+    items: [
+      { key: 'piano', label: 'Пиано' },
+      { key: 'guitar', label: 'Китара' },
+      { key: 'violin', label: 'Цигулка' },
+      { key: 'drums', label: 'Барабани' },
+      { key: 'trumpet', label: 'Тромпет' },
+      { key: 'saxophone', label: 'Саксофон' },
+      { key: 'flute', label: 'Флейта' },
+      { key: 'accordion', label: 'Акордеон' },
+      { key: 'microphone', label: 'Микрофон' },
+      { key: 'headphones', label: 'Слушалки' },
+      { key: 'speaker', label: 'Колона' },
+      { key: 'vinyl', label: 'Плоча' },
+      { key: 'sheetmusic', label: 'Ноти' },
+      { key: 'harp', label: 'Арфа' },
+      { key: 'clarinet', label: 'Кларинет' },
+      { key: 'tambourine', label: 'Тамбурин' },
+      { key: 'cello', label: 'Виолончело' },
+      { key: 'bagpipe', label: 'Гайда' },
+      { key: 'tupan', label: 'Тъпан' },
+      { key: 'kaval', label: 'Кавал' }
+    ]
+  },
+  landmarks: {
+    name: 'Забележителности',
+    icon: '🏛️',
+    description: 'Известни български места и паметници.',
+    palette: {
+      bg1: '#0f1321',
+      bg2: '#174b70',
+      bg3: '#09101a',
+      accent: '#38bdf8',
+      accent2: '#f59e0b',
+      glow: 'rgba(56, 189, 248, 0.24)'
+    },
+    items: [
+      { key: 'tsarevets', label: 'Царевец' },
+      { key: 'madara', label: 'Мадарски конник' },
+      { key: 'rila', label: 'Рилски манастир' },
+      { key: 'shipka', label: 'Шипка' },
+      { key: 'belogradchik', label: 'Белоградчишки скали' },
+      { key: 'alnevsky', label: 'Ал. Невски' },
+      { key: 'oldplovdiv', label: 'Старият Пловдив' },
+      { key: 'nesebar', label: 'Несебър' },
+      { key: 'asensfortress', label: 'Асенова крепост' },
+      { key: 'bachkovo', label: 'Бачковски манастир' },
+      { key: 'devetashka', label: 'Деветашка пещера' },
+      { key: 'krushuna', label: 'Крушунски водопади' },
+      { key: 'stoneforest', label: 'Побити камъни' },
+      { key: 'perperikon', label: 'Перперикон' },
+      { key: 'etara', label: 'Етъра' },
+      { key: 'kapetobridge', label: 'Покрит мост' },
+      { key: 'rozensky', label: 'Роженски манастир' },
+      { key: 'sevenrila', label: 'Седемте рилски езера' },
+      { key: 'boyana', label: 'Боянска църква' },
+      { key: 'svetiivan', label: 'о-в Св. Иван' }
+    ]
+  },
+  history: {
+    name: 'Българска история',
+    icon: '📜',
+    description: 'Личности, символи и събития от българската история.',
+    palette: {
+      bg1: '#1c1208',
+      bg2: '#6b3415',
+      bg3: '#110c08',
+      accent: '#f59e0b',
+      accent2: '#ef4444',
+      glow: 'rgba(245, 158, 11, 0.26)'
+    },
+    items: [
+      { key: 'levski', label: 'Васил Левски' },
+      { key: 'botev', label: 'Христо Ботев' },
+      { key: 'paisii', label: 'Паисий' },
+      { key: 'asparuh', label: 'Хан Аспарух' },
+      { key: 'kubrat', label: 'Кан Кубрат' },
+      { key: 'krum', label: 'Хан Крум' },
+      { key: 'simeon', label: 'Симеон Велики' },
+      { key: 'samuil', label: 'Цар Самуил' },
+      { key: 'kaloyan', label: 'Цар Калоян' },
+      { key: 'paisii_book', label: 'История славянобългарска' },
+      { key: 'shipka_epic', label: 'Шипченска епопея' },
+      { key: 'april_uprising', label: 'Априлско въстание' },
+      { key: 'liberation', label: 'Освобождение' },
+      { key: 'constitution', label: 'Търновска конституция' },
+      { key: 'cyrillic', label: 'Кирилица' },
+      { key: 'pliska', label: 'Плиска' },
+      { key: 'preslav', label: 'Преслав' },
+      { key: 'ohrid', label: 'Охридска школа' },
+      { key: 'rayna', label: 'Райна Княгиня' },
+      { key: 'opalchenie', label: 'Опълчение' }
+    ]
+  },
+  animals: {
+    name: 'Животни',
+    icon: '🦁',
+    description: 'Диви, домашни и морски животни.',
+    palette: {
+      bg1: '#08170d',
+      bg2: '#1d6a35',
+      bg3: '#07100a',
+      accent: '#22c55e',
+      accent2: '#84cc16',
+      glow: 'rgba(34, 197, 94, 0.24)'
+    },
+    items: [
+      { key: 'lion', label: 'Лъв' },
+      { key: 'tiger', label: 'Тигър' },
+      { key: 'bear', label: 'Мечка' },
+      { key: 'wolf', label: 'Вълк' },
+      { key: 'fox', label: 'Лисица' },
+      { key: 'owl', label: 'Бухал' },
+      { key: 'eagle', label: 'Орел' },
+      { key: 'deer', label: 'Елен' },
+      { key: 'horse', label: 'Кон' },
+      { key: 'dog', label: 'Куче' },
+      { key: 'cat', label: 'Котка' },
+      { key: 'rabbit', label: 'Заек' },
+      { key: 'dolphin', label: 'Делфин' },
+      { key: 'turtle', label: 'Костенурка' },
+      { key: 'penguin', label: 'Пингвин' },
+      { key: 'parrot', label: 'Папагал' },
+      { key: 'butterfly', label: 'Пеперуда' },
+      { key: 'bee', label: 'Пчела' },
+      { key: 'frog', label: 'Жаба' },
+      { key: 'elephant', label: 'Слон' }
     ]
   }
 };
@@ -3388,7 +3528,7 @@ function buildRasterFrontMarkup(themeKey, item) {
     soldiers: 'defense'
   };
   const folder = folderMap[themeKey] || themeKey;
-  const version = '830';
+  const version = '831';
   return `
     <div class="raster-front raster-front-${themeKey}" style="--accent:${palette.accent};--accent2:${palette.accent2};--theme-bg1:${palette.bg1};--theme-bg2:${palette.bg2};--theme-glow:${palette.glow};">
       <div class="raster-front__art-panel">
