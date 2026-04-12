@@ -3528,11 +3528,11 @@ function buildRasterFrontMarkup(themeKey, item) {
     soldiers: 'defense'
   };
   const folder = folderMap[themeKey] || themeKey;
-  const version = '831';
+  const version = '833';
   return `
     <div class="raster-front raster-front-${themeKey}" style="--accent:${palette.accent};--accent2:${palette.accent2};--theme-bg1:${palette.bg1};--theme-bg2:${palette.bg2};--theme-glow:${palette.glow};">
       <div class="raster-front__art-panel">
-        <img class="raster-front__image" src="assets/${folder}/${item.key}.webp?v=${version}" alt="${escapeHtml(item.label)}" draggable="false" loading="eager" />
+        <img class="raster-front__image" src="assets/${folder}/${item.key}.png?v=${version}" alt="${escapeHtml(item.label)}" draggable="false" loading="eager" />
       </div>
       <div class="raster-front__label">${escapeHtml(item.label)}</div>
     </div>
