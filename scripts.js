@@ -6,6 +6,7 @@ const player1NameInput = document.getElementById('player1NameInput');
 const player2NameInput = document.getElementById('player2NameInput');
 const player1NameField = document.getElementById('player1NameField');
 const player2NameField = document.getElementById('player2NameField');
+const playerSetupGrid = document.querySelector('.player-setup-grid');
 const difficultySelector = document.getElementById('difficultySelector');
 const startButton = document.getElementById('startButton');
 const newRoundButton = document.getElementById('newRoundButton');
@@ -204,6 +205,48 @@ const AI_OPTIONS = {
   easy: { name: 'Лесно', chance: 0.25, badge: '25%' },
   medium: { name: 'Средно', chance: 0.5, badge: '50%' },
   hard: { name: 'Трудно', chance: 0.75, badge: '75%' }
+};
+
+const AI_BEHAVIOR = {
+  easy: {
+    badge: 'Къса памет',
+    hint: 'по-интуитивно',
+    knownPairBaseChance: 0.16,
+    knownPairGrowth: 0.11,
+    knownPairMaxChance: 0.62,
+    followKnownMatchChance: 0.44,
+    exploreUnknownFirstChance: 0.84,
+    exploreUnknownSecondChance: 0.74,
+    opportunisticPairChance: 0.16,
+    memoryCapacityFactor: 0.35,
+    memoryDecayChance: 0.2
+  },
+  medium: {
+    badge: 'Баланс',
+    hint: 'балансирана памет',
+    knownPairBaseChance: 0.24,
+    knownPairGrowth: 0.14,
+    knownPairMaxChance: 0.84,
+    followKnownMatchChance: 0.7,
+    exploreUnknownFirstChance: 0.64,
+    exploreUnknownSecondChance: 0.52,
+    opportunisticPairChance: 0.28,
+    memoryCapacityFactor: 0.56,
+    memoryDecayChance: 0.11
+  },
+  hard: {
+    badge: 'Силна памет',
+    hint: 'прецизна памет',
+    knownPairBaseChance: 0.34,
+    knownPairGrowth: 0.15,
+    knownPairMaxChance: 0.96,
+    followKnownMatchChance: 0.9,
+    exploreUnknownFirstChance: 0.42,
+    exploreUnknownSecondChance: 0.34,
+    opportunisticPairChance: 0.42,
+    memoryCapacityFactor: 0.76,
+    memoryDecayChance: 0.05
+  }
 };
 
 const THEMES = {
@@ -489,6 +532,60 @@ const THEMES = {
   }
 };
 
+const ASSET_VERSION = '845';
+const RASTER_THEME_CONFIG = {
+  sport: {
+    folder: 'sport',
+    scale: 1.2
+  },
+  brands: {
+    folder: 'brands',
+    itemAssetExt: {
+      toyota: 'svg'
+    },
+    itemScale: {
+      microsoft: 1.55,
+      toyota: 0.74,
+      intel: 1.24,
+      spotify: 1.42,
+      amazon: 1.22,
+      adidas: 1.35,
+      youtube: 1.16,
+      nasa: 1.28,
+      lego: 1.08,
+      bmw: 1.1
+    }
+  },
+  music: {
+    folder: 'music',
+    assetExt: 'svg',
+    scale: 1.18
+  },
+  landmarks: {
+    folder: 'landmarks',
+    assetExt: 'jpg',
+    scale: 1.14
+  },
+  history: {
+    folder: 'history',
+    itemAssetExt: {
+      kaloyan: 'png',
+      samuil: 'png',
+      ohrid: 'png'
+    },
+    assetExt: 'jpg',
+    scale: 1.12
+  },
+  animals: {
+    folder: 'animals',
+    assetExt: 'svg',
+    scale: 1.18
+  },
+  soldiers: {
+    folder: 'defense'
+  }
+};
+
 const BOARD_LAYOUTS = {
   20: [[5, 4], [4, 5], [6, 4], [4, 6]],
   30: [[6, 5], [5, 6], [10, 3], [3, 10]],
@@ -496,6 +593,8 @@ const BOARD_LAYOUTS = {
 };
 
 const ASSET_CACHE = {};
+const ROOM_FETCH_CACHE_TTL_MS = 5 * 60 * 1000;
+const ROOM_FETCH_CACHE_MAX = 24;
 const ONLINE_INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
 const ONLINE_WAITING_ROOM_LIMIT_MS = 30 * 60 * 1000;
 const ONLINE_AUTO_FINISH_WINNER_SLOT = -1;
@@ -583,6 +682,11 @@ const state = {
     interval: null,
     localTurnStartedAt: null,
     durationMs: 30000
+  },
+  aiMemory: {
+    cardsByIndex: new Map(),
+    seenTick: 0,
+    boardAnchor: null
   },
   aiTurnTimeout: null
 };
@@ -676,14 +780,36 @@ function suppressBackgroundOnlineTraffic(ms = 2500) {
   state.online.suppressLobbyUntil = Math.max(state.online.suppressLobbyUntil || 0, until);
 }
 
+function pruneCachedRooms(now = Date.now()) {
+  if (!(state.online.roomFetchCache instanceof Map) || !state.online.roomFetchCache.size) return;
+
+  state.online.roomFetchCache.forEach((cached, roomId) => {
+    if (!cached?.at || now - cached.at > ROOM_FETCH_CACHE_TTL_MS) {
+      state.online.roomFetchCache.delete(roomId);
+    }
+  });
+
+  if (state.online.roomFetchCache.size <= ROOM_FETCH_CACHE_MAX) return;
+
+  const overflow = state.online.roomFetchCache.size - ROOM_FETCH_CACHE_MAX;
+  [...state.online.roomFetchCache.entries()]
+    .sort((a, b) => (a[1]?.at || 0) - (b[1]?.at || 0))
+    .slice(0, overflow)
+    .forEach(([roomId]) => {
+      state.online.roomFetchCache.delete(roomId);
+    });
+}
+
 function setCachedRoom(room) {
   if (!room?.id) return room || null;
+  pruneCachedRooms();
   state.online.roomFetchCache.set(room.id, { room, at: Date.now() });
   return room;
 }
 
 function getCachedRoom(roomId, maxAgeMs = 0) {
   if (!roomId) return null;
+  pruneCachedRooms();
   const cached = state.online.roomFetchCache.get(roomId);
   if (!cached) return null;
   if (maxAgeMs > 0 && Date.now() - cached.at > maxAgeMs) return null;
@@ -2286,6 +2412,7 @@ function setAppMode(mode) {
   app.classList.remove('auth-open');
   authBackdrop?.classList.add('hidden');
   profileButton.classList.toggle('hidden', mode === 'game');
+  newRoundButton?.classList.toggle('hidden', mode === 'game');
   exitGameButton?.classList.toggle('hidden', mode !== 'game');
   if (mode === 'game') {
     toggleProfilePanel(false);
@@ -2374,10 +2501,101 @@ function bindUiPress(target, handler) {
   });
 }
 
+function initHorizontalOptionStrip({
+  root,
+  viewportSelector = '[data-strip-viewport]',
+  prevSelector = '[data-strip-prev]',
+  nextSelector = '[data-strip-next]',
+  itemSelector,
+  selectedSelector,
+  onSelect
+}) {
+  if (!root || typeof onSelect !== 'function' || !itemSelector) return;
+
+  const viewport = root.querySelector(viewportSelector);
+  const prevButton = root.querySelector(prevSelector);
+  const nextButton = root.querySelector(nextSelector);
+  if (!viewport || !prevButton || !nextButton) return;
+
+  root.querySelectorAll(itemSelector).forEach((item) => {
+    item.addEventListener('click', (event) => {
+      event.preventDefault();
+      onSelect(item);
+    });
+  });
+
+  const getStep = () => Math.max(180, Math.round(viewport.clientWidth * 0.78));
+  const scrollByStep = (direction) => {
+    viewport.scrollBy({
+      left: direction * getStep(),
+      behavior: 'smooth'
+    });
+  };
+
+  bindUiPress(prevButton, () => scrollByStep(-1));
+  bindUiPress(nextButton, () => scrollByStep(1));
+
+  let rafId = null;
+  const syncNav = () => {
+    const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+    const left = viewport.scrollLeft;
+    prevButton.disabled = left <= 2;
+    nextButton.disabled = left >= maxScroll - 2;
+    root.classList.toggle('is-scrollable', maxScroll > 4);
+  };
+  const scheduleSync = () => {
+    if (rafId !== null) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
+      syncNav();
+    });
+  };
+
+  viewport.addEventListener('scroll', scheduleSync, { passive: true });
+  viewport.addEventListener('wheel', (event) => {
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    event.preventDefault();
+    viewport.scrollLeft += event.deltaY;
+  }, { passive: false });
+  viewport.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      scrollByStep(-1);
+      return;
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      scrollByStep(1);
+    }
+  });
+
+  requestAnimationFrame(() => {
+    const selected = selectedSelector ? root.querySelector(selectedSelector) : null;
+    if (selected) {
+      const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      const target = selected.offsetLeft - ((viewport.clientWidth - selected.offsetWidth) / 2);
+      viewport.scrollLeft = Math.max(0, Math.min(maxScroll, target));
+    }
+    syncNav();
+  });
+}
+
+function syncSelectedThemeCards() {
+  themeSelector.querySelectorAll('[data-theme]').forEach((item) => {
+    item.classList.toggle('selected', item.dataset.theme === state.selectedTheme);
+  });
+}
+
+function syncSelectedOnlineThemeCards() {
+  onlineThemeSelector.querySelectorAll('[data-online-theme]').forEach((item) => {
+    item.classList.toggle('selected', item.dataset.onlineTheme === state.online.selectedTheme);
+  });
+}
+
 function renderThemeSelector() {
-  themeSelector.innerHTML = Object.entries(THEMES)
+  const cardsMarkup = Object.entries(THEMES)
     .map(([key, theme]) => `
-      <button class="theme-card ${state.selectedTheme === key ? 'selected' : ''}" data-theme="${key}" type="button">
+      <button class="theme-card theme-strip-card ${state.selectedTheme === key ? 'selected' : ''}" data-theme="${key}" type="button">
         <div class="theme-icon">${theme.icon}</div>
         <h3>${theme.name}</h3>
         <p>${theme.description}</p>
@@ -2385,9 +2603,25 @@ function renderThemeSelector() {
     `)
     .join('');
 
-  document.querySelectorAll('.theme-card').forEach((button) => {
-    bindUiPress(button, () => selectTheme(button.dataset.theme));
+  themeSelector.innerHTML = `
+    <div class="theme-strip-shell" data-theme-strip-root>
+      <button class="theme-strip-nav" data-strip-prev type="button" aria-label="Scroll themes left">&lt;</button>
+      <div class="theme-strip-viewport" data-strip-viewport tabindex="0" aria-label="Theme strip">
+        <div class="theme-strip-track">
+          ${cardsMarkup}
+        </div>
+      </div>
+      <button class="theme-strip-nav" data-strip-next type="button" aria-label="Scroll themes right">&gt;</button>
+    </div>
+  `;
+
+  initHorizontalOptionStrip({
+    root: themeSelector.querySelector('[data-theme-strip-root]'),
+    itemSelector: '[data-theme]',
+    selectedSelector: '.theme-card.selected',
+    onSelect: (item) => selectTheme(item.dataset.theme)
   });
+
   renderOnlineThemeSelector();
 }
 
@@ -2400,7 +2634,7 @@ function renderCountSelector() {
     `)
     .join('');
 
-  document.querySelectorAll('.count-option').forEach((button) => {
+  countSelector.querySelectorAll('.count-option').forEach((button) => {
     bindUiPress(button, () => selectCardCount(Number(button.dataset.count)));
   });
   renderOnlineCountSelector();
@@ -2412,9 +2646,10 @@ function renderOnlineThemeSelector(force = false) {
   if (!onlineThemeSelector) return;
   const selected = isValidOnlineTheme(state.online.selectedTheme) ? state.online.selectedTheme : 'sport';
   state.online.selectedTheme = selected;
-  if (!force && lastRenderedOnlineTheme === selected && onlineThemeSelector.children.length === Object.keys(THEMES).length) return;
+  const renderedOptions = onlineThemeSelector.querySelectorAll('[data-online-theme]').length;
+  if (!force && lastRenderedOnlineTheme === selected && renderedOptions === Object.keys(THEMES).length) return;
   lastRenderedOnlineTheme = selected;
-  onlineThemeSelector.innerHTML = Object.entries(THEMES)
+  const optionsMarkup = Object.entries(THEMES)
     .map(([key, theme]) => `
       <button class="online-theme-option ${selected === key ? 'selected' : ''}" data-online-theme="${key}" type="button">
         <span>${theme.icon}</span>
@@ -2423,8 +2658,23 @@ function renderOnlineThemeSelector(force = false) {
     `)
     .join('');
 
-  onlineThemeSelector.querySelectorAll('[data-online-theme]').forEach((button) => {
-    bindUiPress(button, () => selectOnlineTheme(button.dataset.onlineTheme));
+  onlineThemeSelector.innerHTML = `
+    <div class="online-theme-strip-shell" data-online-theme-strip-root>
+      <button class="theme-strip-nav theme-strip-nav-compact" data-strip-prev type="button" aria-label="Scroll themes left">&lt;</button>
+      <div class="theme-strip-viewport online-theme-strip-viewport" data-strip-viewport tabindex="0" aria-label="Online theme strip">
+        <div class="online-theme-strip-track">
+          ${optionsMarkup}
+        </div>
+      </div>
+      <button class="theme-strip-nav theme-strip-nav-compact" data-strip-next type="button" aria-label="Scroll themes right">&gt;</button>
+    </div>
+  `;
+
+  initHorizontalOptionStrip({
+    root: onlineThemeSelector.querySelector('[data-online-theme-strip-root]'),
+    itemSelector: '[data-online-theme]',
+    selectedSelector: '.online-theme-option.selected',
+    onSelect: (item) => selectOnlineTheme(item.dataset.onlineTheme)
   });
 }
 
@@ -2551,8 +2801,8 @@ function selectOnlineTheme(themeKey) {
   state.online.selectedTheme = isValidOnlineTheme(themeKey) ? themeKey : 'sport';
   state.selectedTheme = state.online.selectedTheme;
   applyThemePalette(state.online.selectedTheme);
-  renderOnlineThemeSelector(true);
-  renderThemeSelector();
+  syncSelectedOnlineThemeCards();
+  syncSelectedThemeCards();
   updateHud();
   showFeedback(onlineLobbyFeedback, '', '');
 }
@@ -2568,10 +2818,12 @@ function selectOnlineCardCount(count) {
 
 function selectTheme(themeKey) {
   state.selectedTheme = themeKey;
+  state.online.selectedTheme = isValidOnlineTheme(themeKey) ? themeKey : state.online.selectedTheme;
   applyThemePalette(themeKey);
   startButton.disabled = false;
   updateHud();
-  renderThemeSelector();
+  syncSelectedThemeCards();
+  syncSelectedOnlineThemeCards();
 }
 
 function selectPlayMode(modeKey) {
@@ -3520,24 +3772,34 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+function getRasterAssetPlacement(themeKey, itemKey) {
+  const config = RASTER_THEME_CONFIG[themeKey] || {};
+  const base = themeKey === 'brands'
+    ? { x: 60, y: 76, width: 300, height: 186 }
+    : { x: 58, y: 76, width: 304, height: 186 };
+  const scale = config.itemScale?.[itemKey] || config.scale || 1;
+  const width = Number((base.width * scale).toFixed(2));
+  const height = Number((base.height * scale).toFixed(2));
+  const centerX = base.x + (base.width / 2);
+  const centerY = base.y + (base.height / 2);
+
+  return {
+    folder: config.folder || themeKey,
+    assetExt: config.itemAssetExt?.[itemKey] || config.assetExt || 'png',
+    x: Number((centerX - (width / 2)).toFixed(2)),
+    y: Number((centerY - (height / 2)).toFixed(2)),
+    width,
+    height
+  };
+}
+
 
 function buildRasterFrontMarkup(themeKey, item) {
   const palette = THEMES[themeKey].palette;
-  const folderMap = {
-    sport: 'sport',
-    brands: 'brands',
-    soldiers: 'defense'
-  };
-  const folder = folderMap[themeKey] || themeKey;
-  const version = '836';
-  const isBrand = themeKey === 'brands';
-  const imageX = isBrand ? 60 : 58;
-  const imageY = isBrand ? 76 : 76;
-  const imageW = isBrand ? 300 : 304;
-  const imageH = isBrand ? 186 : 186;
+  const placement = getRasterAssetPlacement(themeKey, item.key);
   const inner = `
-    <image href="assets/${folder}/${item.key}.png?v=${version}"
-           x="${imageX}" y="${imageY}" width="${imageW}" height="${imageH}"
+    <image href="assets/${placement.folder}/${item.key}.${placement.assetExt}?v=${ASSET_VERSION}"
+           x="${placement.x}" y="${placement.y}" width="${placement.width}" height="${placement.height}"
            preserveAspectRatio="xMidYMid meet"/>
   `;
   return cardFrame({
@@ -3660,12 +3922,8 @@ function buildFrontMarkup(themeKey, item) {
     });
   }
 
-  if (themeKey === 'sport' || themeKey === 'brands' || themeKey === 'soldiers') {
+  if (RASTER_THEME_CONFIG[themeKey]) {
     return buildRasterFrontMarkup(themeKey, item);
-  }
-
-  if (themeKey === 'music' || themeKey === 'landmarks' || themeKey === 'history' || themeKey === 'animals') {
-    return buildMonogramFrontMarkup(themeKey, item);
   }
 
   return cardFrame({
@@ -3746,9 +4004,9 @@ function createSerializedDeck(themeKey, cardCount = state.selectedCardCount) {
 }
 
 function buildBoard(themeKey, serializedDeck = null) {
+  const assets = getThemeAssets(themeKey);
   const deck = (serializedDeck || createDeck(themeKey)).map((card) => {
     if (card.frontMarkup) return card;
-    const assets = getThemeAssets(themeKey);
     return {
       ...card,
       frontMarkup: assets.fronts[card.pairId],
@@ -3816,7 +4074,7 @@ function updatePlayerPanels() {
       subtextEls[2].textContent = 'Чака втори играч';
     } else if (isComputerMode()) {
       subtextEls[1].textContent = 'Готов да предизвика AI';
-      subtextEls[2].textContent = `${AI_OPTIONS[state.aiDifficulty].name} • ${Math.round(AI_OPTIONS[state.aiDifficulty].chance * 100)}% шанс`;
+      subtextEls[2].textContent = `${AI_OPTIONS[state.aiDifficulty].name} • ${getAiBehaviorProfile().hint}`;
     } else {
       subtextEls[1].textContent = 'Готов за игра';
       subtextEls[2].textContent = 'Ще атакува след грешка';
@@ -5946,6 +6204,334 @@ function endOnlineGame() {
   }
 }
 
+function getAiBehaviorProfile(level = state.aiDifficulty) {
+  return AI_BEHAVIOR[level] || AI_BEHAVIOR.medium;
+}
+
+function resetComputerMemory() {
+  state.aiMemory.cardsByIndex.clear();
+  state.aiMemory.seenTick = 0;
+  state.aiMemory.boardAnchor = null;
+}
+
+function ensureComputerMemoryBoardContext() {
+  const currentAnchor = gameBoard.querySelector('.memory-card');
+  if (!currentAnchor) {
+    resetComputerMemory();
+    return false;
+  }
+  const previousAnchor = state.aiMemory.boardAnchor;
+  if (previousAnchor && previousAnchor !== currentAnchor && !gameBoard.contains(previousAnchor)) {
+    resetComputerMemory();
+  }
+  state.aiMemory.boardAnchor = currentAnchor;
+  return true;
+}
+
+function syncComputerMemoryWithBoard(applyDecay = false) {
+  if (!isComputerMode() || !state.started || state.gameOver) {
+    resetComputerMemory();
+    return;
+  }
+  if (!ensureComputerMemoryBoardContext()) return;
+
+  const available = getAvailableComputerCards();
+  const availableByIndex = new Map(available.map((card) => [card.dataset.index, card]));
+  [...state.aiMemory.cardsByIndex.keys()].forEach((indexKey) => {
+    if (!availableByIndex.has(indexKey)) state.aiMemory.cardsByIndex.delete(indexKey);
+  });
+
+  const profile = getAiBehaviorProfile();
+  const maxEntries = Math.max(4, Math.round(state.selectedCardCount * profile.memoryCapacityFactor));
+  if (state.aiMemory.cardsByIndex.size > maxEntries) {
+    const oldestFirst = [...state.aiMemory.cardsByIndex.entries()]
+      .sort((a, b) => a[1].seenTick - b[1].seenTick);
+    const overflow = state.aiMemory.cardsByIndex.size - maxEntries;
+    oldestFirst.slice(0, overflow).forEach(([indexKey]) => state.aiMemory.cardsByIndex.delete(indexKey));
+  }
+
+  if (applyDecay && state.aiMemory.cardsByIndex.size > 2) {
+    [...state.aiMemory.cardsByIndex.keys()].forEach((indexKey) => {
+      if (Math.random() < profile.memoryDecayChance) {
+        state.aiMemory.cardsByIndex.delete(indexKey);
+      }
+    });
+  }
+}
+
+function rememberCardForAi(card) {
+  if (!card || !isComputerMode() || !state.started || state.gameOver) return;
+  const indexKey = card.dataset.index;
+  const pairId = card.dataset.pairId;
+  if (!indexKey || !pairId) return;
+  ensureComputerMemoryBoardContext();
+  state.aiMemory.seenTick += 1;
+  state.aiMemory.cardsByIndex.set(indexKey, { pairId, seenTick: state.aiMemory.seenTick });
+  syncComputerMemoryWithBoard(false);
+}
+
+function pickRandomItem(items) {
+  if (!Array.isArray(items) || !items.length) return null;
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function getKnownComputerPairs(availableCards) {
+  const availableByIndex = new Map(availableCards.map((card) => [card.dataset.index, card]));
+  const groups = new Map();
+
+  state.aiMemory.cardsByIndex.forEach((memory, indexKey) => {
+    const card = availableByIndex.get(indexKey);
+    if (!card) return;
+    if (!groups.has(memory.pairId)) groups.set(memory.pairId, []);
+    groups.get(memory.pairId).push(card);
+  });
+
+  const pairs = [];
+  groups.forEach((cards) => {
+    if (cards.length < 2) return;
+    for (let i = 0; i < cards.length - 1; i += 1) {
+      for (let j = i + 1; j < cards.length; j += 1) {
+        pairs.push([cards[i], cards[j]]);
+      }
+    }
+  });
+  return pairs;
+}
+
+function findRememberedMatchCard(firstCard, remainingCards) {
+  const firstIndex = firstCard?.dataset?.index;
+  const firstPairId = firstCard?.dataset?.pairId;
+  if (!firstIndex || !firstPairId) return null;
+  const remainingByIndex = new Map(remainingCards.map((card) => [card.dataset.index, card]));
+
+  for (const [indexKey, memory] of state.aiMemory.cardsByIndex.entries()) {
+    if (indexKey === firstIndex) continue;
+    if (memory.pairId !== firstPairId) continue;
+    const candidate = remainingByIndex.get(indexKey);
+    if (candidate) return candidate;
+  }
+  return null;
+}
+
+function chooseComputerSecondMove(firstCard, plannedSecond = null) {
+  const remaining = getAvailableComputerCards().filter((card) => card !== firstCard && !card.classList.contains('flip'));
+  if (!remaining.length) return null;
+
+  const profile = getAiBehaviorProfile();
+  if (plannedSecond && remaining.includes(plannedSecond) && Math.random() < 0.9) {
+    return plannedSecond;
+  }
+
+  const rememberedMatch = findRememberedMatchCard(firstCard, remaining);
+  if (rememberedMatch && Math.random() < profile.followKnownMatchChance) {
+    return rememberedMatch;
+  }
+
+  const knownPairs = getKnownComputerPairs(remaining);
+  if (knownPairs.length && Math.random() < profile.opportunisticPairChance) {
+    const pair = pickRandomItem(knownPairs);
+    if (pair) return pickRandomItem(pair);
+  }
+
+  const unknown = remaining.filter((card) => !state.aiMemory.cardsByIndex.has(card.dataset.index));
+  const secondPool = unknown.length && Math.random() < profile.exploreUnknownSecondChance ? unknown : remaining;
+  return pickRandomItem(secondPool);
+}
+
+function chooseComputerMove() {
+  const available = getAvailableComputerCards().filter((card) => !card.classList.contains('flip'));
+  if (available.length < 2) return [];
+
+  syncComputerMemoryWithBoard(true);
+  const profile = getAiBehaviorProfile();
+  const knownPairs = getKnownComputerPairs(available);
+  const knownPairChance = Math.min(
+    profile.knownPairMaxChance,
+    profile.knownPairBaseChance + (knownPairs.length * profile.knownPairGrowth)
+  );
+
+  if (knownPairs.length && Math.random() < knownPairChance) {
+    const exactPair = pickRandomItem(knownPairs);
+    if (exactPair) return exactPair.slice(0, 2);
+  }
+
+  const unknown = available.filter((card) => !state.aiMemory.cardsByIndex.has(card.dataset.index));
+  const firstPool = unknown.length && Math.random() < profile.exploreUnknownFirstChance ? unknown : available;
+  const first = pickRandomItem(firstPool);
+  if (!first) return [];
+
+  const second = chooseComputerSecondMove(first);
+  if (!second) return [];
+  return [first, second];
+}
+
+function runComputerTurn() {
+  if (!isComputerTurn() || !state.started || state.gameOver) return;
+  const [first, preselectedSecond] = chooseComputerMove();
+  if (!first) return;
+
+  state.lockBoard = true;
+  updatePlayerPanels();
+  updateHud(`РљРѕРјРїСЋС‚СЉСЂСЉС‚ РјРёСЃР»Рё... (${AI_OPTIONS[state.aiDifficulty].name})`);
+
+  state.aiTurnTimeout = setTimeout(() => {
+    if (!isComputerTurn() || !state.started || state.gameOver) {
+      state.lockBoard = false;
+      return;
+    }
+
+    first.classList.add('flip');
+    state.flipped = [first];
+    rememberCardForAi(first);
+
+    const second = chooseComputerSecondMove(first, preselectedSecond);
+    if (!second) {
+      state.flipped = [];
+      state.lockBoard = false;
+      return;
+    }
+
+    state.aiTurnTimeout = setTimeout(() => {
+      if (!isComputerTurn() || !state.started || state.gameOver) {
+        state.lockBoard = false;
+        return;
+      }
+      second.classList.add('flip');
+      state.flipped = [first, second];
+      rememberCardForAi(second);
+      state.lockBoard = false;
+
+      if (first.dataset.pairId === second.dataset.pairId) {
+        handleMatch(first, second);
+      } else {
+        handleMiss(first, second);
+      }
+    }, 540);
+  }, 380);
+}
+
+function updatePlayerInputUi() {
+  const localMode = state.playMode === 'local';
+  const computerMode = isComputerMode();
+  const onlineMode = isOnlineMode();
+
+  playerSetupGrid?.classList.toggle('hidden', !localMode);
+  player1NameInput.disabled = !localMode;
+  player2NameField.classList.toggle('hidden-field', !localMode);
+  player2NameInput.disabled = !localMode;
+
+  if (computerMode) {
+    player2NameInput.value = 'РљРѕРјРїСЋС‚СЉСЂ';
+    player2NameInput.placeholder = 'РљРѕРјРїСЋС‚СЉСЂ';
+  } else if (onlineMode) {
+    player2NameInput.placeholder = 'Р©Рµ СЃРµ РїРѕРїСЉР»РЅРё РѕС‚ СЃС‚Р°СЏС‚Р°';
+  } else if (localMode && player2NameInput.value.trim() === 'РљРѕРјРїСЋС‚СЉСЂ') {
+    player2NameInput.value = '';
+    player2NameInput.placeholder = 'РРіСЂР°С‡ 2';
+  } else if (!player2NameInput.value.trim()) {
+    player2NameInput.placeholder = 'РРіСЂР°С‡ 2';
+  }
+
+  difficultySelector.classList.toggle('hidden', !computerMode);
+}
+
+function renderDifficultySelector() {
+  difficultySelector.innerHTML = Object.entries(AI_OPTIONS)
+    .map(([key, option]) => {
+      const profile = getAiBehaviorProfile(key);
+      return `
+      <button class="difficulty-option ${state.aiDifficulty === key ? 'selected' : ''}" data-difficulty="${key}" type="button">
+        <strong>${option.name}</strong> • ${profile.badge}
+      </button>
+    `;
+    })
+    .join('');
+
+  document.querySelectorAll('.difficulty-option').forEach((button) => {
+    button.addEventListener('click', () => selectAiDifficulty(button.dataset.difficulty));
+  });
+}
+
+function isLegacyBrokenPlayerLabel(value) {
+  if (!value) return false;
+  const trimmed = value.trim();
+  const knownBroken = new Set([
+    'РРіСЂР°С‡ 2',
+    'Р ВР С–РЎР‚Р В°РЎвЂЎ 2',
+    'РрРіСЂР°С‡ 2',
+    'Р С™Р С•Р СР С—РЎР‹РЎвЂљРЎР‰РЎР‚'
+  ]);
+  if (knownBroken.has(trimmed)) return true;
+  return /^Р.+2$/.test(trimmed);
+}
+
+function updatePlayerInputUi() {
+  const localMode = state.playMode === 'local';
+  const computerMode = isComputerMode();
+  const onlineMode = isOnlineMode();
+  const labelComputer = '\u041a\u043e\u043c\u043f\u044e\u0442\u044a\u0440';
+  const labelPlayer2 = '\u0418\u0433\u0440\u0430\u0447 2';
+  const labelOnlineFill = '\u0429\u0435 \u0441\u0435 \u043f\u043e\u043f\u044a\u043b\u043d\u0438 \u043e\u0442 \u0441\u0442\u0430\u044f\u0442\u0430';
+
+  playerSetupGrid?.classList.toggle('hidden', !localMode);
+  player1NameInput.disabled = !localMode;
+  player2NameField.classList.toggle('hidden-field', !localMode);
+  player2NameInput.disabled = !localMode;
+
+  if (computerMode) {
+    player2NameInput.value = labelComputer;
+    player2NameInput.placeholder = labelComputer;
+  } else if (onlineMode) {
+    player2NameInput.placeholder = labelOnlineFill;
+  } else {
+    if (isLegacyBrokenPlayerLabel(player2NameInput.value)) {
+      player2NameInput.value = '';
+    }
+    if (!player2NameInput.value.trim() || player2NameInput.value.trim() === labelComputer) {
+      player2NameInput.value = '';
+      player2NameInput.placeholder = labelPlayer2;
+    }
+  }
+
+  difficultySelector.classList.toggle('hidden', !computerMode);
+}
+
+let computerMemoryObserver = null;
+function initComputerMemoryObserver() {
+  if (!gameBoard || computerMemoryObserver) return;
+  computerMemoryObserver = new MutationObserver((mutations) => {
+    if (!isComputerMode() || !state.started || state.gameOver) return;
+    mutations.forEach((mutation) => {
+      if (!(mutation.target instanceof HTMLElement)) return;
+      if (!mutation.target.classList.contains('memory-card')) return;
+      if (mutation.target.classList.contains('flip')) {
+        rememberCardForAi(mutation.target);
+      }
+    });
+  });
+  computerMemoryObserver.observe(gameBoard, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class']
+  });
+}
+
+const baseUpdateHud = updateHud;
+updateHud = function patchedUpdateHud(message) {
+  baseUpdateHud(message);
+  if (message || state.ui.persistentNotice) return;
+  if (!state.selectedTheme || state.started || state.playMode !== 'local') return;
+
+  const typedP1 = (player1NameInput.value || '').trim();
+  const typedP2 = (player2NameInput.value || '').trim();
+  const parts = [];
+  if (typedP1) parts.push(`\u0418\u0433\u0440\u0430\u0447 1: ${typedP1}`);
+  if (typedP2) parts.push(`\u0418\u0433\u0440\u0430\u0447 2: ${typedP2}`);
+  parts.push(`\u0422\u0435\u043c\u0430: ${THEMES[state.selectedTheme].name}`);
+  parts.push(`${state.selectedCardCount} \u043a\u0430\u0440\u0442\u0438.`);
+  statusBanner.textContent = parts.join(' • ');
+};
+
 player1NameInput.addEventListener('input', () => {
   refreshPlayerNames();
   updatePlayerPanels();
@@ -5991,6 +6577,7 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
+initComputerMemoryObserver();
 loadGuestState();
 syncRememberMeUi();
 refreshPlayerNames();
