@@ -6112,6 +6112,16 @@ async function handleOnlineFlip(card) {
   if (room.lock_board || state.online.flipBusy) return;
 
   const index = Number(card.dataset.index);
+  if (!Number.isInteger(index)) return;
+  if (card.classList.contains('matched') || card.classList.contains('flip')) return;
+
+  const expectedPatch = computeDirectFlipPatch(room, index, slot);
+  if (!expectedPatch) {
+    // No-op clicks (e.g. same card twice) should not block the turn loop.
+    applyOnlineBoardState();
+    return;
+  }
+
   const beforeKey = roomSnapshotKey(room);
   state.online.flipBusy = true;
   suppressBackgroundOnlineTraffic(2200);
