@@ -727,6 +727,7 @@ const state = {
     reactionPickerOpen: { 1: false, 2: false },
     reactionUsage: {
       turnOwner: 1,
+      turnKey: '',
       usedBy: { 1: false, 2: false }
     }
   },
@@ -1797,20 +1798,45 @@ function isReactionUiVisible() {
   return Boolean(app.classList.contains('game-mode') && state.started && !state.gameOver);
 }
 
+function getReactionTurnKey(owner) {
+  const normalizedOwner = Number(owner) === 2 ? 2 : 1;
+  if (!state.started || state.gameOver) return `idle:${normalizedOwner}`;
+
+  if (state.playMode === 'online') {
+    const roomId = state.online.room?.id || '';
+    const turnAnchor = state.online.room?.turn_started_at || '';
+    return `online:${roomId}:${normalizedOwner}:${turnAnchor}`;
+  }
+
+  const localAnchor = Number(state.timers.localTurnStartedAt) || 0;
+  return `local:${normalizedOwner}:${localAnchor}`;
+}
+
+function resetReactionUsage(owner = state.currentPlayer) {
+  const usage = state.ui.reactionUsage;
+  if (!usage) return;
+  const normalizedOwner = Number(owner) === 2 ? 2 : 1;
+  usage.turnOwner = normalizedOwner;
+  usage.turnKey = getReactionTurnKey(normalizedOwner);
+  usage.usedBy[1] = false;
+  usage.usedBy[2] = false;
+  closeAllReactionPickers();
+}
+
 function syncReactionTurnState() {
   const usage = state.ui.reactionUsage;
   if (!usage) return;
   const owner = Number(state.currentPlayer) === 2 ? 2 : 1;
+  const turnKey = getReactionTurnKey(owner);
 
   if (!state.started || state.gameOver) {
-    usage.turnOwner = owner;
-    usage.usedBy[1] = false;
-    usage.usedBy[2] = false;
+    resetReactionUsage(owner);
     return;
   }
 
-  if (usage.turnOwner !== owner) {
+  if (usage.turnOwner !== owner || usage.turnKey !== turnKey) {
     usage.turnOwner = owner;
+    usage.turnKey = turnKey;
     usage.usedBy[1] = false;
     usage.usedBy[2] = false;
   }
@@ -4455,6 +4481,7 @@ function resetRoundState() {
   state.totalPairs = 0;
   state.gameOver = false;
   clearTurnStart();
+  resetReactionUsage(1);
   if (state.online.pendingTimeout) {
     clearTimeout(state.online.pendingTimeout);
     state.online.pendingTimeout = null;
@@ -4496,9 +4523,10 @@ function startGame() {
   state.flipped = [];
   state.lockBoard = false;
   resetScores();
+  setLocalTurnStart();
+  resetReactionUsage(1);
   updatePlayerPanels();
   buildBoard(state.selectedTheme);
-  setLocalTurnStart();
   emptyState.classList.add('hidden');
   gameBoard.classList.add('active');
   setAppMode('game');
