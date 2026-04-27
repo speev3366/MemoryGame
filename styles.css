@@ -1308,6 +1308,10 @@ button { font: inherit; }
   cursor: pointer;
   font-size: 0.92rem;
   line-height: 1;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .reaction-trigger.is-disabled,
@@ -1348,6 +1352,10 @@ button { font: inherit; }
   cursor: pointer;
   font-size: 1rem;
   line-height: 1;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .reaction-option:hover {
@@ -1796,10 +1804,27 @@ body.lobby-open { overflow: hidden; }
 .room-state-pill.password { background: rgba(255, 209, 102, 0.16); color: #ffd978; }
 .room-state-pill.invite { background: rgba(125, 131, 255, 0.16); color: #b0b4ff; }
 .room-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   font-size: 1rem;
   font-weight: 800;
   overflow-wrap: break-word;
   word-break: normal;
+}
+.room-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #d7efff;
+  border: 1px solid rgba(125, 211, 252, 0.34);
+  background: linear-gradient(135deg, rgba(125, 211, 252, 0.15), rgba(99, 102, 241, 0.15));
+  white-space: nowrap;
 }
 .room-row-meta {
   color: var(--muted);

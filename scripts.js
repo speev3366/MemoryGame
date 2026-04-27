@@ -148,6 +148,8 @@ const profileTotalGames = document.getElementById('profileTotalGames');
 const profileWinRate = document.getElementById('profileWinRate');
 const profileWins = document.getElementById('profileWins');
 const profileModeBreakdown = document.getElementById('profileModeBreakdown');
+const profileRankPoints = document.getElementById('profileRankPoints');
+const profileRankTitle = document.getElementById('profileRankTitle');
 const profileActiveRoom = document.getElementById('profileActiveRoom');
 const profileActiveRoomText = document.getElementById('profileActiveRoomText');
 const resumeRoomButton = document.getElementById('resumeRoomButton');
@@ -675,6 +677,7 @@ const BOARD_LAYOUTS = {
 const ASSET_CACHE = {};
 const ROOM_FETCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const ROOM_FETCH_CACHE_MAX = 24;
+const RANK_MAX = 300;
 const ONLINE_INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
 const ONLINE_WAITING_ROOM_LIMIT_MS = 30 * 60 * 1000;
 const ONLINE_AUTO_FINISH_WINNER_SLOT = -1;
@@ -763,6 +766,7 @@ const state = {
     authSyncQueued: false,
     rematchBusy: false,
     lastRematchAutoKey: null,
+    lastRankRefreshKey: null,
     roomFetchCache: new Map()
   },
   timers: {
@@ -1064,6 +1068,62 @@ function getInviteUrl(token) {
 function normalizeRpcSingle(data) {
   if (Array.isArray(data)) return data[0] || null;
   return data || null;
+}
+
+function normalizeRankPoints(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(RANK_MAX, Math.max(0, Math.trunc(parsed)));
+}
+
+function normalizeOnlineCounter(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.trunc(parsed));
+}
+
+function getRankTitle(points) {
+  const rank = normalizeRankPoints(points);
+  if (rank <= 50) return 'Начинаещ';
+  if (rank <= 100) return 'Напреднал';
+  if (rank <= 200) return 'Майстор';
+  return 'Експерт';
+}
+
+function getProfileRankSnapshot(profile = state.auth.profile) {
+  const wins = normalizeOnlineCounter(profile?.online_wins);
+  const losses = normalizeOnlineCounter(profile?.online_losses);
+  const minRank = wins > 0 ? 1 : 0;
+  const points = Math.max(minRank, normalizeRankPoints(profile?.rank_points));
+  const title = (typeof profile?.rank_title === 'string' && profile.rank_title.trim())
+    ? profile.rank_title.trim()
+    : getRankTitle(points);
+  return {
+    points,
+    wins,
+    losses,
+    title
+  };
+}
+
+function getRoomHostRankSnapshot(room = null) {
+  const points = normalizeRankPoints(room?.host_rank_points);
+  const title = (typeof room?.host_rank_title === 'string' && room.host_rank_title.trim())
+    ? room.host_rank_title.trim()
+    : getRankTitle(points);
+  return { points, title };
+}
+
+function buildRoomRankBadge(snapshot) {
+  if (!snapshot) return '';
+  return `<span class="room-rank-badge" title="Ранг на домакина">Ранг ${normalizeRankPoints(snapshot.points)} • ${escapeHtml(snapshot.title)}</span>`;
+}
+
+function appendRankBadgeToRoomTitle(row, snapshot) {
+  if (!row || !snapshot) return;
+  const title = row.querySelector('.room-row-title');
+  if (!title) return;
+  title.insertAdjacentHTML('beforeend', ` ${buildRoomRankBadge(snapshot)}`);
 }
 
 function isValidOnlineTheme(value) {
@@ -1912,6 +1972,7 @@ function renderRoomList() {
 
   if (isInvitePreviewMode() && state.online.invitePreview) {
     const preview = state.online.invitePreview;
+    const previewRankSnapshot = getRoomHostRankSnapshot(preview);
     const inviteStateText = preview.status === 'playing'
       ? '▶ Играта вече е започнала.'
       : preview.has_guest
@@ -1931,6 +1992,7 @@ function renderRoomList() {
         </div>
       </article>
     `;
+    appendRankBadgeToRoomTitle(roomList.querySelector('.room-row'), previewRankSnapshot);
     showFeedback(
       roomListFeedback,
       preview.status === 'waiting' ? 'Поканата е заредена. Избери как да влезеш в стаята.' : 'Тази покана вече не е в waiting режим.',
@@ -1951,10 +2013,12 @@ function renderRoomList() {
   const rooms = [...state.online.publicRooms]
     .filter((room) => !(ownRoom && room && room.id === ownRoom.id));
   const cards = [];
+  let ownRoomBadgeSnapshot = null;
 
   if (ownRoom) {
     const slot = myRoomSlot();
     const amHost = slot === 1;
+    if (amHost) ownRoomBadgeSnapshot = getProfileRankSnapshot();
     const ownRoomHint = ownRoom.status === 'playing'
       ? (amHost ? '▶ Онлайн мачът е активен. Играта вече е стартирала.' : '▶ Онлайн мачът е активен. Изчакай своя ред и започвайте.')
       : ownRoom.guest_user_id
@@ -2039,6 +2103,13 @@ function renderRoomList() {
   }
 
   roomList.innerHTML = cards.join('');
+  if (ownRoomBadgeSnapshot) {
+    appendRankBadgeToRoomTitle(roomList.querySelector('.room-row-own'), ownRoomBadgeSnapshot);
+  }
+  const listedRoomRows = roomList.querySelectorAll('.room-row:not(.room-row-own)');
+  listedRoomRows.forEach((row, index) => {
+    appendRankBadgeToRoomTitle(row, getRoomHostRankSnapshot(rooms[index]));
+  });
   roomList.querySelectorAll('.room-join-btn').forEach((button) => {
     button.addEventListener('click', () => handleListedRoomJoin(button.dataset.roomId, button.dataset.access, button.dataset.code));
   });
@@ -2162,6 +2233,7 @@ function renderInviteLanding() {
   const themeName = preview?.selected_theme ? (THEMES[preview.selected_theme]?.name || preview.selected_theme) : '—';
   const countText = preview?.selected_card_count ? `${preview.selected_card_count} карти` : '—';
 
+  const previewRank = getRoomHostRankSnapshot(preview);
   inviteLandingTitle.textContent = validPreview
     ? `${titleName} те кани на онлайн двубой`
     : 'Онлайн покана';
@@ -2186,6 +2258,13 @@ function renderInviteLanding() {
       <span class="meta-chip">Токен: ${escapeHtml(String(state.ui.inviteToken || '').slice(0, 8))}…</span>
       <span class="meta-chip">Статус: ${previewLoaded ? 'готово' : 'зареждане'}</span>
     `;
+
+  if (validPreview) {
+    const rankChip = document.createElement('span');
+    rankChip.className = 'meta-chip';
+    rankChip.textContent = `Ранг: ${previewRank.points} • ${previewRank.title}`;
+    inviteLandingMeta.insertBefore(rankChip, inviteLandingMeta.children[1] || null);
+  }
 
   const canShowGuestFlow = Boolean(state.ui.inviteToken);
 
@@ -2430,6 +2509,8 @@ function renderProfilePanel() {
   if (!loggedIn) {
     profileActiveRoom?.classList.add('hidden');
     matchHistoryList.innerHTML = '';
+    if (profileRankPoints) profileRankPoints.textContent = '0';
+    if (profileRankTitle) profileRankTitle.textContent = 'Начинаещ • Победи 0 • Загуби 0';
     historyCountChip.textContent = '0 мача';
     showFeedback(historyFeedback, 'Историята ще се появи след първия завършен мач с активен профил.', '');
     return;
@@ -2437,10 +2518,14 @@ function renderProfilePanel() {
   if (!visible) return;
 
   const profile = state.auth.profile || {};
+  const rank = getProfileRankSnapshot(profile);
   profileFullName.textContent = profile.full_name || profile.username || state.auth.user.email || '—';
   profileUsername.textContent = profile.username ? `@${profile.username}` : '@—';
   profileEmail.textContent = profile.email || state.auth.user.email || '—';
   profileCreatedAt.textContent = `Създаден профил: ${formatDateTime(profile.created_at || state.auth.user.created_at)}`;
+
+  if (profileRankPoints) profileRankPoints.textContent = String(rank.points);
+  if (profileRankTitle) profileRankTitle.textContent = `${rank.title} • Победи ${rank.wins} • Загуби ${rank.losses}`;
 
   const activeRoom = state.online.room;
   if (activeRoom && ['waiting', 'playing'].includes(activeRoom.status)) {
@@ -2570,6 +2655,14 @@ async function saveMatchToHistory(source) {
     console.error('History save failed', result.error);
     showFeedback(historyFeedback, 'Мачът приключи, но записът в историята не успя.', 'error');
     return;
+  }
+
+  if (source.mode === 'online') {
+    try {
+      await loadProfile();
+    } catch (error) {
+      console.warn('Rank profile refresh failed', error);
+    }
   }
 
   await loadMatchHistory();
@@ -4890,7 +4983,10 @@ async function ensureProfileFromSession() {
       first_name: guestName,
       last_name: '',
       full_name: guestName,
-      email: ''
+      email: '',
+      rank_points: 0,
+      online_wins: 0,
+      online_losses: 0
     };
     return;
   }
@@ -4904,7 +5000,15 @@ async function ensureProfileFromSession() {
     email: user.email || ''
   };
   const { error } = await state.auth.client.from('profiles').upsert(profile, { onConflict: 'id' });
-  if (!error) state.auth.profile = profile;
+  if (!error) {
+    const currentRank = getProfileRankSnapshot(state.auth.profile);
+    state.auth.profile = {
+      ...profile,
+      rank_points: currentRank.points,
+      online_wins: currentRank.wins,
+      online_losses: currentRank.losses
+    };
+  }
 }
 
 async function loadProfile() {
@@ -4918,7 +5022,13 @@ async function loadProfile() {
   if (error || !data) {
     await ensureProfileFromSession();
   } else {
-    state.auth.profile = data;
+    state.auth.profile = {
+      ...data,
+      rank_points: normalizeRankPoints(data.rank_points),
+      online_wins: normalizeOnlineCounter(data.online_wins),
+      online_losses: normalizeOnlineCounter(data.online_losses),
+      rank_title: typeof data.rank_title === 'string' ? data.rank_title : ''
+    };
   }
   renderProfilePanel();
 }
@@ -6469,6 +6579,13 @@ function endOnlineGame() {
   resultModal.classList.remove('hidden');
   updatePlayerPanels();
   updateAuthUi();
+  if (state.auth.user) {
+    const rankRefreshKey = `${room.id}:${room.rematch_nonce ?? 0}:${winner}`;
+    if (state.online.lastRankRefreshKey !== rankRefreshKey) {
+      state.online.lastRankRefreshKey = rankRefreshKey;
+      loadProfile().catch((error) => console.warn('Rank refresh failed', error));
+    }
+  }
 
   if (state.auth.user && room.host_user_id === state.auth.user.id) {
     saveMatchToHistory({
@@ -6961,11 +7078,11 @@ rememberMeCheckbox.addEventListener('change', () => {
 });
 
 [1, 2].forEach((player) => {
-  reactionToggles[player]?.addEventListener('click', () => toggleReactionPicker(player));
+  bindUiPress(reactionToggles[player], () => toggleReactionPicker(player));
 });
 
 document.querySelectorAll('.reaction-option').forEach((button) => {
-  button.addEventListener('click', () => {
+  bindUiPress(button, () => {
     const player = Number(button.dataset.player || 0);
     const emoji = button.dataset.emoji || '🙂';
     if (player !== 1 && player !== 2) return;
