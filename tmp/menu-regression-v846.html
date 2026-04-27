@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Menu Regression v846</title>
+  <style>
+    :root { color-scheme: dark; font-family: "Segoe UI", Arial, sans-serif; }
+    body { margin: 0; background: #0b1120; color: #eaf0ff; }
+    .shell { padding: 10px; display: grid; gap: 10px; }
+    .panel {
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.04);
+      padding: 8px 10px;
+    }
+    .title { margin: 0 0 6px; font-size: 14px; font-weight: 700; }
+    .ok { color: #9dff93; }
+    .bad { color: #ff9393; }
+    .log { margin: 0; white-space: pre-wrap; font-size: 12px; line-height: 1.35; max-height: 220px; overflow: auto; }
+    iframe { width: 1920px; height: 980px; border: 0; border-radius: 10px; background: #0b1120; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="panel">
+      <p class="title">v846 Menu + Strip Regression</p>
+      <p class="title" id="status">Тестът стартира...</p>
+      <pre class="log" id="log"></pre>
+    </div>
+    <iframe id="appFrame" src="../index.html"></iframe>
+  </div>
+  <script>
+    (async function run() {
+      const statusEl = document.getElementById('status');
+      const logEl = document.getElementById('log');
+      const frame = document.getElementById('appFrame');
+      const logs = [];
+      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const log = (msg) => { logs.push(msg); logEl.textContent = logs.join('\n'); };
+      const pass = (condition, label) => {
+        log(`${condition ? 'PASS' : 'FAIL'}: ${label}`);
+        return Boolean(condition);
+      };
+      const waitFor = async (doc, selector, timeout = 6000) => {
+        const start = Date.now();
+        while (Date.now() - start < timeout) {
+          const item = doc.querySelector(selector);
+          if (item) return item;
+          await sleep(40);
+        }
+        return null;
+      };
+
+      frame.addEventListener('load', async () => {
+        let ok = true;
+        try {
+          const doc = frame.contentDocument || frame.contentWindow.document;
+          const modeLocal = await waitFor(doc, '[data-mode="local"]');
+          const modeComputer = await waitFor(doc, '[data-mode="computer"]');
+          const modeOnline = await waitFor(doc, '[data-mode="online"]');
+          const themeCards = await waitFor(doc, '.theme-card[data-theme]');
+          if (!modeLocal || !modeComputer || !modeOnline || !themeCards) {
+            pass(false, 'Не са заредени основните елементи на setup менюто.');
+            statusEl.textContent = 'FAIL: Setup менюто не е заредено.';
+            statusEl.className = 'title bad';
+            return;
+          }
+
+          const titles = [...doc.querySelectorAll('.setup-menu-title')].map((el) => el.textContent.trim());
+          ok &= pass(titles.includes('Тип на игра'), 'Има заглавие "Тип на игра".');
+          ok &= pass(titles.includes('Тема на игра'), 'Има заглавие "Тема на игра".');
+          ok &= pass(titles.includes('Брой карти'), 'Има заглавие "Брой карти".');
+
+          const grid = doc.querySelector('.player-setup-grid');
+          ok &= pass(Boolean(grid) && !grid.classList.contains('hidden'), 'Полетата за имена са видими в "Локално".');
+
+          modeComputer.click();
+          await sleep(180);
+          ok &= pass(grid.classList.contains('hidden'), 'Полетата за имена се скриват в "Срещу компютър".');
+
+          modeLocal.click();
+          await sleep(180);
+          ok &= pass(!grid.classList.contains('hidden'), 'Полетата за имена се връщат в "Локално".');
+
+          const viewport = doc.querySelector('[data-strip-viewport]');
+          const shell = doc.querySelector('.theme-strip-shell');
+          if (viewport && shell) {
+            const cards = [...doc.querySelectorAll('.theme-card[data-theme]')];
+            const clickIndexes = [5, 6, 7];
+            for (const idx of clickIndexes) {
+              if (!cards[idx]) continue;
+              cards[idx].click();
+              await sleep(150);
+            }
+            const overflowX = doc.body.scrollWidth - doc.documentElement.clientWidth;
+            const shellRight = Math.round(shell.getBoundingClientRect().right);
+            const docRight = doc.documentElement.clientWidth;
+            ok &= pass(overflowX <= 2, `Няма хоризонтално разместване (overflow=${overflowX}).`);
+            ok &= pass(shellRight <= docRight + 2, `Няма празно поле вдясно (shell=${shellRight}, doc=${docRight}).`);
+            log(`INFO: viewport ${viewport.clientWidth}/${viewport.scrollWidth}, scrollLeft=${Math.round(viewport.scrollLeft)}`);
+          } else {
+            ok &= pass(false, 'Липсват елементи на theme strip за regression тест.');
+          }
+
+          statusEl.textContent = ok ? 'PASS: Всички проверки са успешни.' : 'FAIL: Има неуспешни проверки.';
+          statusEl.className = `title ${ok ? 'ok' : 'bad'}`;
+          document.documentElement.setAttribute('data-test-result', ok ? 'PASS' : 'FAIL');
+        } catch (error) {
+          log(`Грешка: ${error && error.message ? error.message : String(error)}`);
+          statusEl.textContent = 'FAIL: Тестът прекъсна с грешка.';
+          statusEl.className = 'title bad';
+          document.documentElement.setAttribute('data-test-result', 'FAIL');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

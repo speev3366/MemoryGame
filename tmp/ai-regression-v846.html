@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Regression v846</title>
+  <style>
+    :root { color-scheme: dark; font-family: "Segoe UI", Arial, sans-serif; }
+    body { margin: 0; background: #0c1324; color: #e8efff; }
+    .wrap { padding: 10px; display: grid; gap: 10px; }
+    .panel {
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.04);
+      padding: 10px;
+    }
+    .title { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+    .ok { color: #99ff9b; }
+    .bad { color: #ff9696; }
+    .log { margin: 0; white-space: pre-wrap; font-size: 12px; line-height: 1.35; max-height: 220px; overflow: auto; }
+    iframe { width: 1920px; height: 1020px; border: 0; border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <p class="title">v846 AI Memory Regression</p>
+      <p class="title" id="status">Тестът стартира...</p>
+      <pre class="log" id="log"></pre>
+    </div>
+    <iframe id="appFrame" src="../index.html"></iframe>
+  </div>
+  <script>
+    (async function run() {
+      const statusEl = document.getElementById('status');
+      const logEl = document.getElementById('log');
+      const frame = document.getElementById('appFrame');
+      const logs = [];
+      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const log = (msg) => { logs.push(msg); logEl.textContent = logs.join('\n'); };
+      const pass = (cond, label) => { log(`${cond ? 'PASS' : 'FAIL'}: ${label}`); return Boolean(cond); };
+      const waitFor = async (doc, selector, timeout = 7000) => {
+        const start = Date.now();
+        while (Date.now() - start < timeout) {
+          const node = doc.querySelector(selector);
+          if (node) return node;
+          await sleep(50);
+        }
+        return null;
+      };
+
+      frame.addEventListener('load', async () => {
+        let ok = true;
+        try {
+          const win = frame.contentWindow;
+          const doc = frame.contentDocument || win.document;
+          const modeComputer = await waitFor(doc, '[data-mode="computer"]');
+          const startButton = await waitFor(doc, '#startButton');
+          if (!modeComputer || !startButton) {
+            pass(false, 'Липсват mode/start елементи.');
+            statusEl.textContent = 'FAIL: Липсва setup UI.';
+            statusEl.className = 'title bad';
+            return;
+          }
+
+          modeComputer.click();
+          await sleep(120);
+          startButton.click();
+          await sleep(180);
+
+          win.selectAiDifficulty('hard');
+          await sleep(80);
+
+          const cards = [...doc.querySelectorAll('.memory-card')];
+          if (cards.length < 8) {
+            pass(false, 'Липсват достатъчно карти за AI тест.');
+            statusEl.textContent = 'FAIL: Няма достатъчно карти.';
+            statusEl.className = 'title bad';
+            return;
+          }
+
+          const groupByPair = new Map();
+          cards.forEach((card) => {
+            const key = card.dataset.pairId;
+            if (!groupByPair.has(key)) groupByPair.set(key, []);
+            groupByPair.get(key).push(card);
+          });
+          const knownPair = [...groupByPair.values()].find((pair) => pair.length >= 2);
+          if (!knownPair) {
+            pass(false, 'Не е намерена двойка за memory test.');
+            statusEl.textContent = 'FAIL: Не е намерена двойка.';
+            statusEl.className = 'title bad';
+            return;
+          }
+
+          const [knownA, knownB] = knownPair;
+          const knownIndexes = new Set([knownA.dataset.index, knownB.dataset.index]);
+          const isKnownPair = (move) =>
+            Array.isArray(move) &&
+            move.length === 2 &&
+            knownIndexes.has(move[0]?.dataset?.index) &&
+            knownIndexes.has(move[1]?.dataset?.index);
+
+          if (typeof win.resetComputerMemory !== 'function' || typeof win.chooseComputerMove !== 'function') {
+            pass(false, 'AI hooks не са достъпни за тест.');
+            statusEl.textContent = 'FAIL: AI hooks липсват.';
+            statusEl.className = 'title bad';
+            return;
+          }
+
+          const totalTrials = 90;
+          let baselineHits = 0;
+          win.resetComputerMemory();
+          for (let i = 0; i < totalTrials; i += 1) {
+            const move = win.chooseComputerMove();
+            if (isKnownPair(move)) baselineHits += 1;
+          }
+
+          win.resetComputerMemory();
+          win.rememberCardForAi(knownA);
+          win.rememberCardForAi(knownB);
+          let memoryHits = 0;
+          for (let i = 0; i < totalTrials; i += 1) {
+            const move = win.chooseComputerMove();
+            if (isKnownPair(move)) memoryHits += 1;
+          }
+
+          const baselineRate = baselineHits / totalTrials;
+          const memoryRate = memoryHits / totalTrials;
+          log(`INFO: baseline=${baselineHits}/${totalTrials} (${(baselineRate * 100).toFixed(1)}%)`);
+          log(`INFO: memory=${memoryHits}/${totalTrials} (${(memoryRate * 100).toFixed(1)}%)`);
+
+          ok &= pass(memoryHits > baselineHits + 12, 'AI ползва паметта и увеличава точните ходове.');
+          ok &= pass(memoryRate > 0.35, 'При "Трудно" нивото memory-hit е достатъчно високо.');
+
+          statusEl.textContent = ok ? 'PASS: AI паметта работи коректно.' : 'FAIL: AI паметта не мина прага.';
+          statusEl.className = `title ${ok ? 'ok' : 'bad'}`;
+          document.documentElement.setAttribute('data-test-result', ok ? 'PASS' : 'FAIL');
+        } catch (error) {
+          log(`Грешка: ${error && error.message ? error.message : String(error)}`);
+          statusEl.textContent = 'FAIL: AI тестът прекъсна с грешка.';
+          statusEl.className = 'title bad';
+          document.documentElement.setAttribute('data-test-result', 'FAIL');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

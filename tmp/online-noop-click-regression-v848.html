@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Online No-op Click Regression v848</title>
+  <style>
+    :root { color-scheme: dark; font-family: "Segoe UI", Arial, sans-serif; }
+    body { margin: 0; background: #0b1324; color: #e8efff; }
+    .wrap { padding: 10px; display: grid; gap: 10px; }
+    .panel {
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.04);
+      padding: 10px;
+    }
+    .title { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+    .ok { color: #9aff95; }
+    .bad { color: #ff9696; }
+    .log { margin: 0; white-space: pre-wrap; font-size: 12px; line-height: 1.35; max-height: 220px; overflow: auto; }
+    iframe { width: 1920px; height: 980px; border: 0; border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <p class="title">v848 Online No-op Click Regression</p>
+      <p class="title" id="status">Тестът стартира...</p>
+      <pre class="log" id="log"></pre>
+    </div>
+    <iframe id="appFrame" src="../index.html"></iframe>
+  </div>
+
+  <script>
+    (async function run() {
+      const statusEl = document.getElementById('status');
+      const logEl = document.getElementById('log');
+      const frame = document.getElementById('appFrame');
+      const lines = [];
+      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const log = (msg) => { lines.push(msg); logEl.textContent = lines.join('\n'); };
+      const pass = (condition, label) => {
+        log(`${condition ? 'PASS' : 'FAIL'}: ${label}`);
+        return Boolean(condition);
+      };
+
+      frame.addEventListener('load', async () => {
+        let ok = true;
+        try {
+          const win = frame.contentWindow;
+          const doc = frame.contentDocument || win.document;
+          const setState = (code) => win.eval(code);
+          const getState = (code) => win.eval(code);
+
+          await sleep(120);
+          setState(`
+            state.selectedTheme = 'sport';
+            state.selectedCardCount = 20;
+            state.playMode = 'online';
+            state.auth.user = { id: 'host-local-test' };
+            state.started = true;
+            state.gameOver = false;
+            state.online.flipBusy = false;
+            state.online.room = null;
+          `);
+
+          win.buildBoard('sport');
+          const cards = [...doc.querySelectorAll('.memory-card')];
+          if (cards.length < 2) {
+            pass(false, 'Липсват карти за regression теста.');
+            statusEl.textContent = 'FAIL: Няма карти.';
+            statusEl.className = 'title bad';
+            return;
+          }
+
+          const first = cards[0];
+          const firstIndex = Number(first.dataset.index);
+          const deck = cards.map((card) => ({
+            pairId: card.dataset.pairId,
+            label: card.getAttribute('aria-label') || '',
+            uid: card.dataset.uid
+          }));
+          win.__testDeck = deck;
+          setState(`
+            state.online.room = {
+              id: 'room-noop-test',
+              status: 'playing',
+              host_user_id: 'host-local-test',
+              guest_user_id: 'guest-local-test',
+              selected_theme: 'sport',
+              selected_card_count: 20,
+              deck: window.__testDeck,
+              scores: { '1': 0, '2': 0 },
+              current_player_slot: 1,
+              flipped_indices: [${firstIndex}],
+              matched_indices: [],
+              lock_board: false,
+              updated_at: new Date().toISOString()
+            };
+          `);
+
+          win.applyOnlineBoardState();
+          ok &= pass(first.classList.contains('flip'), 'Първата карта е маркирана като отворена.');
+
+          const t0 = performance.now();
+          await win.handleOnlineFlip(first);
+          const elapsed = performance.now() - t0;
+
+          ok &= pass(elapsed < 220, `No-op кликът връща бързо (${Math.round(elapsed)}ms).`);
+          ok &= pass(getState('state.online.flipBusy === false'), 'flipBusy не остава блокиран след no-op клик.');
+          ok &= pass(first.classList.contains('flip'), 'Състоянието на първата карта е запазено.');
+
+          statusEl.textContent = ok ? 'PASS: Няма блокиране при повторен клик на същата карта.' : 'FAIL: Засечен е проблем.';
+          statusEl.className = `title ${ok ? 'ok' : 'bad'}`;
+          document.documentElement.setAttribute('data-test-result', ok ? 'PASS' : 'FAIL');
+        } catch (error) {
+          log(`Грешка: ${error && error.message ? error.message : String(error)}`);
+          statusEl.textContent = 'FAIL: Тестът прекъсна с грешка.';
+          statusEl.className = 'title bad';
+          document.documentElement.setAttribute('data-test-result', 'FAIL');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

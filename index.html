@@ -3,8 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Duel Online V8.3.5</title>
-  <link rel="stylesheet" href="styles.css?v=846" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.supabase.com wss://*.supabase.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self';" />
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
+  <title>Memory Duel Online V8.3.6</title>
+  <link rel="stylesheet" href="styles.css?v=871" />
 </head>
 <body>
   <div class="app setup-mode" id="app">
@@ -19,23 +23,39 @@
           <span class="turn-pill" id="player1Turn">На ход</span>
         </div>
         <div class="player-score" id="player1Score">0</div>
+        <div class="player-reaction-wrap" id="playerReactionWrap1">
+          <button class="reaction-trigger" id="reactionToggleP1" type="button" aria-label="Избери реакция за Играч 1" aria-expanded="false">🙂</button>
+          <div class="reaction-picker hidden" id="reactionPickerP1">
+            <button class="reaction-option" type="button" data-player="1" data-emoji="😄" aria-label="Смеещо се">😄</button>
+            <button class="reaction-option" type="button" data-player="1" data-emoji="😭" aria-label="Плачещо">😭</button>
+            <button class="reaction-option" type="button" data-player="1" data-emoji="😡" aria-label="Ядосано">😡</button>
+            <button class="reaction-option" type="button" data-player="1" data-emoji="😵" aria-label="Отчаяно">😵</button>
+            <button class="reaction-option" type="button" data-player="1" data-emoji="😢" aria-label="Тъжно">😢</button>
+          </div>
+          <div class="reaction-burst" id="reactionBurstP1" aria-live="polite"></div>
+        </div>
         <div class="player-subtext" id="player1Subtext">Готов за игра</div>
       </div>
 
       <div class="center-console">
         <div class="title-bar">
           <div class="title-wrap">
-            <p class="eyebrow">MEMORY DUEL V8.3.5</p>
+            <p class="eyebrow">MEMORY DUEL V8.3.6</p>
             <h1>Локална, AI и истинска онлайн игра</h1>
             <p class="subtitle">Гост режим за локална игра, профил с история и waiting room с публични, защитени и invite стаи.</p>
           </div>
-          <button class="profile-button" id="profileButton" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="authPanel">
-            <span class="profile-button-icon">👤</span>
-            <span class="profile-button-texts">
-              <strong id="profileButtonTitle">Профил</strong>
-              <small id="profileButtonSubtext">Вход / регистрация</small>
-            </span>
-          </button>
+          <div class="title-actions">
+            <button class="info-button" id="infoButton" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="infoPanel">
+              <span class="info-button-icon">i</span>
+            </button>
+            <button class="profile-button" id="profileButton" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="authPanel">
+              <span class="profile-button-icon">👤</span>
+              <span class="profile-button-texts">
+                <strong id="profileButtonTitle">Профил</strong>
+                <small id="profileButtonSubtext">Вход / регистрация</small>
+              </span>
+            </button>
+          </div>
         </div>
 
         <div class="auth-backdrop hidden" id="authBackdrop" aria-hidden="true"></div>
@@ -72,7 +92,7 @@
           </div>
 
           <form class="auth-form active" id="loginForm" novalidate autocomplete="on">
-            <div class="auth-grid two-col" id="lobbyJoinCreateRow">
+            <div class="auth-grid two-col" id="loginFormRow">
               <label class="setup-field" id="loginEmailField">
                 <span>Имейл или username</span>
                 <input id="loginEmail" name="username" type="text" inputmode="email" required placeholder="you@example.com / player123" autocomplete="username" autocapitalize="none" spellcheck="false" />
@@ -193,6 +213,54 @@
           </section>
         </section>
 
+        <section class="info-panel hidden" id="infoPanel">
+          <div class="info-panel-head">
+            <div>
+              <h2>Информация за Memory Duel</h2>
+              <p>Това е игра за забавление и за развитие на паметта, наблюдателността и бързата реакция.</p>
+            </div>
+            <button class="icon-dismiss" id="closeInfoPanelButton" type="button" aria-label="Затвори информацията">✕</button>
+          </div>
+
+          <article class="info-block">
+            <h3>Какво представлява играта</h3>
+            <p>Memory Duel е модерна memory игра с локален режим, режим срещу компютър и реален онлайн режим със стаи. Целта е да откриеш повече еднакви двойки карти от опонента си.</p>
+          </article>
+
+          <article class="info-block">
+            <h3>Защо е полезна</h3>
+            <p>Редовната игра тренира краткосрочната памет, концентрацията, визуалното разпознаване и стратегическото планиране на ходове.</p>
+          </article>
+
+          <article class="info-block">
+            <h3>Как се играе</h3>
+            <p>1. Избираш тема, режим и брой карти.</p>
+            <p>2. Играчът на ход отваря две карти.</p>
+            <p>3. Ако картите съвпадат, взима точка и продължава.</p>
+            <p>4. Ако не съвпадат, ходът преминава към другия играч.</p>
+            <p>5. Победител е този с най-много намерени двойки в края на рунда.</p>
+          </article>
+
+          <article class="info-block">
+            <h3>Режими</h3>
+            <p>Локално: двама играчи на едно устройство.</p>
+            <p>Срещу компютър: AI с различно поведение и памет.</p>
+            <p>Онлайн: публични, защитени или invite стаи с код/линк.</p>
+          </article>
+
+          <article class="info-block">
+            <h3>Онлайн възможности</h3>
+            <p>Създаване на стая, присъединяване по код, invite линк, waiting room, старт от домакина и синхронизирана игра между двама реални играчи.</p>
+          </article>
+
+          <article class="info-block">
+            <h3>Бързи съвети</h3>
+            <p>Запомняй позицията на отворените карти.</p>
+            <p>Следи какво отваря противникът.</p>
+            <p>Ползвай emoji реакциите по време на игра за повече емоция.</p>
+          </article>
+        </section>
+
         <div class="player-setup-grid">
           <label class="setup-field" id="player1NameField">
             <span>Име на играч 1</span>
@@ -236,6 +304,17 @@
           <span class="turn-pill" id="player2Turn">Изчаква</span>
         </div>
         <div class="player-score" id="player2Score">0</div>
+        <div class="player-reaction-wrap" id="playerReactionWrap2">
+          <button class="reaction-trigger" id="reactionToggleP2" type="button" aria-label="Избери реакция за Играч 2" aria-expanded="false">🙂</button>
+          <div class="reaction-picker hidden" id="reactionPickerP2">
+            <button class="reaction-option" type="button" data-player="2" data-emoji="😄" aria-label="Смеещо се">😄</button>
+            <button class="reaction-option" type="button" data-player="2" data-emoji="😭" aria-label="Плачещо">😭</button>
+            <button class="reaction-option" type="button" data-player="2" data-emoji="😡" aria-label="Ядосано">😡</button>
+            <button class="reaction-option" type="button" data-player="2" data-emoji="😵" aria-label="Отчаяно">😵</button>
+            <button class="reaction-option" type="button" data-player="2" data-emoji="😢" aria-label="Тъжно">😢</button>
+          </div>
+          <div class="reaction-burst" id="reactionBurstP2" aria-live="polite"></div>
+        </div>
         <div class="player-subtext" id="player2Subtext">Ще атакува след грешка</div>
       </div>
     </header>
@@ -285,11 +364,11 @@
           </div>
 
           <div class="online-match-grid" id="onlineMatchGrid">
-            <label class="setup-field compact-field">
+            <label class="setup-field compact-field online-theme-field">
               <span>Тема на онлайн играта</span>
               <div class="online-theme-selector" id="onlineThemeSelector"></div>
             </label>
-            <label class="setup-field compact-field">
+            <label class="setup-field compact-field online-count-field">
               <span>Брой карти</span>
               <div class="online-count-selector" id="onlineCountSelector"></div>
             </label>
@@ -297,12 +376,13 @@
 
           <div class="history-feedback" id="onlineLobbyFeedback">Избери тип стая, тема и брой карти, после създай стаята.</div>
 
-          <div class="auth-grid two-col">
+          <div class="auth-grid two-col" id="lobbyJoinCreateRow">
             <button class="btn btn-primary" id="createRoomButton" type="button">Създай стая</button>
             <label class="setup-field compact-field" id="joinRoomField">
               <span>Влез с код</span>
-              <div class="inline-field">
+              <div class="inline-field lobby-code-row">
                 <input id="joinRoomInput" type="text" maxlength="6" placeholder="ABC123" autocomplete="off" />
+                <button class="btn btn-secondary" id="refreshRoomsButtonInline" type="button">Опресни</button>
                 <button class="btn btn-secondary" id="joinRoomButton" type="button">Влез</button>
               </div>
               <small class="field-error" id="joinRoomError"></small>
@@ -414,6 +494,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=824"></script>
-    <script src="scripts.js?v=848"></script>
+    <script src="scripts.js?v=853"></script>
 </body>
 </html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lobby Dense Align Check</title>
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body class="lobby-open">
+  <div class="app online-lobby-mode">
+    <section class="online-lobby">
+      <div class="online-lobby-shell">
+        <div class="lobby-head">
+          <div><h3>Check</h3><p class="lobby-subtitle">Dense alignment check</p></div>
+        </div>
+        <div class="lobby-create-grid" id="lobbyCreateGrid"><label class="setup-field compact-field"><span>Достъп</span><div class="room-access-selector"><button class="room-access-option selected"><small>Open</small><strong>Свободно</strong></button></div></label></div>
+        <div class="online-match-grid" id="onlineMatchGrid"><label class="setup-field compact-field online-theme-field"><span>Тема</span><div class="online-theme-selector"><div class="online-theme-strip-shell"><button class="theme-strip-nav theme-strip-nav-compact">&lt;</button><div class="theme-strip-viewport online-theme-strip-viewport"><div class="online-theme-strip-track"><button class="online-theme-option selected"><span>🏆</span><strong>Спорт</strong></button></div></div><button class="theme-strip-nav theme-strip-nav-compact">&gt;</button></div></div></label><label class="setup-field compact-field online-count-field"><span>Брой</span><div class="online-count-selector"><button class="online-count-option selected">20 карти</button></div></label></div>
+        <div class="history-feedback" id="onlineLobbyFeedback">Стаята е активна. Изчакай втория играч.</div>
+        <div class="auth-grid two-col"><button class="btn btn-primary" id="createRoomButton">Създай нова стая</button><label class="setup-field compact-field" id="joinRoomField"><span>Влез с код</span><div class="inline-field"><input type="text" value="ABC123"/><button class="btn btn-secondary">Влез</button></div></label></div>
+        <div class="invite-card"><div><strong>Линк за покана</strong><p>Сподели този линк с конкретен опонент.</p></div><div class="inline-field"><input type="text" value="https://example.com/invite/demo-token"/><button class="btn btn-secondary">Копирай</button></div></div>
+        <div class="lobby-meta"><div class="meta-chip">Код: B38QFF</div><div class="meta-chip">Стая: waiting</div></div>
+        <div class="auth-actions"><button class="btn btn-secondary">Затвори стая</button><button class="btn btn-primary">Старт онлайн</button></div>
+        <div class="lobby-list-head hidden"><h4>Свободни стаи</h4></div>
+        <div class="history-feedback hidden" id="roomListFeedback">feedback</div>
+        <div class="room-list" id="roomList"><article class="room-row room-row-own"><div class="room-row-top"><div><div class="room-row-title">Твоята стая • stefanad96</div><div class="room-row-meta room-code-line">Код B38QFF • Спорт • 20 карти</div></div><span class="room-state-pill invite">С линк</span></div><div class="room-row-bottom"><div class="room-row-meta room-row-hint">🔗 Стаята е с invite линк. Изпрати поканата на конкретния опонент.</div><button class="btn btn-secondary btn-small">С покана</button></div></article></div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
