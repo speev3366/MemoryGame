@@ -1853,10 +1853,12 @@ function canPlayerReact(player) {
 function setReactionPicker(player, open) {
   const picker = reactionPickers[player];
   const trigger = reactionToggles[player];
+  const panel = playerPanels[player];
   if (!picker || !trigger) return;
   state.ui.reactionPickerOpen[player] = Boolean(open);
   picker.classList.toggle('hidden', !state.ui.reactionPickerOpen[player]);
   trigger.setAttribute('aria-expanded', state.ui.reactionPickerOpen[player] ? 'true' : 'false');
+  panel?.classList.toggle('reaction-open', state.ui.reactionPickerOpen[player]);
 }
 
 function closeAllReactionPickers() {

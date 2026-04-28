@@ -3103,6 +3103,10 @@ body.lobby-open { overflow: hidden; }
   overflow: visible !important;
 }
 
+.app.game-mode .player-card.reaction-open {
+  z-index: 260;
+}
+
 .app.game-mode .player-reaction-wrap {
   z-index: 300;
 }
