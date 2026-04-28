@@ -2880,6 +2880,39 @@ function bindUiPress(target, handler) {
   });
 }
 
+function bindReactionPress(target, handler) {
+  if (!target || typeof handler !== 'function') return;
+  let lastTouchAt = 0;
+
+  const run = (event) => {
+    if (event?.cancelable) event.preventDefault();
+    event?.stopPropagation?.();
+    handler();
+  };
+
+  // iOS Safari can drop touchend on tiny controls near edges.
+  // Using touchstart keeps the emoji picker reliably tappable.
+  target.addEventListener('touchstart', (event) => {
+    lastTouchAt = Date.now();
+    run(event);
+  }, { passive: false });
+
+  target.addEventListener('touchend', (event) => {
+    lastTouchAt = Date.now();
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+  }, { passive: false });
+
+  target.addEventListener('click', (event) => {
+    if (Date.now() - lastTouchAt < 550) {
+      if (event.cancelable) event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    run(event);
+  });
+}
+
 function initHorizontalOptionStrip({
   root,
   viewportSelector = '[data-strip-viewport]',
@@ -7106,16 +7139,23 @@ rememberMeCheckbox.addEventListener('change', () => {
 });
 
 [1, 2].forEach((player) => {
-  bindUiPress(reactionToggles[player], () => toggleReactionPicker(player));
+  bindReactionPress(reactionToggles[player], () => toggleReactionPicker(player));
 });
 
 document.querySelectorAll('.reaction-option').forEach((button) => {
-  bindUiPress(button, () => {
+  bindReactionPress(button, () => {
     const player = Number(button.dataset.player || 0);
     const emoji = button.dataset.emoji || '🙂';
     if (player !== 1 && player !== 2) return;
     triggerReaction(player, emoji);
   });
+});
+
+[1, 2].forEach((player) => {
+  const picker = reactionPickers[player];
+  if (!picker) return;
+  picker.addEventListener('touchstart', (event) => event.stopPropagation(), { passive: true });
+  picker.addEventListener('click', (event) => event.stopPropagation());
 });
 
 document.addEventListener('click', (event) => {

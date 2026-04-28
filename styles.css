@@ -68,6 +68,7 @@ button { font: inherit; }
   height: 150px;
   border-radius: 50%;
   background: radial-gradient(circle, var(--card-glow), transparent 65%);
+  pointer-events: none;
 }
 .player-label {
   font-size: 0.9rem;
@@ -1343,6 +1344,14 @@ button { font: inherit; }
   left: auto;
   right: 0;
   transform: none;
+}
+
+@media (max-width: 980px) {
+  #player1Panel .reaction-picker {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
 }
 
 .reaction-option {
