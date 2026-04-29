@@ -1218,6 +1218,7 @@ button { font: inherit; }
   display: grid;
   gap: 14px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 24px 18px 24px 24px;
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(10, 18, 34, 0.98), rgba(6, 12, 24, 0.98));
@@ -1230,9 +1231,16 @@ button { font: inherit; }
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 12px;
   position: relative;
   padding-right: 56px;
+  min-width: 0;
+}
+
+.info-panel-head > div:first-child {
+  min-width: 0;
+  flex: 1 1 100%;
 }
 
 .info-panel-head h2 {
@@ -1254,6 +1262,8 @@ button { font: inherit; }
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.14);
   background: rgba(7, 14, 28, 0.65);
+  max-width: 100%;
+  flex-shrink: 0;
 }
 
 .lang-btn {
@@ -1327,6 +1337,15 @@ button { font: inherit; }
   line-height: 1.45;
 }
 
+.info-panel-head h2,
+.info-panel-head p,
+.info-block h3,
+.info-block p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+}
+
 @media (max-width: 900px) {
   .info-panel {
     --info-panel-top: 10px;
@@ -1336,15 +1355,21 @@ button { font: inherit; }
     left: 10px;
     width: auto;
     max-height: calc(100dvh - 20px);
-    padding: 18px 14px 18px 18px;
+    padding: 16px 12px 16px 14px;
   }
 
   .info-panel-head {
-    padding-right: 52px;
+    padding-right: 46px;
+    gap: 8px;
   }
 
   .lang-switch {
-    margin-right: 46px;
+    margin-right: 0;
+    margin-bottom: 2px;
+  }
+
+  .lang-btn {
+    min-width: 44px;
   }
 
   .info-panel::-webkit-scrollbar-track {
