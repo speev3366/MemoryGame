@@ -40,6 +40,17 @@ const sessionChip = document.getElementById('sessionChip');
 const infoButton = document.getElementById('infoButton');
 const infoPanel = document.getElementById('infoPanel');
 const closeInfoPanelButton = document.getElementById('closeInfoPanelButton');
+const langBgButton = document.getElementById('langBgButton');
+const langEnButton = document.getElementById('langEnButton');
+const langDeButton = document.getElementById('langDeButton');
+const heroTitle = document.getElementById('heroTitle');
+const heroSubtitle = document.getElementById('heroSubtitle');
+const infoPanelTitle = document.getElementById('infoPanelTitle');
+const infoPanelIntro = document.getElementById('infoPanelIntro');
+const emptyStateTitle = document.getElementById('emptyStateTitle');
+const emptyStateText = document.getElementById('emptyStateText');
+const lobbyTitle = document.getElementById('lobbyTitle');
+const lobbySubtitle = document.getElementById('lobbySubtitle');
 const profileButton = document.getElementById('profileButton');
 const profileButtonTitle = document.getElementById('profileButtonTitle');
 const profileButtonSubtext = document.getElementById('profileButtonSubtext');
@@ -280,8 +291,235 @@ const MODE_OPTIONS = {
     name: 'Онлайн',
     description: 'Онлайн игра срещу други играчи.',
     badge: 'Realtime'
+  },
+  de: {
+    app: {
+      heroTitle: 'Lokales, KI- und echtes Online-Spiel',
+      heroSubtitle: 'Gastmodus für lokales Spielen, Profil mit Verlauf und Waiting Room mit öffentlichen, geschützten und Invite-Räumen.',
+      profileTitle: 'Profil',
+      profileSignInCta: 'Anmelden / Registrieren',
+      profileOnlineActive: 'Online aktiv',
+      profileInviteGuest: 'Gast per Einladung',
+      profileLocalGuest: 'Gastmodus (lokal)',
+      profileUnlockOnline: 'Online-Modus freischalten',
+      infoCloseAria: 'Information schließen',
+      authCloseAria: 'Schließen'
+    },
+    players: {
+      player1: 'Spieler 1',
+      player2: 'Spieler 2',
+      computer: 'Computer',
+      guest: 'Gast',
+      host: 'Host',
+      yourTurn: 'Du bist dran',
+      waiting: 'Wartet',
+      final: 'Finale',
+      ready: 'Bereit zum Spielen',
+      waitChance: 'Greift nach einem Fehler an',
+      yourTurnFindPair: 'Du bist dran, ein Paar zu finden',
+      aiThinking: 'KI denkt nach',
+      waitingYourMistake: 'Wartet auf deinen Fehler',
+      waitingNextChance: 'Wartet auf die nächste Chance',
+      onlinePrepared: 'Online-Auswahl ist bereit',
+      waitSecondPlayer: 'Wartet auf zweiten Spieler',
+      readyChallengeAi: 'Bereit, die KI herauszufordern',
+      finalSaved: 'Endergebnis gespeichert',
+      tryRematch: 'Revanche versuchen'
+    },
+    setup: {
+      player1Name: 'Name von Spieler 1',
+      player2Name: 'Name von Spieler 2',
+      player1Placeholder: 'Spieler 1',
+      player2Placeholder: 'Spieler 2',
+      player2OnlinePlaceholder: 'Wird aus dem Raum übernommen',
+      menuMode: 'Spielmodus',
+      menuTheme: 'Spielthema',
+      menuCards: 'Kartenanzahl',
+      start: 'Start',
+      changeTheme: 'Thema wechseln',
+      exitGame: 'Spiel verlassen',
+      cardsSuffix: 'Karten',
+      scrollThemesLeft: 'Themen nach links scrollen',
+      scrollThemesRight: 'Themen nach rechts scrollen',
+      themeStripAria: 'Themenleiste',
+      onlineThemeStripAria: 'Online-Themenleiste',
+      modeRequiresRegistration: 'Diese Option erfordert eine Registrierung.',
+      modeLogin: 'Anmelden'
+    },
+    hud: {
+      theme: 'Thema',
+      mode: 'Modus',
+      cards: 'Karten',
+      pairsLeft: 'Verbleibende Paare',
+      timer: 'Timer',
+      turn: 'Zug',
+      roundOver: 'Runde beendet',
+      none: 'keins',
+      setupHint: 'Namen eingeben, Modus, Thema und Kartenanzahl wählen. Der Online-Modus wird über das Profil oben rechts freigeschaltet.',
+      onlineHintEnabled: 'Online-Modus: Thema und Kartenanzahl wählen, Raum erstellen, aus dem Waiting Room beitreten oder Invite-Link verwenden.',
+      onlineHintDisabled: 'Der Online-Modus benötigt eine Supabase-Konfiguration in supabase-config.js.'
+    },
+    auth: {
+      panelTitle: 'Profil und Online-Zugang',
+      panelIntro: 'Melde dich an oder registriere dich, um den Online-Modus freizuschalten.',
+      guestBannerTitle: 'Als Gast spielen',
+      guestBannerText: 'Wir generieren einen lokalen Namen wie {guestName}. Gäste werden nicht in der Datenbank gespeichert und können keine Online-Räume nutzen.',
+      continueGuest: 'Als Gast fortfahren',
+      loginBlockTitle: 'Anmelden',
+      loginBlockHint: 'Wenn du bereits ein Konto hast, melde dich hier an.',
+      registerBlockTitle: 'Registrieren',
+      registerBlockHint: 'Noch kein Konto? Erstelle eins und schalte den Online-Modus frei.',
+      emailOrUsername: 'E-Mail oder Benutzername',
+      password: 'Passwort',
+      rememberMe: 'Auf diesem Gerät angemeldet bleiben',
+      login: 'Anmelden',
+      logout: 'Abmelden',
+      username: 'Benutzername',
+      firstName: 'Vorname',
+      lastName: 'Nachname',
+      email: 'E-Mail',
+      registerPasswordPlaceholder: 'Mindestens 8 Zeichen, Buchstabe und Zahl',
+      register: 'Registrieren',
+      backendDisconnected: 'Backend: getrennt',
+      backendNoSupabase: 'Backend: kein Supabase',
+      backendSupabase: 'Backend: Supabase',
+      session: 'Sitzung',
+      sessionLoggedIn: 'angemeldet',
+      sessionGuest: 'Gast',
+      sessionNone: 'keine'
+    },
+    modes: {
+      local: { name: 'Lokal', description: 'Zwei Spieler an einem Computer ohne Registrierung.' },
+      computer: { name: 'Gegen Computer', description: 'Spiele allein gegen die KI mit 3 Schwierigkeitsstufen.' },
+      online: { name: 'Online', description: 'Online-Spiel gegen andere Spieler.' }
+    },
+    ai: {
+      easy: 'Leicht',
+      medium: 'Mittel',
+      hard: 'Schwer',
+      behaviorBadge: { easy: 'Kurzes Gedächtnis', medium: 'Ausgewogen', hard: 'Starkes Gedächtnis' },
+      behaviorHint: { easy: 'intuitiver', medium: 'ausgeglichenes Gedächtnis', hard: 'präzises Gedächtnis' }
+    },
+    roomAccess: {
+      public: { name: 'Offen', description: 'Im Lobby sichtbar, ohne Passwort.' },
+      password: { name: 'Mit Passwort', description: 'Im Lobby sichtbar, Beitritt nur mit Passwort.' },
+      invite: { name: 'Mit Link', description: 'Versteckter Raum, nur über Einladung zugänglich.' }
+    },
+    themes: {
+      sport: { name: 'Sport', description: 'Fußball, Tennis, Laufen, Ski und mehr.' },
+      countries: { name: 'Länder', description: 'Flaggen aus Europa, Asien und Amerika.' },
+      soldiers: { name: 'Soldaten', description: 'Verteidigungstechnik, Ausrüstung und taktische Symbole.' },
+      brands: { name: 'Marken', description: 'Bekannte Marken und ikonische Symbole.' },
+      music: { name: 'Musik', description: 'Instrumente und musikalische Symbole.' },
+      landmarks: { name: 'Sehenswürdigkeiten', description: 'Berühmte bulgarische Orte und Denkmäler.' },
+      history: { name: 'Bulgarische Geschichte', description: 'Persönlichkeiten, Symbole und Ereignisse der bulgarischen Geschichte.' },
+      animals: { name: 'Tiere', description: 'Wild-, Haus- und Meerestiere.' }
+    },
+    lobby: {
+      title: 'Waiting room / Online-Lobby',
+      subtitle: 'Erstelle einen öffentlichen, geschützten oder Invite-Raum. Der zweite Spieler kann ihn in der Lobby, per Code oder Einladung finden.',
+      accessLabel: 'Raumzugang',
+      roomPasswordLabel: 'Raumpasswort',
+      roomPasswordPlaceholder: 'Mindestens 4 Zeichen',
+      onlineThemeLabel: 'Thema des Online-Spiels',
+      cardsLabel: 'Kartenanzahl',
+      feedbackIntro: 'Wähle Raumtyp, Thema und Kartenanzahl und erstelle dann den Raum.',
+      createRoom: 'Raum erstellen',
+      joinByCode: 'Mit Code beitreten',
+      refresh: 'Aktualisieren',
+      join: 'Beitreten',
+      selectedRoomPassword: 'Passwort des ausgewählten Raums',
+      selectedRoomPasswordPlaceholder: 'Passwort eingeben',
+      confirm: 'Bestätigen',
+      inviteLinkTitle: 'Einladungslink',
+      inviteLinkText: 'Teile diesen Link mit einem bestimmten Gegner. Invite-Räume werden nicht in der öffentlichen Liste angezeigt.',
+      copy: 'Kopieren',
+      inviteDetected: 'Einladung erkannt',
+      temporaryGuestName: 'Temporärer Gastname',
+      inviteJoinProfile: 'Anmelden / Registrieren',
+      inviteJoinGuest: 'Als Gast beitreten',
+      inviteJoinDirect: 'Einladung annehmen',
+      roomCode: 'Code',
+      roomStatus: 'Raum',
+      roomPlayers: 'Spieler',
+      roomTurn: 'Zug',
+      leaveRoom: 'Raum verlassen',
+      startOnline: 'Online starten',
+      freeRooms: 'Freie Räume'
+    },
+    board: {
+      emptyTitle: 'Lokal oder online spielen',
+      emptyText: 'Lokal — sofort starten. Gegen Computer — Schwierigkeitsgrad wählen. Online — anmelden, Raum erstellen oder per Code beitreten.'
+    },
+    result: {
+      roundEnd: 'Rundenende',
+      winnerPrefix: 'Sieger',
+      draw: 'Unentschieden',
+      player1Score: 'Punkte Spieler 1',
+      player2Score: 'Punkte Spieler 2',
+      playAgain: 'Nochmal spielen',
+      mainMenu: 'Hauptmenü',
+      rematch: 'Revanche',
+      rematchPending: 'Revanche angefordert',
+      rematchPreparing: 'Revanche wird vorbereitet...'
+    },
+    rank: {
+      label: 'Rang',
+      beginner: 'Anfänger',
+      advanced: 'Fortgeschritten',
+      master: 'Meister',
+      expert: 'Experte',
+      wins: 'Siege',
+      losses: 'Niederlagen'
+    },
+    info: {
+      title: 'Informationen zu Memory Duel',
+      intro: 'Dieses Spiel dient dem Spaß und der Verbesserung von Gedächtnis, Beobachtung und Reaktionsgeschwindigkeit.',
+      blocks: [
+        {
+          title: 'Was ist dieses Spiel',
+          lines: ['Memory Duel ist ein modernes Memory-Spiel mit lokalem Modus, Spiel gegen Computer und echtem Online-Modus mit Räumen. Ziel ist es, mehr passende Kartenpaare als der Gegner zu finden.']
+        },
+        {
+          title: 'Warum es hilfreich ist',
+          lines: ['Regelmäßiges Spielen verbessert Kurzzeitgedächtnis, Konzentration, visuelle Erkennung und strategisches Planen.']
+        },
+        {
+          title: 'So wird gespielt',
+          lines: [
+            '1. Wähle Thema, Modus und Kartenanzahl.',
+            '2. Der aktive Spieler deckt zwei Karten auf.',
+            '3. Stimmen die Karten überein, gibt es einen Punkt und der Spieler ist erneut dran.',
+            '4. Stimmen sie nicht überein, wechselt der Zug.',
+            '5. Gewinner ist, wer am Ende der Runde die meisten Paare hat.'
+          ]
+        },
+        {
+          title: 'Modi',
+          lines: [
+            'Lokal: zwei Spieler auf einem Gerät.',
+            'Gegen Computer: KI mit unterschiedlichem Verhalten und Gedächtnis.',
+            'Online: öffentliche, geschützte oder Invite-Räume mit Code/Link.'
+          ]
+        },
+        {
+          title: 'Online-Funktionen',
+          lines: ['Raum erstellen, per Code beitreten, Invite-Link, Waiting Room, Start durch Host und synchronisiertes Echtzeit-Spiel zwischen zwei Spielern.']
+        },
+        {
+          title: 'Schnelle Tipps',
+          lines: [
+            'Merke dir die Positionen geöffneter Karten.',
+            'Beobachte, welche Karten dein Gegner aufdeckt.',
+            'Nutze Emoji-Reaktionen im Spiel für mehr Emotion.'
+          ]
+        }
+      ]
+    }
   }
 };
+const DE_LANGUAGE_PACK = MODE_OPTIONS.de;
+delete MODE_OPTIONS.de;
 
 const AI_OPTIONS = {
   easy: { name: 'Лесно', chance: 0.25, badge: '25%' },
@@ -614,7 +852,7 @@ const THEMES = {
   }
 };
 
-const ASSET_VERSION = '845';
+const ASSET_VERSION = '847';
 const RASTER_THEME_CONFIG = {
   sport: {
     folder: 'sport',
@@ -684,6 +922,7 @@ const ONLINE_AUTO_FINISH_WINNER_SLOT = -1;
 const DIRECT_ROOM_WRITE_FALLBACK_ENABLED = false;
 const ONLINE_WAITING_RESTORE_WITH_GUEST_MS = 10 * 60 * 1000;
 const ONLINE_WAITING_RESTORE_EMPTY_MS = 10 * 60 * 1000;
+const CLIENT_REACTION_TOKEN = `reaction-${Math.random().toString(36).slice(2, 10)}`;
 
 const state = {
   selectedTheme: 'sport',
@@ -716,6 +955,9 @@ const state = {
   ui: {
     profileOpen: false,
     infoOpen: false,
+    language: ['bg', 'en', 'de'].includes(localStorage.getItem('memory_duel_language'))
+      ? localStorage.getItem('memory_duel_language')
+      : 'bg',
     pendingProtectedRoomId: null,
     inviteToken: null,
     onlinePreviewVisible: false,
@@ -782,6 +1024,697 @@ const state = {
   },
   aiTurnTimeout: null
 };
+
+const I18N = {
+  bg: {
+    app: {
+      heroTitle: 'Локална, AI и истинска онлайн игра',
+      heroSubtitle: 'Гост режим за локална игра, профил с история и waiting room с публични, защитени и invite стаи.',
+      profileTitle: 'Профил',
+      profileSignInCta: 'Вход / регистрация',
+      profileOnlineActive: 'Онлайн активен',
+      profileInviteGuest: 'Гост по покана',
+      profileLocalGuest: 'Гост режим (локален)',
+      profileUnlockOnline: 'Отключи онлайн режим',
+      infoCloseAria: 'Затвори информацията',
+      authCloseAria: 'Затвори'
+    },
+    players: {
+      player1: 'Играч 1',
+      player2: 'Играч 2',
+      computer: 'Компютър',
+      guest: 'Гост',
+      host: 'Домакин',
+      yourTurn: 'На ход',
+      waiting: 'Изчаква',
+      final: 'Финал',
+      ready: 'Готов за игра',
+      waitChance: 'Ще атакува след грешка',
+      yourTurnFindPair: 'Твоят ред да намериш двойка',
+      aiThinking: 'AI мисли',
+      waitingYourMistake: 'Чака твоя грешка',
+      waitingNextChance: 'Чака следващ шанс',
+      onlinePrepared: 'Онлайн изборът е подготвен',
+      waitSecondPlayer: 'Чака втори играч',
+      readyChallengeAi: 'Готов да предизвика AI',
+      finalSaved: 'Финален резултат записан',
+      tryRematch: 'Опитай реванш'
+    },
+    setup: {
+      player1Name: 'Име на играч 1',
+      player2Name: 'Име на играч 2',
+      player1Placeholder: 'Играч 1',
+      player2Placeholder: 'Играч 2',
+      player2OnlinePlaceholder: 'Ще се попълни от стаята',
+      menuMode: 'Тип на игра',
+      menuTheme: 'Тема на игра',
+      menuCards: 'Брой карти',
+      start: 'Старт',
+      changeTheme: 'Смени тема',
+      exitGame: 'Изход от играта',
+      cardsSuffix: 'карти',
+      scrollThemesLeft: 'Скрол теми наляво',
+      scrollThemesRight: 'Скрол теми надясно',
+      themeStripAria: 'Лента с теми',
+      onlineThemeStripAria: 'Лента с онлайн теми',
+      modeRequiresRegistration: 'Тази опция изисква регистрация.',
+      modeLogin: 'Вход'
+    },
+    hud: {
+      theme: 'Тема',
+      mode: 'Режим',
+      cards: 'Карти',
+      pairsLeft: 'Оставащи двойки',
+      timer: 'Таймер',
+      turn: 'Ред',
+      roundOver: 'Рундът приключи',
+      none: 'няма',
+      setupHint: 'Въведи име, избери режим, тема и брой карти. Онлайн режимът се отключва от профила горе вдясно.',
+      onlineHintEnabled: 'Онлайн режим: избери тема и брой карти, създай стая, присъедини се от waiting room-а или използвай invite линк.',
+      onlineHintDisabled: 'Онлайн режимът изисква Supabase конфигурация в supabase-config.js.'
+    },
+    auth: {
+      panelTitle: 'Профил и онлайн достъп',
+      panelIntro: 'Влез или се регистрирай, за да отключиш онлайн режима.',
+      guestBannerTitle: 'Играй като гост',
+      guestBannerText: 'Ще генерираме локално име от типа {guestName}. Гостите не се записват в базата и нямат достъп до онлайн стаи.',
+      continueGuest: 'Продължи като гост',
+      loginBlockTitle: 'Вход',
+      loginBlockHint: 'Ако вече имаш профил, влез оттук.',
+      registerBlockTitle: 'Регистрация',
+      registerBlockHint: 'Нямаш профил? Създай нов акаунт и ще отключиш онлайн режима.',
+      emailOrUsername: 'Имейл или username',
+      password: 'Парола',
+      rememberMe: 'Запомни ме на това устройство',
+      login: 'Вход',
+      logout: 'Изход',
+      username: 'Потребителско име',
+      firstName: 'Име',
+      lastName: 'Фамилия',
+      email: 'Имейл',
+      registerPasswordPlaceholder: 'Минимум 8 символа, буква и цифра',
+      register: 'Регистрация',
+      backendDisconnected: 'Backend: не е свързан',
+      backendNoSupabase: 'Backend: няма Supabase',
+      backendSupabase: 'Backend: Supabase',
+      session: 'Сесия',
+      sessionLoggedIn: 'влязъл',
+      sessionGuest: 'гост',
+      sessionNone: 'няма'
+    },
+    modes: {
+      local: { name: 'Локално', description: 'Двама играчи на един компютър без регистрация.' },
+      computer: { name: 'Срещу компютър', description: 'Играй сам срещу AI с 3 нива на трудност.' },
+      online: { name: 'Онлайн', description: 'Онлайн игра срещу други играчи.' }
+    },
+    ai: {
+      easy: 'Лесно',
+      medium: 'Средно',
+      hard: 'Трудно',
+      behaviorBadge: { easy: 'Къса памет', medium: 'Баланс', hard: 'Силна памет' },
+      behaviorHint: { easy: 'по-интуитивно', medium: 'балансирана памет', hard: 'прецизна памет' }
+    },
+    roomAccess: {
+      public: { name: 'Свободно', description: 'Видима стая в лобито без парола.' },
+      password: { name: 'С парола', description: 'Видима в лобито, но влизането иска парола.' },
+      invite: { name: 'С линк', description: 'Скрита стая, достъпна само чрез покана.' }
+    },
+    themes: {
+      sport: { name: 'Спорт', description: 'Футбол, тенис, бягане, ски и още.' },
+      countries: { name: 'Държави', description: 'Флагове на държави от Европа, Азия и Америка.' },
+      soldiers: { name: 'Войници', description: 'Отбранителна техника, екипировка и тактически символи.' },
+      brands: { name: 'Марки', description: 'Разпознаваеми марки и емблематични символи.' },
+      music: { name: 'Музика', description: 'Инструменти и музикални символи.' },
+      landmarks: { name: 'Забележителности', description: 'Известни български места и паметници.' },
+      history: { name: 'Българска история', description: 'Личности, символи и събития от българската история.' },
+      animals: { name: 'Животни', description: 'Диви, домашни и морски животни.' }
+    },
+    lobby: {
+      title: 'Waiting room / онлайн лоби',
+      subtitle: 'Създай публична, защитена или invite стая. Вторият играч може да я намери в лобито, с код или с покана.',
+      accessLabel: 'Достъп до стаята',
+      roomPasswordLabel: 'Парола за стая',
+      roomPasswordPlaceholder: 'Минимум 4 символа',
+      onlineThemeLabel: 'Тема на онлайн играта',
+      cardsLabel: 'Брой карти',
+      feedbackIntro: 'Избери тип стая, тема и брой карти, после създай стаята.',
+      createRoom: 'Създай стая',
+      joinByCode: 'Влез с код',
+      refresh: 'Опресни',
+      join: 'Влез',
+      selectedRoomPassword: 'Парола за избраната стая',
+      selectedRoomPasswordPlaceholder: 'Въведи парола',
+      confirm: 'Потвърди',
+      inviteLinkTitle: 'Линк за покана',
+      inviteLinkText: 'Сподели този линк с конкретен опонент. Invite стаите не се показват в публичния списък.',
+      copy: 'Копирай',
+      inviteDetected: 'Открита покана',
+      temporaryGuestName: 'Временно име за гост',
+      inviteJoinProfile: 'Вход / регистрация',
+      inviteJoinGuest: 'Влез като гост',
+      inviteJoinDirect: 'Влез с поканата',
+      roomCode: 'Код',
+      roomStatus: 'Стая',
+      roomPlayers: 'Играчите',
+      roomTurn: 'Ход',
+      leaveRoom: 'Напусни стая',
+      startOnline: 'Старт онлайн',
+      freeRooms: 'Свободни стаи'
+    },
+    board: {
+      emptyTitle: 'Играй локално или онлайн',
+      emptyText: 'Локално — започваш веднага. Срещу компютър — избираш трудност. Онлайн — влизаш в профила си, създаваш стая или се присъединяваш с код.'
+    },
+    result: {
+      roundEnd: 'Край на рунда',
+      winnerPrefix: 'Победител',
+      draw: 'Равенство',
+      player1Score: 'Играч 1 резултат',
+      player2Score: 'Играч 2 резултат',
+      playAgain: 'Играй пак',
+      mainMenu: 'Начално меню',
+      rematch: 'Реванш',
+      rematchPending: 'Реванш заявен',
+      rematchPreparing: 'Подготвяме реванш...'
+    },
+    rank: {
+      label: 'Ранг',
+      beginner: 'Начинаещ',
+      advanced: 'Напреднал',
+      master: 'Майстор',
+      expert: 'Експерт',
+      wins: 'Победи',
+      losses: 'Загуби'
+    },
+    info: {
+      title: 'Информация за Memory Duel',
+      intro: 'Това е игра за забавление и за развитие на паметта, наблюдателността и бързата реакция.',
+      blocks: [
+        {
+          title: 'Какво представлява играта',
+          lines: ['Memory Duel е модерна memory игра с локален режим, режим срещу компютър и реален онлайн режим със стаи. Целта е да откриеш повече еднакви двойки карти от опонента си.']
+        },
+        {
+          title: 'Защо е полезна',
+          lines: ['Редовната игра тренира краткосрочната памет, концентрацията, визуалното разпознаване и стратегическото планиране на ходове.']
+        },
+        {
+          title: 'Как се играе',
+          lines: [
+            '1. Избираш тема, режим и брой карти.',
+            '2. Играчът на ход отваря две карти.',
+            '3. Ако картите съвпадат, взима точка и продължава.',
+            '4. Ако не съвпадат, ходът преминава към другия играч.',
+            '5. Победител е този с най-много намерени двойки в края на рунда.'
+          ]
+        },
+        {
+          title: 'Режими',
+          lines: [
+            'Локално: двама играчи на едно устройство.',
+            'Срещу компютър: AI с различно поведение и памет.',
+            'Онлайн: публични, защитени или invite стаи с код/линк.'
+          ]
+        },
+        {
+          title: 'Онлайн възможности',
+          lines: ['Създаване на стая, присъединяване по код, invite линк, waiting room, старт от домакина и синхронизирана игра между двама реални играчи.']
+        },
+        {
+          title: 'Бързи съвети',
+          lines: [
+            'Запомняй позицията на отворените карти.',
+            'Следи какво отваря противникът.',
+            'Ползвай emoji реакциите по време на игра за повече емоция.'
+          ]
+        }
+      ]
+    }
+  },
+  en: {
+    app: {
+      heroTitle: 'Local, AI and real online game',
+      heroSubtitle: 'Guest mode for local play, profile with history and waiting room with public, protected and invite rooms.',
+      profileTitle: 'Profile',
+      profileSignInCta: 'Sign in / Register',
+      profileOnlineActive: 'Online active',
+      profileInviteGuest: 'Guest via invite',
+      profileLocalGuest: 'Guest mode (local)',
+      profileUnlockOnline: 'Unlock online mode',
+      infoCloseAria: 'Close information',
+      authCloseAria: 'Close'
+    },
+    players: {
+      player1: 'Player 1',
+      player2: 'Player 2',
+      computer: 'Computer',
+      guest: 'Guest',
+      host: 'Host',
+      yourTurn: 'Your turn',
+      waiting: 'Waiting',
+      final: 'Final',
+      ready: 'Ready to play',
+      waitChance: 'Will attack after a miss',
+      yourTurnFindPair: 'Your turn to find a pair',
+      aiThinking: 'AI thinking',
+      waitingYourMistake: 'Waiting for your miss',
+      waitingNextChance: 'Waiting for next chance',
+      onlinePrepared: 'Online setup is ready',
+      waitSecondPlayer: 'Waiting for second player',
+      readyChallengeAi: 'Ready to challenge AI',
+      finalSaved: 'Final result saved',
+      tryRematch: 'Try rematch'
+    },
+    setup: {
+      player1Name: 'Player 1 name',
+      player2Name: 'Player 2 name',
+      player1Placeholder: 'Player 1',
+      player2Placeholder: 'Player 2',
+      player2OnlinePlaceholder: 'Will be filled from room',
+      menuMode: 'Game mode',
+      menuTheme: 'Game theme',
+      menuCards: 'Card count',
+      start: 'Start',
+      changeTheme: 'Change theme',
+      exitGame: 'Exit game',
+      cardsSuffix: 'cards',
+      scrollThemesLeft: 'Scroll themes left',
+      scrollThemesRight: 'Scroll themes right',
+      themeStripAria: 'Theme strip',
+      onlineThemeStripAria: 'Online theme strip',
+      modeRequiresRegistration: 'This option requires registration.',
+      modeLogin: 'Login'
+    },
+    hud: {
+      theme: 'Theme',
+      mode: 'Mode',
+      cards: 'Cards',
+      pairsLeft: 'Pairs left',
+      timer: 'Timer',
+      turn: 'Turn',
+      roundOver: 'Round finished',
+      none: 'none',
+      setupHint: 'Enter names, choose mode, theme and card count. Online mode is unlocked from the profile in the top right.',
+      onlineHintEnabled: 'Online mode: choose theme and card count, create a room, join from waiting room or use an invite link.',
+      onlineHintDisabled: 'Online mode requires Supabase configuration in supabase-config.js.'
+    },
+    auth: {
+      panelTitle: 'Profile and online access',
+      panelIntro: 'Sign in or register to unlock online mode.',
+      guestBannerTitle: 'Play as guest',
+      guestBannerText: 'We will generate a local name like {guestName}. Guests are not saved in database and cannot use online rooms.',
+      continueGuest: 'Continue as guest',
+      loginBlockTitle: 'Login',
+      loginBlockHint: 'If you already have an account, sign in here.',
+      registerBlockTitle: 'Register',
+      registerBlockHint: 'No account yet? Create one and unlock online mode.',
+      emailOrUsername: 'Email or username',
+      password: 'Password',
+      rememberMe: 'Remember me on this device',
+      login: 'Login',
+      logout: 'Logout',
+      username: 'Username',
+      firstName: 'First name',
+      lastName: 'Last name',
+      email: 'Email',
+      registerPasswordPlaceholder: 'Minimum 8 chars, letter and number',
+      register: 'Register',
+      backendDisconnected: 'Backend: disconnected',
+      backendNoSupabase: 'Backend: no Supabase',
+      backendSupabase: 'Backend: Supabase',
+      session: 'Session',
+      sessionLoggedIn: 'signed in',
+      sessionGuest: 'guest',
+      sessionNone: 'none'
+    },
+    modes: {
+      local: { name: 'Local', description: 'Two players on one computer without registration.' },
+      computer: { name: 'Vs Computer', description: 'Play solo against AI with 3 difficulty levels.' },
+      online: { name: 'Online', description: 'Online match against other players.' }
+    },
+    ai: {
+      easy: 'Easy',
+      medium: 'Medium',
+      hard: 'Hard',
+      behaviorBadge: { easy: 'Short memory', medium: 'Balanced', hard: 'Strong memory' },
+      behaviorHint: { easy: 'more intuitive', medium: 'balanced memory', hard: 'precise memory' }
+    },
+    roomAccess: {
+      public: { name: 'Open', description: 'Visible room in lobby without password.' },
+      password: { name: 'Locked', description: 'Visible in lobby, but joining requires password.' },
+      invite: { name: 'Invite link', description: 'Hidden room, available only through invite.' }
+    },
+    themes: {
+      sport: { name: 'Sports', description: 'Football, tennis, running, ski and more.' },
+      countries: { name: 'Countries', description: 'Country flags from Europe, Asia and America.' },
+      soldiers: { name: 'Soldiers', description: 'Defence equipment, gear and tactical symbols.' },
+      brands: { name: 'Brands', description: 'Recognizable brands and emblematic symbols.' },
+      music: { name: 'Music', description: 'Instruments and musical symbols.' },
+      landmarks: { name: 'Landmarks', description: 'Famous Bulgarian places and monuments.' },
+      history: { name: 'Bulgarian History', description: 'People, symbols and events from Bulgarian history.' },
+      animals: { name: 'Animals', description: 'Wild, domestic and sea animals.' }
+    },
+    lobby: {
+      title: 'Waiting room / online lobby',
+      subtitle: 'Create a public, protected or invite room. Second player can find it in lobby, by code or by invitation.',
+      accessLabel: 'Room access',
+      roomPasswordLabel: 'Room password',
+      roomPasswordPlaceholder: 'Minimum 4 characters',
+      onlineThemeLabel: 'Online game theme',
+      cardsLabel: 'Card count',
+      feedbackIntro: 'Choose room type, theme and card count, then create the room.',
+      createRoom: 'Create room',
+      joinByCode: 'Join by code',
+      refresh: 'Refresh',
+      join: 'Join',
+      selectedRoomPassword: 'Selected room password',
+      selectedRoomPasswordPlaceholder: 'Enter password',
+      confirm: 'Confirm',
+      inviteLinkTitle: 'Invite link',
+      inviteLinkText: 'Share this link with a specific opponent. Invite rooms are hidden from public list.',
+      copy: 'Copy',
+      inviteDetected: 'Invite detected',
+      temporaryGuestName: 'Temporary guest name',
+      inviteJoinProfile: 'Sign in / Register',
+      inviteJoinGuest: 'Join as guest',
+      inviteJoinDirect: 'Join invite',
+      roomCode: 'Code',
+      roomStatus: 'Room',
+      roomPlayers: 'Players',
+      roomTurn: 'Turn',
+      leaveRoom: 'Leave room',
+      startOnline: 'Start online',
+      freeRooms: 'Open rooms'
+    },
+    board: {
+      emptyTitle: 'Play local or online',
+      emptyText: 'Local — start instantly. Vs Computer — choose difficulty. Online — sign in, create a room or join with code.'
+    },
+    result: {
+      roundEnd: 'Round end',
+      winnerPrefix: 'Winner',
+      draw: 'Draw',
+      player1Score: 'Player 1 score',
+      player2Score: 'Player 2 score',
+      playAgain: 'Play again',
+      mainMenu: 'Main menu',
+      rematch: 'Rematch',
+      rematchPending: 'Rematch pending',
+      rematchPreparing: 'Preparing rematch...'
+    },
+    rank: {
+      label: 'Rank',
+      beginner: 'Beginner',
+      advanced: 'Advanced',
+      master: 'Master',
+      expert: 'Expert',
+      wins: 'Wins',
+      losses: 'Losses'
+    },
+    info: {
+      title: 'About Memory Duel',
+      intro: 'This game is for fun and for improving memory, observation and reaction speed.',
+      blocks: [
+        {
+          title: 'What is this game',
+          lines: ['Memory Duel is a modern memory game with local mode, versus computer mode and real online mode with rooms. The goal is to discover more matching pairs than your opponent.']
+        },
+        {
+          title: 'Why it helps',
+          lines: ['Regular play improves short-term memory, concentration, visual recognition and strategic planning.']
+        },
+        {
+          title: 'How to play',
+          lines: [
+            '1. Choose theme, mode and card count.',
+            '2. The active player opens two cards.',
+            '3. If cards match, the player scores and continues.',
+            '4. If they do not match, turn passes to the other player.',
+            '5. Winner is the player with most pairs at the end of the round.'
+          ]
+        },
+        {
+          title: 'Modes',
+          lines: [
+            'Local: two players on one device.',
+            'Vs Computer: AI with different behavior and memory.',
+            'Online: public, protected or invite rooms with code/link.'
+          ]
+        },
+        {
+          title: 'Online features',
+          lines: ['Create room, join by code, invite link, waiting room, host start and synchronized real-time match between two players.']
+        },
+        {
+          title: 'Quick tips',
+          lines: [
+            'Remember positions of opened cards.',
+            'Watch what your opponent opens.',
+            'Use emoji reactions during the game for extra emotion.'
+          ]
+        }
+      ]
+    }
+  }
+};
+I18N.de = DE_LANGUAGE_PACK;
+
+const ITEM_LABEL_EN_OVERRIDES = {
+  uk: 'UK',
+  usa: 'USA',
+  alnevsky: 'Alexander Nevsky',
+  asensfortress: "Asen's Fortress",
+  kapetobridge: 'Covered Bridge',
+  svetiivan: 'St. Ivan Island',
+  oldplovdiv: 'Old Plovdiv',
+  sevenrila: 'Seven Rila Lakes',
+  april_uprising: 'April Uprising',
+  shipka_epic: 'Shipka Epic',
+  paisii_book: 'Slav-Bulgarian History'
+};
+
+function getCurrentLanguage() {
+  if (state.ui.language === 'en') return 'en';
+  if (state.ui.language === 'de') return 'de';
+  return 'bg';
+}
+
+function getI18nValue(path) {
+  const read = (pack) => String(path || '')
+    .split('.')
+    .reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), pack);
+  const langPack = I18N[getCurrentLanguage()] || I18N.en || I18N.bg;
+  return read(langPack) ?? read(I18N.en) ?? read(I18N.bg);
+}
+
+function t(path, vars = {}) {
+  const raw = getI18nValue(path);
+  if (typeof raw !== 'string') return raw;
+  return raw.replace(/\{(\w+)\}/g, (_, key) => (vars[key] ?? ''));
+}
+
+function tr(bgText, enText, deText = enText) {
+  const lang = getCurrentLanguage();
+  if (lang === 'bg') return bgText;
+  if (lang === 'de') return deText;
+  return enText;
+}
+
+function setText(selector, value) {
+  const el = document.querySelector(selector);
+  if (!el) return;
+  el.textContent = value;
+}
+
+function setPlaceholder(selector, value) {
+  const el = document.querySelector(selector);
+  if (!el) return;
+  el.setAttribute('placeholder', value);
+}
+
+function itemKeyToEnglishLabel(itemKey) {
+  if (!itemKey) return '';
+  if (ITEM_LABEL_EN_OVERRIDES[itemKey]) return ITEM_LABEL_EN_OVERRIDES[itemKey];
+  return String(itemKey)
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .map((part) => part ? `${part[0].toUpperCase()}${part.slice(1)}` : '')
+    .join(' ');
+}
+
+function getThemeDisplayName(themeKey) {
+  return getI18nValue(`themes.${themeKey}.name`) || THEMES[themeKey]?.name || themeKey;
+}
+
+function getThemeDisplayDescription(themeKey) {
+  return getI18nValue(`themes.${themeKey}.description`) || THEMES[themeKey]?.description || '';
+}
+
+function getModeDisplayNameKey(modeKey) {
+  return getI18nValue(`modes.${modeKey}.name`) || MODE_OPTIONS[modeKey]?.name || modeKey;
+}
+
+function getModeDisplayDescriptionKey(modeKey) {
+  return getI18nValue(`modes.${modeKey}.description`) || MODE_OPTIONS[modeKey]?.description || '';
+}
+
+function getAiDifficultyName(level) {
+  return getI18nValue(`ai.${level}`) || AI_OPTIONS[level]?.name || level;
+}
+
+function getAiBehaviorBadge(level) {
+  return getI18nValue(`ai.behaviorBadge.${level}`) || AI_BEHAVIOR[level]?.badge || '';
+}
+
+function getAiBehaviorHint(level) {
+  return getI18nValue(`ai.behaviorHint.${level}`) || AI_BEHAVIOR[level]?.hint || '';
+}
+
+function getRoomAccessName(accessKey) {
+  return getI18nValue(`roomAccess.${accessKey}.name`) || ROOM_ACCESS_OPTIONS[accessKey]?.name || accessKey;
+}
+
+function getRoomAccessDescription(accessKey) {
+  return getI18nValue(`roomAccess.${accessKey}.description`) || ROOM_ACCESS_OPTIONS[accessKey]?.description || '';
+}
+
+function getItemDisplayLabel(themeKey, item) {
+  if (getCurrentLanguage() === 'bg') return item.label;
+  return itemKeyToEnglishLabel(item.key);
+}
+
+function clearAssetCache() {
+  Object.keys(ASSET_CACHE).forEach((key) => {
+    delete ASSET_CACHE[key];
+  });
+}
+
+function applyStaticTranslations() {
+  document.documentElement.setAttribute('lang', getCurrentLanguage());
+  langBgButton?.classList.toggle('is-active', getCurrentLanguage() === 'bg');
+  langEnButton?.classList.toggle('is-active', getCurrentLanguage() === 'en');
+  langDeButton?.classList.toggle('is-active', getCurrentLanguage() === 'de');
+
+  if (heroTitle) heroTitle.textContent = t('app.heroTitle');
+  if (heroSubtitle) heroSubtitle.textContent = t('app.heroSubtitle');
+  if (emptyStateTitle) emptyStateTitle.textContent = t('board.emptyTitle');
+  if (emptyStateText) emptyStateText.textContent = t('board.emptyText');
+
+  if (infoPanelTitle) infoPanelTitle.textContent = t('info.title');
+  if (infoPanelIntro) infoPanelIntro.textContent = t('info.intro');
+  if (closeInfoPanelButton) closeInfoPanelButton.setAttribute('aria-label', t('app.infoCloseAria'));
+  if (closeAuthPanelButton) closeAuthPanelButton.setAttribute('aria-label', t('app.authCloseAria'));
+
+  const infoBlocks = Array.from(document.querySelectorAll('#infoPanel .info-block'));
+  const infoData = getI18nValue('info.blocks') || [];
+  infoBlocks.forEach((block, index) => {
+    const blockData = infoData[index];
+    if (!blockData) return;
+    const title = block.querySelector('h3');
+    if (title) title.textContent = blockData.title;
+    const lines = Array.from(block.querySelectorAll('p'));
+    lines.forEach((line, lineIndex) => {
+      if (blockData.lines[lineIndex]) line.textContent = blockData.lines[lineIndex];
+    });
+  });
+
+  setText('#player1NameField > span', t('setup.player1Name'));
+  setText('#player2NameField > span', t('setup.player2Name'));
+  setPlaceholder('#player1NameInput', t('setup.player1Placeholder'));
+  setPlaceholder('#player2NameInput', t('setup.player2Placeholder'));
+
+  const setupTitles = document.querySelectorAll('.setup-menu-title');
+  if (setupTitles[0]) setupTitles[0].textContent = t('setup.menuMode');
+  if (setupTitles[1]) setupTitles[1].textContent = t('setup.menuTheme');
+  if (setupTitles[2]) setupTitles[2].textContent = t('setup.menuCards');
+
+  if (startButton) startButton.textContent = t('setup.start');
+  if (newRoundButton) newRoundButton.textContent = t('setup.changeTheme');
+  if (exitGameButton) exitGameButton.textContent = t('setup.exitGame');
+  if (playAgainButton) playAgainButton.textContent = t('result.playAgain');
+  if (mainMenuButton) mainMenuButton.textContent = t('result.mainMenu');
+  setText('#resultModal .eyebrow', t('result.roundEnd'));
+  const resultScoreLabels = document.querySelectorAll('.result-score-label');
+  if (resultScoreLabels[0]) resultScoreLabels[0].textContent = t('result.player1Score');
+  if (resultScoreLabels[1]) resultScoreLabels[1].textContent = t('result.player2Score');
+
+  setText('#authPanel .auth-head h2', t('auth.panelTitle'));
+  if (authStatusText) authStatusText.textContent = t('auth.panelIntro');
+  setText('#guestBanner strong', t('auth.guestBannerTitle'));
+  setText('#continueGuestButton', t('auth.continueGuest'));
+  setText('#authSectionsIntro .auth-section-title strong', t('auth.loginBlockTitle'));
+  setText('#authSectionsIntro .auth-section-title small', t('auth.loginBlockHint'));
+  setText('.register-title strong', t('auth.registerBlockTitle'));
+  setText('.register-title small', t('auth.registerBlockHint'));
+  setText('#loginEmailField > span', t('auth.emailOrUsername'));
+  setText('#loginPasswordField > span', t('auth.password'));
+  setText('.remember-row span', t('auth.rememberMe'));
+  setText('#loginButton', t('auth.login'));
+  setText('#logoutButton', t('auth.logout'));
+  setText('#registerUsernameField > span', t('auth.username'));
+  setText('#registerFirstNameField > span', t('auth.firstName'));
+  setText('#registerLastNameField > span', t('auth.lastName'));
+  setText('#registerEmailField > span', t('auth.email'));
+  setText('#registerPasswordField > span', t('auth.password'));
+  setPlaceholder('#registerPassword', t('auth.registerPasswordPlaceholder'));
+  setText('#registerButton', t('auth.register'));
+
+  setText('#lobbyTitle', t('lobby.title'));
+  setText('#lobbySubtitle', t('lobby.subtitle'));
+  setText('#lobbyCreateGrid > label > span', t('lobby.accessLabel'));
+  setText('#roomPasswordField > span', t('lobby.roomPasswordLabel'));
+  setPlaceholder('#roomPasswordInput', t('lobby.roomPasswordPlaceholder'));
+  setText('#onlineMatchGrid .online-theme-field > span', t('lobby.onlineThemeLabel'));
+  setText('#onlineMatchGrid .online-count-field > span', t('lobby.cardsLabel'));
+  setText('#onlineLobbyFeedback', t('lobby.feedbackIntro'));
+  setText('#createRoomButton', t('lobby.createRoom'));
+  setText('#joinRoomField > span', t('lobby.joinByCode'));
+  setText('#refreshRoomsButtonInline', t('lobby.refresh'));
+  setText('#joinRoomButton', t('lobby.join'));
+  setText('#joinPasswordField > span', t('lobby.selectedRoomPassword'));
+  setPlaceholder('#joinPasswordInput', t('lobby.selectedRoomPasswordPlaceholder'));
+  setText('#joinPasswordConfirmButton', t('lobby.confirm'));
+  setText('#inviteCard strong', t('lobby.inviteLinkTitle'));
+  setText('#inviteCard p', t('lobby.inviteLinkText'));
+  setText('#copyInviteButton', t('lobby.copy'));
+  setText('#inviteJoinBanner strong', t('lobby.inviteDetected'));
+  setText('#inviteGuestNameField > span', t('lobby.temporaryGuestName'));
+  setText('#openProfileFromInviteButton', t('lobby.inviteJoinProfile'));
+  setText('#continueInviteGuestButton', t('lobby.inviteJoinGuest'));
+  setText('#joinInviteButton', t('lobby.inviteJoinDirect'));
+  setText('#leaveRoomButton', t('lobby.leaveRoom'));
+  setText('#startOnlineButton', t('lobby.startOnline'));
+  setText('.lobby-list-head h4', t('lobby.freeRooms'));
+  setText('#refreshRoomsButton', t('lobby.refresh'));
+}
+
+function applyLanguage({ rerender = true } = {}) {
+  localStorage.setItem('memory_duel_language', getCurrentLanguage());
+  applyStaticTranslations();
+  clearAssetCache();
+  if (!rerender) return;
+  renderModeSelector();
+  renderDifficultySelector();
+  renderThemeSelector();
+  renderCountSelector();
+  renderRoomAccessSelector();
+  renderOnlineThemeSelector(true);
+  renderOnlineCountSelector(true);
+  renderInviteLanding();
+  renderRoomList();
+  updatePlayerInputUi();
+  refreshPlayerNames();
+  updatePlayerPanels();
+  updateProfileLauncher();
+  updateAuthUi();
+  updateHud();
+}
+
+function setLanguage(lang) {
+  state.ui.language = ['bg', 'en', 'de'].includes(lang) ? lang : 'bg';
+  applyLanguage({ rerender: true });
+}
 
 let lastRenderedOnlineTheme = null;
 let lastRenderedOnlineCount = null;
@@ -1085,10 +2018,10 @@ function normalizeOnlineCounter(value) {
 
 function getRankTitle(points) {
   const rank = normalizeRankPoints(points);
-  if (rank <= 50) return 'Начинаещ';
-  if (rank <= 100) return 'Напреднал';
-  if (rank <= 200) return 'Майстор';
-  return 'Експерт';
+  if (rank <= 50) return t('rank.beginner');
+  if (rank <= 100) return t('rank.advanced');
+  if (rank <= 200) return t('rank.master');
+  return t('rank.expert');
 }
 
 function getProfileRankSnapshot(profile = state.auth.profile) {
@@ -1096,9 +2029,7 @@ function getProfileRankSnapshot(profile = state.auth.profile) {
   const losses = normalizeOnlineCounter(profile?.online_losses);
   const minRank = wins > 0 ? 1 : 0;
   const points = Math.max(minRank, normalizeRankPoints(profile?.rank_points));
-  const title = (typeof profile?.rank_title === 'string' && profile.rank_title.trim())
-    ? profile.rank_title.trim()
-    : getRankTitle(points);
+  const title = getRankTitle(points);
   return {
     points,
     wins,
@@ -1109,15 +2040,13 @@ function getProfileRankSnapshot(profile = state.auth.profile) {
 
 function getRoomHostRankSnapshot(room = null) {
   const points = normalizeRankPoints(room?.host_rank_points);
-  const title = (typeof room?.host_rank_title === 'string' && room.host_rank_title.trim())
-    ? room.host_rank_title.trim()
-    : getRankTitle(points);
+  const title = getRankTitle(points);
   return { points, title };
 }
 
 function buildRoomRankBadge(snapshot) {
   if (!snapshot) return '';
-  return `<span class="room-rank-badge" title="Ранг на домакина">Ранг ${normalizeRankPoints(snapshot.points)} • ${escapeHtml(snapshot.title)}</span>`;
+  return `<span class="room-rank-badge" title="${escapeHtml(t('rank.label'))}">${escapeHtml(t('rank.label'))} ${normalizeRankPoints(snapshot.points)} • ${escapeHtml(snapshot.title)}</span>`;
 }
 
 function appendRankBadgeToRoomTitle(row, snapshot) {
@@ -1874,18 +2803,64 @@ function toggleReactionPicker(player, force) {
   setReactionPicker(player, nextOpen);
 }
 
-function triggerReaction(player, emoji) {
-  if (!canPlayerReact(player)) return;
-  const burst = reactionBursts[player];
+function playReactionBurst(player, emoji, durationMs = 2650) {
+  const normalized = Number(player) === 2 ? 2 : 1;
+  const burst = reactionBursts[normalized];
   if (!burst) return;
   burst.textContent = emoji;
   burst.classList.remove('show');
   void burst.offsetWidth;
   burst.classList.add('show');
-  window.setTimeout(() => burst.classList.remove('show'), 2650);
-  state.ui.reactionUsage.usedBy[player] = true;
-  setReactionPicker(player, false);
+  window.setTimeout(() => burst.classList.remove('show'), Math.max(1800, Number(durationMs) || 2650));
+}
+
+function applyIncomingReactionUsage(player) {
+  const normalized = Number(player) === 2 ? 2 : 1;
+  if (!state.ui?.reactionUsage?.usedBy) return;
+  state.ui.reactionUsage.usedBy[normalized] = true;
+  if (state.ui.reactionPickerOpen?.[normalized]) setReactionPicker(normalized, false);
   syncReactionUi();
+}
+
+function broadcastOnlineReaction(player, emoji) {
+  if (state.playMode !== 'online') return;
+  const roomId = state.online.room?.id;
+  const channel = state.online.channel;
+  if (!roomId || !channel) return;
+  const payload = {
+    roomId,
+    player: Number(player) === 2 ? 2 : 1,
+    emoji: String(emoji || '🙂'),
+    sentAt: Date.now(),
+    actorId: state.auth.user?.id || null,
+    clientToken: CLIENT_REACTION_TOKEN
+  };
+  Promise.resolve(channel.send({
+    type: 'broadcast',
+    event: 'reaction',
+    payload
+  })).catch((error) => console.warn('Reaction broadcast failed', error));
+}
+
+function handleIncomingOnlineReaction(payload) {
+  if (!payload || state.playMode !== 'online' || !state.online.room) return;
+  if (payload.roomId && payload.roomId !== state.online.room.id) return;
+  if (payload.clientToken && payload.clientToken === CLIENT_REACTION_TOKEN) return;
+  if (payload.actorId && state.auth.user?.id && payload.actorId === state.auth.user.id) return;
+  const player = Number(payload.player) === 2 ? 2 : 1;
+  const emoji = String(payload.emoji || '🙂');
+  playReactionBurst(player, emoji);
+  applyIncomingReactionUsage(player);
+}
+
+function triggerReaction(player, emoji) {
+  if (!canPlayerReact(player)) return;
+  const normalized = Number(player) === 2 ? 2 : 1;
+  playReactionBurst(normalized, emoji, 2650);
+  state.ui.reactionUsage.usedBy[normalized] = true;
+  setReactionPicker(normalized, false);
+  syncReactionUi();
+  broadcastOnlineReaction(normalized, emoji);
 }
 
 function syncReactionUi() {
@@ -1979,14 +2954,14 @@ function isInvitePreviewMode() {
 function getInvitePreviewRoomSummary() {
   const preview = state.online.invitePreview;
   if (!preview) return '';
-  return `${preview.host_name || 'Домакин'} • ${THEMES[preview.selected_theme]?.name || preview.selected_theme} • ${preview.selected_card_count} карти.`;
+  return `${preview.host_name || t('players.host')} • ${getThemeDisplayName(preview.selected_theme)} • ${preview.selected_card_count} ${t('setup.cardsSuffix')}.`;
 }
 
 function renderRoomAccessSelector() {
   roomAccessSelector.innerHTML = Object.entries(ROOM_ACCESS_OPTIONS).map(([key, option]) => `
     <button class="room-access-option ${state.online.accessType === key ? 'selected' : ''}" data-access="${key}" type="button">
       <span>${option.badge}</span>
-      <strong>${option.name}</strong>
+      <strong>${getRoomAccessName(key)}</strong>
     </button>
   `).join('');
 
@@ -2010,10 +2985,10 @@ function renderRoomList() {
       <article class="room-row room-row-own">
         <div class="room-row-top">
           <div class="room-row-main">
-            <div class="room-row-title">Поканена стая • ${escapeHtml(preview.host_name || 'Домакин')}</div>
-            <div class="room-row-meta room-code-line">Код ${escapeHtml(preview.code)} <button class="room-code-copy-btn" type="button" data-room-code="${escapeHtml(preview.code)}" aria-label="Копирай кода ${escapeHtml(preview.code)}" title="Копирай кода">📋</button> • ${escapeHtml(THEMES[preview.selected_theme]?.name || preview.selected_theme)} • ${preview.selected_card_count} карти</div>
+            <div class="room-row-title">${t('lobby.inviteDetected')} • ${escapeHtml(preview.host_name || t('players.host'))}</div>
+            <div class="room-row-meta room-code-line">${t('lobby.roomCode')} ${escapeHtml(preview.code)} <button class="room-code-copy-btn" type="button" data-room-code="${escapeHtml(preview.code)}" aria-label="${t('lobby.copy')} ${t('lobby.roomCode').toLowerCase()} ${escapeHtml(preview.code)}" title="${t('lobby.copy')} ${t('lobby.roomCode').toLowerCase()}">📋</button> • ${escapeHtml(getThemeDisplayName(preview.selected_theme))} • ${preview.selected_card_count} ${t('setup.cardsSuffix')}</div>
           </div>
-          <span class="room-state-pill invite">С линк</span>
+          <span class="room-state-pill invite">${getRoomAccessName('invite')}</span>
         </div>
         <div class="room-row-bottom">
           <div class="room-row-meta room-row-hint">${inviteStateText}</div>
@@ -2031,7 +3006,15 @@ function renderRoomList() {
 
   if (!state.auth.user) {
     roomList.innerHTML = '';
-    showFeedback(roomListFeedback, 'Влез в профила си, за да виждаш отворените онлайн стаи.', '');
+    showFeedback(
+      roomListFeedback,
+      tr(
+        'Влез в профила си, за да виждаш отворените онлайн стаи.',
+        'Sign in to see open online rooms.',
+        'Melde dich an, um freie Online-Räume zu sehen.'
+      ),
+      ''
+    );
     return;
   }
 
@@ -2052,7 +3035,9 @@ function renderRoomList() {
       : ownRoom.guest_user_id
         ? (amHost ? '👥 Вторият играч е влязъл. Можеш да натиснеш „Старт онлайн“.' : '👥 Влезе в стаята. Изчакай домакинът да натисне „Старт онлайн“.')
         : (ownRoom.access_type === 'invite' ? '🔗 Стаята е с invite линк. Изпрати поканата на конкретния опонент.' : '⌛ Стаята чака втори играч.');
-    const roomTitle = amHost ? `Твоята стая • ${escapeHtml(ownRoom.host_name || 'Домакин')}` : `Стая на ${escapeHtml(ownRoom.host_name || 'Домакин')}`;
+    const roomTitle = amHost
+      ? `${tr('Твоята стая', 'Your room', 'Dein Raum')} • ${escapeHtml(ownRoom.host_name || t('players.host'))}`
+      : `${tr('Стая на', 'Room by', 'Raum von')} ${escapeHtml(ownRoom.host_name || t('players.host'))}`;
     const ownRoomButtonLabel = ownRoom.status === 'playing'
       ? 'Активна игра'
       : amHost
@@ -2085,9 +3070,9 @@ function renderRoomList() {
         <div class="room-row-top">
           <div>
             <div class="room-row-title">${roomTitle}</div>
-            <div class="room-row-meta room-code-line">Код ${escapeHtml(ownRoom.code)} <button class="room-code-copy-btn" type="button" data-room-code="${escapeHtml(ownRoom.code)}" aria-label="Копирай кода ${escapeHtml(ownRoom.code)}" title="Копирай кода">📋</button> • ${escapeHtml(THEMES[ownRoom.selected_theme]?.name || ownRoom.selected_theme)} • ${ownRoom.selected_card_count} карти</div>
+            <div class="room-row-meta room-code-line">${t('lobby.roomCode')} ${escapeHtml(ownRoom.code)} <button class="room-code-copy-btn" type="button" data-room-code="${escapeHtml(ownRoom.code)}" aria-label="${t('lobby.copy')} ${t('lobby.roomCode').toLowerCase()} ${escapeHtml(ownRoom.code)}" title="${t('lobby.copy')} ${t('lobby.roomCode').toLowerCase()}">📋</button> • ${escapeHtml(getThemeDisplayName(ownRoom.selected_theme))} • ${ownRoom.selected_card_count} ${t('setup.cardsSuffix')}</div>
           </div>
-          <span class="room-state-pill ${ownRoom.access_type || 'public'}">${ROOM_ACCESS_OPTIONS[ownRoom.access_type || 'public']?.name || 'Свободно'}</span>
+          <span class="room-state-pill ${ownRoom.access_type || 'public'}">${getRoomAccessName(ownRoom.access_type || 'public')}</span>
         </div>
         ${ownRoomInviteMarkup}
         <div class="room-row-bottom">
@@ -2103,10 +3088,10 @@ function renderRoomList() {
       <article class="room-row">
         <div class="room-row-top">
           <div>
-            <div class="room-row-title">${escapeHtml(room.host_name || 'Домакин')}</div>
-            <div class="room-row-meta room-code-line">Код ${escapeHtml(room.code)} <button class="room-code-copy-btn" type="button" data-room-code="${escapeHtml(room.code)}" aria-label="Копирай кода ${escapeHtml(room.code)}" title="Копирай кода">📋</button> • ${escapeHtml(THEMES[room.selected_theme]?.name || room.selected_theme)} • ${room.selected_card_count} карти</div>
+            <div class="room-row-title">${escapeHtml(room.host_name || t('players.host'))}</div>
+            <div class="room-row-meta room-code-line">${t('lobby.roomCode')} ${escapeHtml(room.code)} <button class="room-code-copy-btn" type="button" data-room-code="${escapeHtml(room.code)}" aria-label="${t('lobby.copy')} ${t('lobby.roomCode').toLowerCase()} ${escapeHtml(room.code)}" title="${t('lobby.copy')} ${t('lobby.roomCode').toLowerCase()}">📋</button> • ${escapeHtml(getThemeDisplayName(room.selected_theme))} • ${room.selected_card_count} ${t('setup.cardsSuffix')}</div>
           </div>
-          <span class="room-state-pill ${room.access_type || 'public'}">${ROOM_ACCESS_OPTIONS[room.access_type || 'public']?.name || 'Свободно'}</span>
+          <span class="room-state-pill ${room.access_type || 'public'}">${getRoomAccessName(room.access_type || 'public')}</span>
         </div>
         <div class="room-row-bottom">
           <div class="room-row-meta room-row-hint">${room.access_type === 'password' ? '🔐 Изисква парола' : room.access_type === 'invite' ? '🔗 Само с линк' : '🌐 Отворена за всеки'} • Създадена ${formatDateTime(room.created_at)}</div>
@@ -2746,7 +3731,9 @@ function isComputerTurn() {
 }
 
 function getModeDisplayName() {
-  return isComputerMode() ? `${MODE_OPTIONS.computer.name} (${AI_OPTIONS[state.aiDifficulty].name})` : MODE_OPTIONS[state.playMode].name;
+  return isComputerMode()
+    ? `${getModeDisplayNameKey('computer')} (${getAiDifficultyName(state.aiDifficulty)})`
+    : getModeDisplayNameKey(state.playMode);
 }
 
 function updatePlayerInputUi() {
@@ -3011,21 +3998,21 @@ function renderThemeSelector() {
     .map(([key, theme]) => `
       <button class="theme-card theme-strip-card ${state.selectedTheme === key ? 'selected' : ''}" data-theme="${key}" type="button">
         <div class="theme-icon">${theme.icon}</div>
-        <h3>${theme.name}</h3>
-        <p>${theme.description}</p>
+        <h3>${getThemeDisplayName(key)}</h3>
+        <p>${getThemeDisplayDescription(key)}</p>
       </button>
     `)
     .join('');
 
   themeSelector.innerHTML = `
     <div class="theme-strip-shell" data-theme-strip-root>
-      <button class="theme-strip-nav" data-strip-prev type="button" aria-label="Scroll themes left">&lt;</button>
-      <div class="theme-strip-viewport" data-strip-viewport tabindex="0" aria-label="Theme strip">
+      <button class="theme-strip-nav" data-strip-prev type="button" aria-label="${t('setup.scrollThemesLeft')}">&lt;</button>
+      <div class="theme-strip-viewport" data-strip-viewport tabindex="0" aria-label="${t('setup.themeStripAria')}">
         <div class="theme-strip-track">
           ${cardsMarkup}
         </div>
       </div>
-      <button class="theme-strip-nav" data-strip-next type="button" aria-label="Scroll themes right">&gt;</button>
+      <button class="theme-strip-nav" data-strip-next type="button" aria-label="${t('setup.scrollThemesRight')}">&gt;</button>
     </div>
   `;
 
@@ -4218,7 +5205,7 @@ function buildRasterFrontMarkup(themeKey, item) {
   `;
   return cardFrame({
     palette,
-    label: item.label,
+    label: getItemDisplayLabel(themeKey, item),
     inner,
     idSeed: `__ID__-${themeKey}-${item.key}`
   });
@@ -4233,7 +5220,8 @@ function getItemMonogram(label) {
 
 function buildMonogramFrontMarkup(themeKey, item) {
   const palette = THEMES[themeKey].palette;
-  const monogram = escapeHtml(getItemMonogram(item.label));
+  const displayLabel = getItemDisplayLabel(themeKey, item);
+  const monogram = escapeHtml(getItemMonogram(displayLabel));
   const motifs = {
     music: `
       <g transform="translate(124 84)">
@@ -4273,7 +5261,7 @@ function buildMonogramFrontMarkup(themeKey, item) {
   `;
   return cardFrame({
     palette,
-    label: item.label,
+    label: displayLabel,
     inner,
     idSeed: `__ID__-${themeKey}-${item.key}`
   });
@@ -4329,7 +5317,7 @@ function buildFrontMarkup(themeKey, item) {
   if (themeKey === 'countries') {
     return cardFrame({
       palette,
-      label: item.label,
+      label: getItemDisplayLabel(themeKey, item),
       fullBleed: true,
       inner: realisticFlagMarkup(item.key),
       idSeed: `__ID__-${themeKey}-${item.key}`
@@ -4342,7 +5330,7 @@ function buildFrontMarkup(themeKey, item) {
 
   return cardFrame({
     palette,
-    label: item.label,
+    label: getItemDisplayLabel(themeKey, item),
     inner: iconSoldier(item.key),
     idSeed: `__ID__-${themeKey}-${item.key}`
   });
@@ -4367,7 +5355,7 @@ function buildBackMarkup(themeKey) {
       </g>
       <circle cx="210" cy="190" r="54" fill="rgba(255,255,255,0.92)"/>
       <text x="210" y="204" text-anchor="middle" font-size="54" font-weight="900" fill="${theme.palette.bg1}" font-family="Inter, Arial, sans-serif">M</text>
-      <text x="210" y="276" text-anchor="middle" font-size="28" font-weight="800" fill="#ffffff" font-family="Inter, Arial, sans-serif">${theme.name}</text>
+      <text x="210" y="276" text-anchor="middle" font-size="28" font-weight="800" fill="#ffffff" font-family="Inter, Arial, sans-serif">${getThemeDisplayName(themeKey)}</text>
     </svg>
   `;
 }
@@ -4392,7 +5380,7 @@ function createDeck(themeKey) {
   const cards = selectedItems.flatMap((item) => {
     const template = {
       pairId: item.key,
-      label: item.label,
+      label: getItemDisplayLabel(themeKey, item),
       frontMarkup: assets.fronts[item.key],
       backMarkup: assets.backMarkup
     };
@@ -4411,8 +5399,8 @@ function createSerializedDeck(themeKey, cardCount = state.selectedCardCount) {
   const pairCount = cardCount / 2;
   const selectedItems = shuffle(theme.items).slice(0, pairCount);
   const cards = selectedItems.flatMap((item) => ([
-    { pairId: item.key, label: item.label, uid: `${item.key}-a-${Math.random().toString(36).slice(2, 7)}` },
-    { pairId: item.key, label: item.label, uid: `${item.key}-b-${Math.random().toString(36).slice(2, 7)}` }
+    { pairId: item.key, label: getItemDisplayLabel(themeKey, item), uid: `${item.key}-a-${Math.random().toString(36).slice(2, 7)}` },
+    { pairId: item.key, label: getItemDisplayLabel(themeKey, item), uid: `${item.key}-b-${Math.random().toString(36).slice(2, 7)}` }
   ]));
   return shuffle(cards);
 }
@@ -5282,7 +6270,7 @@ async function registerUser(event) {
     await ensureProfileFromSession();
     await loadProfile();
     await loadMatchHistory();
-    player1NameInput.value = sanitizeName(values.firstName || values.username, 'Играч 1');
+    player1NameInput.value = sanitizeName(values.firstName || values.username, t('players.player1'));
     showFeedback(registerFeedback, 'Регистрацията е успешна и профилът беше влязъл автоматично.', 'success');
     if (state.ui.inviteToken) {
       toggleProfilePanel(false);
@@ -5345,7 +6333,7 @@ async function loginUser(event) {
   }
 
   state.ui.pendingOnlineIntent = false;
-  player1NameInput.value = sanitizeName(resolved.matchedUsername || resolved.email.split('@')[0], 'Играч 1');
+  player1NameInput.value = sanitizeName(resolved.matchedUsername || resolved.email.split('@')[0], t('players.player1'));
   showFeedback(loginFeedback, resolved.mode === 'username' ? 'Успешен вход с username.' : 'Успешен вход.', 'success');
   toggleProfilePanel(false);
   updateAuthUi();
@@ -5448,6 +6436,9 @@ async function subscribeToRoom(roomId) {
         updateHud(`Играч ${guestLabel} се присъедини към стаята. Натисни „Старт онлайн“.`);
       }
     });
+  channel.on('broadcast', { event: 'reaction' }, (message) => {
+    handleIncomingOnlineReaction(message?.payload);
+  });
 
   try {
     state.online.channel = channel;
@@ -6933,9 +7924,9 @@ function updatePlayerInputUi() {
   const localMode = state.playMode === 'local';
   const computerMode = isComputerMode();
   const onlineMode = isOnlineMode();
-  const labelComputer = '\u041a\u043e\u043c\u043f\u044e\u0442\u044a\u0440';
-  const labelPlayer2 = '\u0418\u0433\u0440\u0430\u0447 2';
-  const labelOnlineFill = '\u0429\u0435 \u0441\u0435 \u043f\u043e\u043f\u044a\u043b\u043d\u0438 \u043e\u0442 \u0441\u0442\u0430\u044f\u0442\u0430';
+  const labelComputer = t('players.computer');
+  const labelPlayer2 = t('setup.player2Placeholder');
+  const labelOnlineFill = t('setup.player2OnlinePlaceholder');
 
   playerSetupGrid?.classList.toggle('hidden', !localMode);
   player1NameInput.disabled = !localMode;
@@ -6981,6 +7972,7 @@ function initComputerMemoryObserver() {
 }
 
 const baseUpdateHud = updateHud;
+// i18n-aware wrapper for setup banner text
 updateHud = function patchedUpdateHud(message) {
   baseUpdateHud(message);
   if (message || state.ui.persistentNotice) return;
@@ -6994,6 +7986,461 @@ updateHud = function patchedUpdateHud(message) {
   parts.push(`\u0422\u0435\u043c\u0430: ${THEMES[state.selectedTheme].name}`);
   parts.push(`${state.selectedCardCount} \u043a\u0430\u0440\u0442\u0438.`);
   statusBanner.textContent = parts.join(' • ');
+};
+
+const baseSetAppModeI18n = setAppMode;
+setAppMode = function localizedSetAppMode(mode) {
+  baseSetAppModeI18n(mode);
+  if (newRoundButton) newRoundButton.textContent = t('setup.changeTheme');
+  if (exitGameButton) exitGameButton.textContent = t('setup.exitGame');
+};
+
+renderCountSelector = function localizedRenderCountSelector() {
+  countSelector.innerHTML = COUNT_OPTIONS
+    .map((count) => `
+      <button class="count-option ${state.selectedCardCount === count ? 'selected' : ''}" data-count="${count}" type="button">
+        <strong>${count}</strong> ${t('setup.cardsSuffix')}
+      </button>
+    `)
+    .join('');
+
+  countSelector.querySelectorAll('.count-option').forEach((button) => {
+    bindUiPress(button, () => selectCardCount(Number(button.dataset.count)));
+  });
+  renderOnlineCountSelector();
+};
+
+renderOnlineThemeSelector = function localizedRenderOnlineThemeSelector(force = false) {
+  if (!onlineThemeSelector) return;
+  const selected = isValidOnlineTheme(state.online.selectedTheme) ? state.online.selectedTheme : 'sport';
+  state.online.selectedTheme = selected;
+  const renderedOptions = onlineThemeSelector.querySelectorAll('[data-online-theme]').length;
+  if (!force && lastRenderedOnlineTheme === selected && renderedOptions === Object.keys(THEMES).length) return;
+  lastRenderedOnlineTheme = selected;
+
+  const optionsMarkup = Object.entries(THEMES)
+    .map(([key, theme]) => `
+      <button class="online-theme-option ${selected === key ? 'selected' : ''}" data-online-theme="${key}" type="button">
+        <span>${theme.icon}</span>
+        <strong>${getThemeDisplayName(key)}</strong>
+      </button>
+    `)
+    .join('');
+
+  onlineThemeSelector.innerHTML = `
+    <div class="online-theme-strip-shell" data-online-theme-strip-root>
+      <button class="theme-strip-nav theme-strip-nav-compact" data-strip-prev type="button" aria-label="${t('setup.scrollThemesLeft')}">&lt;</button>
+      <div class="theme-strip-viewport online-theme-strip-viewport" data-strip-viewport tabindex="0" aria-label="${t('setup.onlineThemeStripAria')}">
+        <div class="online-theme-strip-track">
+          ${optionsMarkup}
+        </div>
+      </div>
+      <button class="theme-strip-nav theme-strip-nav-compact" data-strip-next type="button" aria-label="${t('setup.scrollThemesRight')}">&gt;</button>
+    </div>
+  `;
+
+  initHorizontalOptionStrip({
+    root: onlineThemeSelector.querySelector('[data-online-theme-strip-root]'),
+    itemSelector: '[data-online-theme]',
+    selectedSelector: '.online-theme-option.selected',
+    onSelect: (item) => selectOnlineTheme(item.dataset.onlineTheme)
+  });
+};
+
+renderOnlineCountSelector = function localizedRenderOnlineCountSelector(force = false) {
+  if (!onlineCountSelector) return;
+  const selected = isValidOnlineCount(state.online.selectedCardCount) ? Number(state.online.selectedCardCount) : 20;
+  state.online.selectedCardCount = selected;
+  if (!force && lastRenderedOnlineCount === selected && onlineCountSelector.children.length === COUNT_OPTIONS.length) return;
+  lastRenderedOnlineCount = selected;
+
+  onlineCountSelector.innerHTML = COUNT_OPTIONS
+    .map((count) => `
+      <button class="online-count-option ${selected === count ? 'selected' : ''}" data-online-count="${count}" type="button">
+        ${count} ${t('setup.cardsSuffix')}
+      </button>
+    `)
+    .join('');
+
+  onlineCountSelector.querySelectorAll('[data-online-count]').forEach((button) => {
+    bindUiPress(button, () => selectOnlineCardCount(Number(button.dataset.onlineCount)));
+  });
+};
+
+renderModeSelector = function localizedRenderModeSelector() {
+  const onlineUnlocked = canUseOnlineLobby() || Boolean(isAnonymousUser() && state.online.room);
+  modeSelector.innerHTML = Object.entries(MODE_OPTIONS)
+    .map(([key, mode]) => {
+      const locked = key === 'online' && !onlineUnlocked;
+      const showPreview = locked && state.ui.onlinePreviewVisible && !state.ui.inviteToken;
+      return `
+      <button class="mode-option ${state.playMode === key ? 'selected' : ''} ${locked ? 'locked' : ''}" data-mode="${key}" type="button">
+        <span class="mode-badge">${mode.badge}</span>
+        <strong>${getModeDisplayNameKey(key)}</strong>
+        <p>${getModeDisplayDescriptionKey(key)}</p>
+        ${locked && !state.ui.inviteToken ? `<div class="mode-preview ${showPreview ? '' : 'hidden'}"><p>${t('setup.modeRequiresRegistration')}</p><span class="mode-preview-link" data-open-profile="true" role="button" tabindex="0">${t('setup.modeLogin')}</span></div>` : ''}
+      </button>
+    `;
+    })
+    .join('');
+
+  document.querySelectorAll('.mode-option').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      const requested = button.dataset.mode;
+      if (event.target.closest('[data-open-profile="true"]')) {
+        event.preventDefault();
+        event.stopPropagation();
+        openProfileFromPreview();
+        return;
+      }
+      if (requested === 'online' && !state.auth.user) {
+        state.ui.onlinePreviewVisible = true;
+        renderModeSelector();
+        updateHud(tr(
+          'Онлайн режимът е заключен. Влез в профила от линка в картата или продължи локално като гост.',
+          'Online mode is locked. Sign in from the card link or continue locally as guest.',
+          'Der Online-Modus ist gesperrt. Melde dich über den Link in der Karte an oder spiele lokal als Gast weiter.'
+        ));
+        return;
+      }
+      selectPlayMode(requested);
+    });
+  });
+
+  document.querySelectorAll('.mode-preview-link').forEach((link) => {
+    link.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openProfileFromPreview();
+      }
+    });
+  });
+};
+
+renderDifficultySelector = function localizedRenderDifficultySelector() {
+  difficultySelector.innerHTML = Object.entries(AI_OPTIONS)
+    .map(([key]) => `
+      <button class="difficulty-option ${state.aiDifficulty === key ? 'selected' : ''}" data-difficulty="${key}" type="button">
+        <strong>${getAiDifficultyName(key)}</strong> • ${getAiBehaviorBadge(key)}
+      </button>
+    `)
+    .join('');
+
+  document.querySelectorAll('.difficulty-option').forEach((button) => {
+    button.addEventListener('click', () => selectAiDifficulty(button.dataset.difficulty));
+  });
+};
+
+refreshPlayerNames = function localizedRefreshPlayerNames() {
+  if (!state.auth.user && state.guest.active) ensureGuestNames(false);
+
+  state.playerNames[1] = sanitizeName(
+    player1NameInput.value,
+    state.guest.active ? state.guest.name1 || t('players.player1') : t('players.player1')
+  );
+  state.playerNames[2] = isComputerMode()
+    ? t('players.computer')
+    : sanitizeName(
+      player2NameInput.value,
+      state.guest.active ? state.guest.name2 || t('players.player2') : t('players.player2')
+    );
+
+  if (state.playMode === 'online' && state.online.room) {
+    state.playerNames[1] = sanitizeName(state.online.room.host_name || state.playerNames[1], t('players.player1'));
+    state.playerNames[2] = sanitizeName(state.online.room.guest_name || state.playerNames[2], t('players.player2'));
+  }
+
+  nameEls[1].textContent = state.playerNames[1];
+  nameEls[2].textContent = state.playerNames[2];
+};
+
+updateProfileLauncher = function localizedUpdateProfileLauncher() {
+  const hasSession = Boolean(state.auth.user);
+  const loggedIn = isRealAccountUser();
+  const anonymous = Boolean(hasSession && isAnonymousUser());
+  const sessionLabel = loggedIn
+    ? getDisplayName()
+    : (anonymous ? t('players.guest') : (state.guest.active ? state.guest.name1 || t('players.guest') : t('app.profileSignInCta')));
+  profileButtonTitle.textContent = loggedIn ? sessionLabel : t('app.profileTitle');
+  profileButtonSubtext.textContent = loggedIn
+    ? t('app.profileOnlineActive')
+    : (anonymous ? t('app.profileInviteGuest') : (state.guest.active ? t('app.profileLocalGuest') : t('app.profileUnlockOnline')));
+  profileButton.classList.toggle('logged', loggedIn);
+};
+
+const baseUpdatePlayerPanelsI18n = updatePlayerPanels;
+updatePlayerPanels = function localizedUpdatePlayerPanels() {
+  baseUpdatePlayerPanelsI18n();
+
+  [1, 2].forEach((player) => {
+    const isActive = !state.gameOver && state.currentPlayer === player;
+    turnEls[player].textContent = state.gameOver ? t('players.final') : (isActive ? t('players.yourTurn') : t('players.waiting'));
+    scoreEls[player].textContent = state.scores[player];
+  });
+
+  if (state.gameOver) {
+    subtextEls[1].textContent = state.scores[1] >= state.scores[2] ? t('players.finalSaved') : t('players.tryRematch');
+    subtextEls[2].textContent = state.scores[2] >= state.scores[1] ? t('players.finalSaved') : t('players.tryRematch');
+    return;
+  }
+
+  if (!state.started) {
+    if (state.playMode === 'online') {
+      subtextEls[1].textContent = t('players.onlinePrepared');
+      subtextEls[2].textContent = t('players.waitSecondPlayer');
+    } else if (isComputerMode()) {
+      subtextEls[1].textContent = t('players.readyChallengeAi');
+      subtextEls[2].textContent = `${getAiDifficultyName(state.aiDifficulty)} • ${getAiBehaviorHint(state.aiDifficulty)}`;
+    } else {
+      subtextEls[1].textContent = t('players.ready');
+      subtextEls[2].textContent = t('players.waitChance');
+    }
+    return;
+  }
+
+  if (isComputerMode()) {
+    subtextEls[1].textContent = state.currentPlayer === 1 ? t('players.yourTurnFindPair') : `${t('players.waiting')} ${t('players.computer').toLowerCase()}`;
+    subtextEls[2].textContent = state.currentPlayer === 2 ? `${t('players.aiThinking')} • ${getAiDifficultyName(state.aiDifficulty)}` : t('players.waitingYourMistake');
+    return;
+  }
+
+  subtextEls[1].textContent = state.currentPlayer === 1 ? t('players.yourTurnFindPair') : t('players.waitingNextChance');
+  subtextEls[2].textContent = state.currentPlayer === 2 ? t('players.yourTurnFindPair') : t('players.waitingNextChance');
+};
+
+const localizedBaseUpdateHud = updateHud;
+updateHud = function localizedHud(message) {
+  localizedBaseUpdateHud(message);
+
+  const themeName = state.selectedTheme ? getThemeDisplayName(state.selectedTheme) : t('hud.none');
+  selectedThemeChip.textContent = `${t('hud.theme')}: ${themeName}`;
+  gameModeChip.textContent = `${t('hud.mode')}: ${getModeName()}`;
+  cardCountChip.textContent = `${t('hud.cards')}: ${state.selectedCardCount}`;
+  pairsLeftChip.textContent = `${t('hud.pairsLeft')}: ${Math.max(state.totalPairs - state.matchedPairs, 0)}`;
+  turnChip.textContent = state.gameOver ? t('hud.roundOver') : `${t('hud.turn')}: ${getPlayerName(state.currentPlayer)}`;
+
+  if (message || state.ui.persistentNotice) return;
+
+  if (!state.selectedTheme) {
+    statusBanner.textContent = t('hud.setupHint');
+    return;
+  }
+
+  if (!state.started) {
+    if (state.playMode === 'online') {
+      statusBanner.textContent = state.auth.enabled ? t('hud.onlineHintEnabled') : t('hud.onlineHintDisabled');
+      return;
+    }
+    if (isComputerMode()) {
+      statusBanner.textContent = `${t('players.player1')}: ${getPlayerName(1)} • ${t('players.computer')}: ${getPlayerName(2)} • ${t('hud.theme')}: ${themeName} • ${state.selectedCardCount} ${t('setup.cardsSuffix')}.`;
+      return;
+    }
+    const typedP1 = (player1NameInput.value || '').trim();
+    const typedP2 = (player2NameInput.value || '').trim();
+    const parts = [];
+    if (typedP1) parts.push(`${t('players.player1')}: ${typedP1}`);
+    if (typedP2) parts.push(`${t('players.player2')}: ${typedP2}`);
+    parts.push(`${t('hud.theme')}: ${themeName}`);
+    parts.push(`${state.selectedCardCount} ${t('setup.cardsSuffix')}.`);
+    statusBanner.textContent = parts.join(' • ');
+    return;
+  }
+
+  statusBanner.textContent = `${t('hud.theme')}: ${themeName} • ${t('hud.mode')}: ${getModeName()} • ${t('hud.cards')}: ${state.selectedCardCount} • ${t('hud.pairsLeft')}: ${Math.max(state.totalPairs - state.matchedPairs, 0)}.`;
+};
+
+const baseUpdateAuthUiI18n = updateAuthUi;
+updateAuthUi = function localizedUpdateAuthUi() {
+  baseUpdateAuthUiI18n();
+
+  const hasSession = Boolean(state.auth.user);
+  const loggedIn = isRealAccountUser();
+  const anonymousSession = Boolean(hasSession && isAnonymousUser());
+  const sessionLabel = loggedIn
+    ? t('auth.sessionLoggedIn')
+    : (anonymousSession ? t('auth.sessionGuest') : (state.guest.active ? t('auth.sessionGuest') : t('auth.sessionNone')));
+  sessionChip.textContent = `${t('auth.session')}: ${sessionLabel}`;
+
+  if (!state.auth.enabled) {
+    authStatusText.textContent = tr(
+      'Добави ключовете си в supabase-config.js и пусни SQL схемата, за да активираш онлайн режима.',
+      'Add your keys in supabase-config.js and run the SQL schema to activate online mode.',
+      'Füge deine Schlüssel in supabase-config.js hinzu und führe das SQL-Schema aus, um den Online-Modus zu aktivieren.'
+    );
+  } else if (loggedIn) {
+    authStatusText.textContent = tr(
+      `Влязъл си като ${getDisplayName()}. Онлайн режимът е активен, waiting room-ът е отключен и историята се пази.`,
+      `Signed in as ${getDisplayName()}. Online mode is active, waiting room is unlocked and history is saved.`,
+      `Angemeldet als ${getDisplayName()}. Der Online-Modus ist aktiv, der Waiting Room ist freigeschaltet und der Verlauf wird gespeichert.`
+    );
+  } else if (anonymousSession) {
+    authStatusText.textContent = tr(
+      `Влезе като гост${state.online.room ? ' в поканената стая' : ''}. Гостът не отваря профил и не може да създава нови стаи.`,
+      `Joined as guest${state.online.room ? ' in the invited room' : ''}. Guests cannot open profiles or create new rooms.`,
+      `Als Gast beigetreten${state.online.room ? ' im eingeladenen Raum' : ''}. Gäste können keine Profile öffnen oder neue Räume erstellen.`
+    );
+  } else if (state.ui.inviteToken) {
+    authStatusText.textContent = tr(
+      'Поканата е разпозната. Влез с имейл или username, регистрирай се или използвай временен гост вход, за да приемеш поканата.',
+      'Invite detected. Sign in with email/username, register, or use temporary guest access to accept the invite.',
+      'Einladung erkannt. Melde dich mit E-Mail/Benutzername an, registriere dich oder nutze temporären Gastzugang, um die Einladung anzunehmen.'
+    );
+  } else {
+    authStatusText.textContent = tr(
+      'Влез с имейл или username, или се регистрирай, за да отключиш онлайн режима. Като гост можеш да продължиш локално.',
+      'Sign in with email/username or register to unlock online mode. As guest you can continue locally.',
+      'Melde dich mit E-Mail/Benutzername an oder registriere dich, um den Online-Modus freizuschalten. Als Gast kannst du lokal weiterspielen.'
+    );
+  }
+
+  const room = state.online.room;
+  const invitePreviewMode = isInvitePreviewMode();
+  const preview = state.online.invitePreview;
+  const roomCode = room?.code || (invitePreviewMode ? preview?.code : '');
+  const roomStatus = room?.status || (invitePreviewMode ? preview?.status : null);
+  const count = room ? 1 + (room.guest_user_id ? 1 : 0) : (invitePreviewMode ? 1 + (preview?.has_guest ? 1 : 0) : 0);
+
+  roomCodeChip.textContent = `${t('lobby.roomCode')}: ${roomCode || '—'}`;
+  roomStatusChip.textContent = `${t('lobby.roomStatus')}: ${roomStatus || tr('няма', 'none', 'kein')}`;
+  roomPlayersChip.textContent = `${t('lobby.roomPlayers')}: ${room || invitePreviewMode ? count : 0}/2`;
+  onlineTurnChip.textContent = `${t('lobby.roomTurn')}: ${room?.current_player_slot ? getPlayerName(room.current_player_slot) : '—'}`;
+
+  const isHostWaitingRoom = Boolean(loggedIn && room && room.host_user_id === state.auth.user?.id && room.status === 'waiting');
+  const isHostTurnInActiveGame = Boolean(
+    loggedIn
+    && room
+    && room.status === 'playing'
+    && room.host_user_id === state.auth.user?.id
+    && Number(room.current_player_slot) === 1
+  );
+  const canUseStartButton = Boolean((isHostWaitingRoom && room?.guest_user_id) || isHostTurnInActiveGame);
+  if (startOnlineButton) {
+    startOnlineButton.textContent = state.online.startBusy
+      ? tr('Стартираме...', 'Starting...', 'Starte...')
+      : (canUseStartButton ? tr('Започни игра', 'Start game', 'Spiel starten') : t('lobby.startOnline'));
+  }
+
+  if (leaveRoomButton) {
+    leaveRoomButton.textContent = room?.status === 'playing'
+      ? t('setup.exitGame')
+      : room && loggedIn && room.host_user_id === state.auth.user?.id
+        ? tr('Затвори стая', 'Close room', 'Raum schließen')
+        : t('lobby.leaveRoom');
+  }
+  if (createRoomButton) {
+    createRoomButton.textContent = canReplaceOwnWaitingRoom()
+      ? tr('Създай нова стая', 'Create new room', 'Neuen Raum erstellen')
+      : t('lobby.createRoom');
+  }
+};
+
+const baseRenderProfilePanelI18n = renderProfilePanel;
+renderProfilePanel = function localizedRenderProfilePanel() {
+  baseRenderProfilePanelI18n();
+
+  if (!state.auth.user) {
+    if (profileRankTitle) profileRankTitle.textContent = `${t('rank.beginner')} • ${t('rank.wins')} 0 • ${t('rank.losses')} 0`;
+    if (historyCountChip) historyCountChip.textContent = tr('0 мача', '0 matches', '0 Spiele');
+    return;
+  }
+
+  const rank = getProfileRankSnapshot();
+  if (profileRankTitle) profileRankTitle.textContent = `${rank.title} • ${t('rank.wins')} ${rank.wins} • ${t('rank.losses')} ${rank.losses}`;
+
+  const stats = getPlayerStatsFromHistory(state.auth.user.id);
+  if (profileWinRate) profileWinRate.textContent = `${t('rank.wins')}: ${stats.winRate}%`;
+  if (profileModeBreakdown) {
+    profileModeBreakdown.textContent = tr(
+      `Онлайн ${stats.onlineGames} • AI ${stats.computerGames} • Локално ${stats.localGames}`,
+      `Online ${stats.onlineGames} • AI ${stats.computerGames} • Local ${stats.localGames}`,
+      `Online ${stats.onlineGames} • KI ${stats.computerGames} • Lokal ${stats.localGames}`
+    );
+  }
+  if (historyCountChip) {
+    historyCountChip.textContent = tr(
+      `${stats.totalGames} ${stats.totalGames === 1 ? 'мач' : 'мача'}`,
+      `${stats.totalGames} ${stats.totalGames === 1 ? 'match' : 'matches'}`,
+      `${stats.totalGames} ${stats.totalGames === 1 ? 'Spiel' : 'Spiele'}`
+    );
+  }
+};
+
+getOnlineRematchStatus = function localizedGetOnlineRematchStatus(room = state.online.room) {
+  const slot = myRoomSlot();
+  const { hostReady, guestReady } = getOnlineRematchFlags(room);
+  const bothReady = hostReady && guestReady;
+  const myReady = slot === 1 ? hostReady : slot === 2 ? guestReady : false;
+  const waitingForOther = slot === 1 ? !guestReady : !hostReady;
+  const statusText = bothReady
+    ? t('result.rematchPreparing')
+    : myReady
+      ? t('result.rematchPending')
+      : t('result.rematch');
+  return { bothReady, myReady, waitingForOther, statusText };
+};
+
+updateResultActionButtons = function localizedUpdateResultActionButtons() {
+  if (state.playMode === 'online' && state.online.room?.status === 'finished') {
+    const rematch = getOnlineRematchStatus(state.online.room);
+    playAgainButton.textContent = rematch.statusText;
+    playAgainButton.disabled = state.online.rematchBusy || rematch.myReady || rematch.bothReady;
+    mainMenuButton.classList.remove('hidden');
+    mainMenuButton.disabled = false;
+    return;
+  }
+  playAgainButton.textContent = t('result.playAgain');
+  playAgainButton.disabled = false;
+  mainMenuButton.classList.remove('hidden');
+  mainMenuButton.disabled = false;
+};
+
+endGame = function localizedEndGame() {
+  state.started = false;
+  state.gameOver = true;
+  clearTurnStart();
+  let title = t('result.draw');
+  let winnerSlot = 0;
+
+  if (state.scores[1] > state.scores[2]) {
+    title = `${t('result.winnerPrefix')}: ${getPlayerName(1)}`;
+    winnerSlot = 1;
+  } else if (state.scores[2] > state.scores[1]) {
+    title = `${t('result.winnerPrefix')}: ${getPlayerName(2)}`;
+    winnerSlot = 2;
+  }
+
+  setResultSummaryContent({
+    title,
+    summary: `${t('hud.mode')}: ${getModeName()} • ${t('hud.theme')}: ${getThemeDisplayName(state.selectedTheme)} • ${t('hud.cards')}: ${state.selectedCardCount}.`,
+    player1Name: getPlayerName(1),
+    player2Name: getPlayerName(2),
+    player1Score: state.scores[1],
+    player2Score: state.scores[2]
+  });
+  updatePlayerPanels();
+  updateHud(tr(
+    'Рундът приключи. Може да натиснеш „Играй пак“ или да се върнеш в началното меню.',
+    'Round finished. You can press "Play again" or return to main menu.',
+    'Die Runde ist beendet. Du kannst „Nochmal spielen“ drücken oder zum Hauptmenü zurückkehren.'
+  ));
+  updateResultActionButtons();
+  resultModal.classList.remove('hidden');
+
+  if (state.auth.user && state.playMode !== 'online') {
+    saveMatchToHistory({
+      mode: state.playMode === 'computer' ? 'computer' : 'local',
+      theme_key: state.selectedTheme,
+      card_count: state.selectedCardCount,
+      player1_user_id: state.auth.user.id,
+      player1_name: getPlayerName(1),
+      player2_user_id: null,
+      player2_name: getPlayerName(2),
+      player1_score: state.scores[1],
+      player2_score: state.scores[2],
+      winner_slot: winnerSlot,
+      winner_user_id: winnerSlot === 1 ? state.auth.user.id : null
+    });
+  }
 };
 
 player1NameInput.addEventListener('input', () => {
@@ -7052,6 +8499,7 @@ document.addEventListener('keydown', (event) => {
 initComputerMemoryObserver();
 loadGuestState();
 syncRememberMeUi();
+applyLanguage({ rerender: false });
 refreshPlayerNames();
 renderModeSelector();
 renderDifficultySelector();
@@ -7069,6 +8517,9 @@ setAuthTab('login');
 
 profileButton.addEventListener('click', () => toggleProfilePanel());
 infoButton?.addEventListener('click', () => toggleInfoPanel());
+langBgButton?.addEventListener('click', () => setLanguage('bg'));
+langEnButton?.addEventListener('click', () => setLanguage('en'));
+langDeButton?.addEventListener('click', () => setLanguage('de'));
 closeAuthPanelButton.addEventListener('click', () => toggleProfilePanel(false));
 closeInfoPanelButton?.addEventListener('click', () => toggleInfoPanel(false));
 closeOnlineLobbyButton?.addEventListener('click', () => exitOnlineLobby());

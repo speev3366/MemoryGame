@@ -8,7 +8,7 @@
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
   <title>Memory Duel Online V8.3.6</title>
-  <link rel="stylesheet" href="styles.css?v=872" />
+  <link rel="stylesheet" href="styles.css?v=879" />
 </head>
 <body>
   <div class="app setup-mode" id="app">
@@ -41,8 +41,8 @@
         <div class="title-bar">
           <div class="title-wrap">
             <p class="eyebrow">MEMORY DUEL V8.3.6</p>
-            <h1>Локална, AI и истинска онлайн игра</h1>
-            <p class="subtitle">Гост режим за локална игра, профил с история и waiting room с публични, защитени и invite стаи.</p>
+            <h1 id="heroTitle">Локална, AI и истинска онлайн игра</h1>
+            <p class="subtitle" id="heroSubtitle">Гост режим за локална игра, профил с история и waiting room с публични, защитени и invite стаи.</p>
           </div>
           <div class="title-actions">
             <button class="info-button" id="infoButton" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="infoPanel">
@@ -221,8 +221,13 @@
         <section class="info-panel hidden" id="infoPanel">
           <div class="info-panel-head">
             <div>
-              <h2>Информация за Memory Duel</h2>
-              <p>Това е игра за забавление и за развитие на паметта, наблюдателността и бързата реакция.</p>
+              <h2 id="infoPanelTitle">Информация за Memory Duel</h2>
+              <p id="infoPanelIntro">Това е игра за забавление и за развитие на паметта, наблюдателността и бързата реакция.</p>
+            </div>
+            <div class="lang-switch" id="langSwitch" role="group" aria-label="Language switch">
+              <button class="lang-btn is-active" id="langBgButton" type="button">BG</button>
+              <button class="lang-btn" id="langEnButton" type="button">EN</button>
+              <button class="lang-btn" id="langDeButton" type="button">DE</button>
             </div>
             <button class="icon-dismiss" id="closeInfoPanelButton" type="button" aria-label="Затвори информацията">✕</button>
           </div>
@@ -350,8 +355,8 @@
       <div class="online-lobby-shell">
           <div class="lobby-head">
             <div>
-              <h3>Waiting room / онлайн лоби</h3>
-              <p class="lobby-subtitle">Създай публична, защитена или invite стая. Вторият играч може да я намери в лобито, с код или с покана.</p>
+              <h3 id="lobbyTitle">Waiting room / онлайн лоби</h3>
+              <p class="lobby-subtitle" id="lobbySubtitle">Създай публична, защитена или invite стая. Вторият играч може да я намери в лобито, с код или с покана.</p>
             </div>
             <div class="lobby-head-actions"><button class="icon-dismiss lobby-dismiss" id="closeOnlineLobbyButton" type="button" aria-label="Назад към началото">✕</button></div>
           </div>
@@ -461,8 +466,8 @@
           <div class="empty-state" id="emptyState">
             <div>
               <div class="empty-icon">✦</div>
-              <h2>Играй локално или онлайн</h2>
-              <p>Локално — започваш веднага. Срещу компютър — избираш трудност. Онлайн — влизаш в профила си, създаваш стая или се присъединяваш с код.</p>
+              <h2 id="emptyStateTitle">Играй локално или онлайн</h2>
+              <p id="emptyStateText">Локално — започваш веднага. Срещу компютър — избираш трудност. Онлайн — влизаш в профила си, създаваш стая или се присъединяваш с код.</p>
             </div>
           </div>
           <section class="memory-board" id="gameBoard" aria-label="Memory board"></section>
@@ -499,6 +504,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=824"></script>
-    <script src="scripts.js?v=854"></script>
+    <script src="scripts.js?v=882"></script>
 </body>
 </html>
