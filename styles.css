@@ -2856,6 +2856,19 @@ body.lobby-open { overflow: hidden; }
     min-height: min(48vh, 460px);
     max-height: none;
   }
+
+  .app.online-lobby-mode #onlineMatchGrid .online-theme-strip-track {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - 10px) / 2);
+    width: 100%;
+    gap: 10px;
+  }
+
+  .app.online-lobby-mode #onlineMatchGrid .online-theme-strip-track .online-theme-option {
+    min-height: 82px;
+    width: 100%;
+  }
 }
 
 @media (max-width: 520px) {

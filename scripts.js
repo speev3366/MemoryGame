@@ -2565,7 +2565,24 @@ async function refreshOnlineState(force = false) {
       } else {
         state.online.refreshMisses = (state.online.refreshMisses || 0) + 1;
         if (currentRoom.status === 'playing' && state.online.refreshMisses < 25) return;
-        if (currentRoom.status === 'waiting' && state.online.refreshMisses < 4) return;
+        if (currentRoom.status === 'waiting' && state.online.refreshMisses < 10) return;
+
+        const forced = await fetchRoomById(currentRoom.id, { force: true, timeoutMs: 9000 });
+        if (forced) {
+          state.online.refreshMisses = 0;
+          adoptIncomingRoom(forced);
+          syncFromOnlineRoom();
+          return;
+        }
+
+        const recovered = await loadMyActiveRoom();
+        if (recovered) {
+          state.online.refreshMisses = 0;
+          adoptIncomingRoom(recovered);
+          syncFromOnlineRoom();
+          return;
+        }
+
         clearOnlineRoomLocalState();
         if (state.playMode === 'online') {
           resetRoundState();
@@ -3938,6 +3955,7 @@ function initHorizontalOptionStrip({
   nextSelector = '[data-strip-next]',
   itemSelector,
   selectedSelector,
+  stepItems = 1,
   onSelect
 }) {
   if (!root || typeof onSelect !== 'function' || !itemSelector) return;
@@ -3954,7 +3972,7 @@ function initHorizontalOptionStrip({
     });
   });
 
-  const getStep = () => Math.max(180, Math.round(viewport.clientWidth * 0.78));
+  const getStep = () => Math.max(180, Math.round(viewport.clientWidth * 0.78 * Math.max(1, Number(stepItems) || 1)));
   const scrollByStep = (direction) => {
     viewport.scrollBy({
       left: direction * getStep(),
@@ -4104,6 +4122,7 @@ function renderOnlineThemeSelector(force = false) {
     root: onlineThemeSelector.querySelector('[data-online-theme-strip-root]'),
     itemSelector: '[data-online-theme]',
     selectedSelector: '.online-theme-option.selected',
+    stepItems: window.matchMedia('(max-width: 760px)').matches ? 2 : 1,
     onSelect: (item) => selectOnlineTheme(item.dataset.onlineTheme)
   });
 }
@@ -5906,8 +5925,8 @@ async function requestOnlineRematch() {
     if (!updated) throw new Error('Не успях да запиша заявката за реванш.');
     adoptIncomingRoom(updated);
     endOnlineGame();
-    scheduleHardUiSync([200, 550, 1100, 2200], { roomId: updated.id });
-    scheduleOnlineRefreshBurst([220, 680, 1350, 2600], { allowDuringPlaying: false });
+    scheduleHardUiSync([200, 550, 1100, 2200, 3600], { roomId: updated.id });
+    scheduleOnlineRefreshBurst([220, 680, 1350, 2600, 4200, 6200], { allowDuringPlaying: true });
     const flags = getOnlineRematchFlags(updated);
     shouldAutoStart = slot === 1 && flags.hostReady && flags.guestReady;
     if (slot !== 1) updateHud('Реваншът е заявен. Изчаква се домакинът да стартира новата игра.');
@@ -6633,11 +6652,11 @@ async function loadMyActiveRoom() {
   const validateRoom = async (room) => {
     if (!room) return null;
     if (room.status === 'finished') return null;
-    if (isWaitingRoomExpired(room) && room.host_user_id === state.auth.user?.id) {
+    if (false && isWaitingRoomExpired(room) && room.host_user_id === state.auth.user?.id) {
       try { await rpcCall('leave_room_safe', { p_room_id: room.id }, 10000, 'Затварянето на старата стая'); } catch (e) { console.warn(e); }
       return null;
     }
-    if (room.status === 'playing' || shouldAutoRestoreWaitingRoom(room)) return room;
+    if (room.status === 'playing' || room.status === 'waiting') return room;
     return null;
   };
 
@@ -6703,9 +6722,7 @@ async function loadLobbyRooms() {
       return null;
     }
 
-    state.online.publicRooms = keepNewestWaitingRoomPerHost(
-      (Array.isArray(data) ? data : []).filter((room) => !isWaitingRoomExpired(room))
-    );
+    state.online.publicRooms = keepNewestWaitingRoomPerHost(Array.isArray(data) ? data : []);
     renderRoomList();
     return state.online.publicRooms;
   })();
@@ -7498,6 +7515,10 @@ function syncFromOnlineRoom() {
     if (room.status === 'playing') {
       state.online.playingGraceUntil = Date.now() + 20000;
       state.online.lastRematchAutoKey = null;
+      if (resultModal && !resultModal.classList.contains('hidden')) {
+        resultModal.classList.add('hidden');
+        setResultRematchStatus('', '');
+      }
     }
   }
 
@@ -8131,6 +8152,7 @@ renderOnlineThemeSelector = function localizedRenderOnlineThemeSelector(force = 
     root: onlineThemeSelector.querySelector('[data-online-theme-strip-root]'),
     itemSelector: '[data-online-theme]',
     selectedSelector: '.online-theme-option.selected',
+    stepItems: window.matchMedia('(max-width: 760px)').matches ? 2 : 1,
     onSelect: (item) => selectOnlineTheme(item.dataset.onlineTheme)
   });
 };
@@ -8458,13 +8480,38 @@ getOnlineRematchStatus = function localizedGetOnlineRematchStatus(room = state.o
   const { hostReady, guestReady } = getOnlineRematchFlags(room);
   const bothReady = hostReady && guestReady;
   const myReady = slot === 1 ? hostReady : slot === 2 ? guestReady : false;
+  const otherReady = slot === 1 ? guestReady : slot === 2 ? hostReady : false;
   const waitingForOther = slot === 1 ? !guestReady : !hostReady;
   const statusText = bothReady
     ? t('result.rematchPreparing')
     : myReady
       ? t('result.rematchPending')
       : t('result.rematch');
-  return { bothReady, myReady, waitingForOther, statusText };
+  const rematchMessage = bothReady
+    ? tr(
+      'И двамата играчи потвърдиха реванш. Подготвяме новата игра...',
+      'Both players confirmed rematch. Preparing the new game...',
+      'Beide Spieler haben die Revanche bestätigt. Neues Spiel wird vorbereitet...'
+    )
+    : myReady
+      ? tr(
+        'Ти заяви реванш. Изчаква се другият играч.',
+        'You requested rematch. Waiting for the other player.',
+        'Du hast Revanche angefordert. Warte auf den anderen Spieler.'
+      )
+      : otherReady
+        ? tr(
+          'Другият играч поиска реванш. Натисни „Реванш“, за да потвърдиш.',
+          'The other player requested rematch. Press "Rematch" to confirm.',
+          'Der andere Spieler hat eine Revanche angefordert. Drücke „Revanche“, um zu bestätigen.'
+        )
+        : tr(
+          'Натисни „Реванш“, за да заявиш нова онлайн игра.',
+          'Press "Rematch" to request a new online game.',
+          'Drücke „Revanche“, um ein neues Onlinespiel anzufordern.'
+        );
+  const rematchTone = bothReady ? 'success' : (myReady || otherReady ? 'info' : '');
+  return { bothReady, myReady, otherReady, waitingForOther, statusText, rematchMessage, rematchTone };
 };
 
 updateResultActionButtons = function localizedUpdateResultActionButtons() {
@@ -8472,12 +8519,14 @@ updateResultActionButtons = function localizedUpdateResultActionButtons() {
     const rematch = getOnlineRematchStatus(state.online.room);
     playAgainButton.textContent = rematch.statusText;
     playAgainButton.disabled = state.online.rematchBusy || rematch.myReady || rematch.bothReady;
+    setResultRematchStatus(rematch.rematchMessage, rematch.rematchTone);
     mainMenuButton.classList.remove('hidden');
     mainMenuButton.disabled = false;
     return;
   }
   playAgainButton.textContent = t('result.playAgain');
   playAgainButton.disabled = false;
+  setResultRematchStatus('', '');
   mainMenuButton.classList.remove('hidden');
   mainMenuButton.disabled = false;
 };
