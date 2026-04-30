@@ -5420,7 +5420,7 @@ function createDeck(themeKey) {
     ];
   });
 
-  return shuffle(cards);
+  return antiAdjacentShuffle(cards, state.selectedCardCount, 1);
 }
 
 function createSerializedDeck(themeKey, cardCount = state.selectedCardCount) {
@@ -5431,7 +5431,52 @@ function createSerializedDeck(themeKey, cardCount = state.selectedCardCount) {
     { pairId: item.key, label: getItemDisplayLabel(themeKey, item), uid: `${item.key}-a-${Math.random().toString(36).slice(2, 7)}` },
     { pairId: item.key, label: getItemDisplayLabel(themeKey, item), uid: `${item.key}-b-${Math.random().toString(36).slice(2, 7)}` }
   ]));
-  return shuffle(cards);
+  return antiAdjacentShuffle(cards, cardCount, 1);
+}
+
+function getGridDimsForCount(cardCount) {
+  const numeric = Number(cardCount);
+  if (numeric === 20) return { rows: 4, cols: 5 };
+  if (numeric === 30) return { rows: 5, cols: 6 };
+  if (numeric === 40) return { rows: 5, cols: 8 };
+  return null;
+}
+
+function countAdjacentMatchingPairs(deck, cardCount) {
+  if (!Array.isArray(deck) || deck.length < 2) return 0;
+  const dims = getGridDimsForCount(cardCount);
+  if (!dims || dims.rows * dims.cols !== deck.length) return 0;
+  const { rows, cols } = dims;
+  let adjacent = 0;
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      const i = r * cols + c;
+      const pairId = deck[i]?.pairId;
+      if (!pairId) continue;
+      if (c + 1 < cols && deck[i + 1]?.pairId === pairId) adjacent += 1;
+      if (r + 1 < rows && deck[i + cols]?.pairId === pairId) adjacent += 1;
+    }
+  }
+  return adjacent;
+}
+
+function antiAdjacentShuffle(cards, cardCount, maxAdjacentPairs = 1) {
+  const limit = Number.isFinite(maxAdjacentPairs) ? Math.max(0, Math.floor(maxAdjacentPairs)) : 1;
+  const maxAttempts = 260;
+  let bestDeck = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const candidate = shuffle([...cards]);
+    const score = countAdjacentMatchingPairs(candidate, cardCount);
+    if (score < bestScore) {
+      bestScore = score;
+      bestDeck = candidate;
+      if (bestScore <= limit) break;
+    }
+  }
+
+  return bestDeck || shuffle([...cards]);
 }
 
 function buildBoard(themeKey, serializedDeck = null) {
