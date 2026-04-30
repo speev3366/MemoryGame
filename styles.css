@@ -1475,6 +1475,21 @@ button { font: inherit; }
   z-index: 85;
 }
 
+.reaction-burst-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1200;
+}
+
+.reaction-burst.reaction-burst-floating {
+  position: absolute;
+  left: var(--burst-x, 50%);
+  top: var(--burst-y, 0px);
+  right: auto;
+}
+
 .reaction-burst.show {
   animation: reaction-burst 2600ms ease forwards;
 }
@@ -1810,6 +1825,8 @@ body.lobby-open { overflow: hidden; }
   display: grid;
   gap: 4px;
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .room-access-option:hover {
   transform: translateY(-2px);

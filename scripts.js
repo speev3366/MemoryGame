@@ -202,6 +202,7 @@ const reactionBursts = {
   1: document.getElementById('reactionBurstP1'),
   2: document.getElementById('reactionBurstP2')
 };
+let reactionBurstLayer = null;
 
 const nameEls = {
   1: document.getElementById('player1NameLabel'),
@@ -2171,7 +2172,7 @@ function shouldIgnoreIncomingRoom(current, incoming) {
     if (incomingDeckSize === 0 && incomingTime && currentTime && incomingTime <= currentTime + 10000) return true;
   }
 
-  if (current.status === 'finished' && incoming.status !== 'finished') {
+  if (current.status === 'finished' && incoming.status === 'waiting') {
     const currentTime = Math.max(getRoomFreshnessTime(current), getRoomActivityTime(current));
     const incomingTime = Math.max(getRoomFreshnessTime(incoming), getRoomActivityTime(incoming));
     if (incomingTime && currentTime && incomingTime <= currentTime + 1500) return true;
@@ -2340,7 +2341,13 @@ function scheduleOnlineRefreshBurst(delays = [0, 600], options = {}) {
   state.online.refreshBurstTimers.forEach((id) => clearTimeout(id));
   state.online.refreshBurstTimers = [];
   if (allowDuringPlaying) state.online.allowPlayingBurstUntil = Date.now() + 2500;
-  delays.slice(0, 2).forEach((delayMs) => {
+  const burstDelays = Array.isArray(delays)
+    ? [...new Set(delays
+        .map((delayMs) => Number(delayMs))
+        .filter((delayMs) => Number.isFinite(delayMs) && delayMs >= 0))]
+        .sort((a, b) => a - b)
+    : [0, 600];
+  burstDelays.slice(0, 8).forEach((delayMs) => {
     const id = window.setTimeout(() => {
       const isPlaying = state.online.room?.status === 'playing';
       if (isPlaying && !allowDuringPlaying && Date.now() > (state.online.allowPlayingBurstUntil || 0)) return;
@@ -2803,15 +2810,32 @@ function toggleReactionPicker(player, force) {
   setReactionPicker(player, nextOpen);
 }
 
+function ensureReactionBurstLayer() {
+  if (reactionBurstLayer && document.body.contains(reactionBurstLayer)) return reactionBurstLayer;
+  reactionBurstLayer = document.createElement('div');
+  reactionBurstLayer.className = 'reaction-burst-layer';
+  document.body.appendChild(reactionBurstLayer);
+  return reactionBurstLayer;
+}
+
 function playReactionBurst(player, emoji, durationMs = 2650) {
   const normalized = Number(player) === 2 ? 2 : 1;
-  const burst = reactionBursts[normalized];
-  if (!burst) return;
+  const anchor = reactionToggles[normalized] || playerPanels[normalized];
+  if (!anchor) return;
+  const rect = anchor.getBoundingClientRect();
+  const layer = ensureReactionBurstLayer();
+  const burst = document.createElement('div');
+  burst.className = 'reaction-burst reaction-burst-floating';
   burst.textContent = emoji;
-  burst.classList.remove('show');
-  void burst.offsetWidth;
-  burst.classList.add('show');
-  window.setTimeout(() => burst.classList.remove('show'), Math.max(1800, Number(durationMs) || 2650));
+  burst.style.setProperty('--burst-x', `${Math.round(rect.left + (rect.width / 2))}px`);
+  burst.style.setProperty('--burst-y', `${Math.round(rect.bottom + 6)}px`);
+  layer.appendChild(burst);
+  requestAnimationFrame(() => burst.classList.add('show'));
+  const visibleFor = Math.max(2000, Number(durationMs) || 2650);
+  window.setTimeout(() => {
+    burst.classList.remove('show');
+    window.setTimeout(() => burst.remove(), 520);
+  }, visibleFor);
 }
 
 function applyIncomingReactionUsage(player) {
@@ -2966,7 +2990,7 @@ function renderRoomAccessSelector() {
   `).join('');
 
   roomAccessSelector.querySelectorAll('.room-access-option').forEach((button) => {
-    button.addEventListener('click', () => setRoomAccess(button.dataset.access));
+    bindUiPress(button, () => setRoomAccess(button.dataset.access));
   });
 }
 
@@ -3124,7 +3148,7 @@ function renderRoomList() {
     appendRankBadgeToRoomTitle(row, getRoomHostRankSnapshot(rooms[index]));
   });
   roomList.querySelectorAll('.room-join-btn').forEach((button) => {
-    button.addEventListener('click', () => handleListedRoomJoin(button.dataset.roomId, button.dataset.access, button.dataset.code));
+    bindUiPress(button, () => handleListedRoomJoin(button.dataset.roomId, button.dataset.access, button.dataset.code));
   });
   roomList.querySelectorAll('.room-code-copy-btn').forEach((button) => {
     button.addEventListener('click', async (event) => {
@@ -3151,9 +3175,7 @@ function renderRoomList() {
     });
   });
   roomList.querySelectorAll('.room-own-start-btn[data-room-start="1"]').forEach((button) => {
-    button.addEventListener('click', async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+    bindUiPress(button, async () => {
       if (!state.online.room) return;
       if (state.online.room.status === 'waiting') await startOnlineMatch();
       else await resumeOnlineSession();
@@ -3853,19 +3875,26 @@ function applyThemePalette(themeKey) {
 
 function bindUiPress(target, handler) {
   if (!target || typeof handler !== 'function') return;
-  let touchTriggered = false;
+  let lastTouchAt = 0;
+  const run = (event) => {
+    if (event?.cancelable) event.preventDefault();
+    event?.stopPropagation?.();
+    handler(event);
+  };
+  target.addEventListener('touchstart', (event) => {
+    lastTouchAt = Date.now();
+  }, { passive: true });
   target.addEventListener('touchend', (event) => {
-    touchTriggered = true;
-    event.preventDefault();
-    handler();
-    window.setTimeout(() => {
-      touchTriggered = false;
-    }, 320);
+    lastTouchAt = Date.now();
+    run(event);
   }, { passive: false });
   target.addEventListener('click', (event) => {
-    event.preventDefault();
-    if (touchTriggered) return;
-    handler();
+    if (Date.now() - lastTouchAt < 550) {
+      if (event.cancelable) event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    run(event);
   });
 }
 
@@ -5782,13 +5811,25 @@ async function startOnlineRematchRound(room = state.online.room) {
       'Стартиране на реванша'
     ));
     if (!updated || updated.status !== 'playing') throw new Error('Не успях да стартирам реванша.');
-    adoptIncomingRoom(updated);
+    let nextRoom = updated;
+    let adopted = adoptIncomingRoom(nextRoom);
+    if (!adopted || state.online.room?.status !== 'playing') {
+      const fresh = await fetchRoomById(room.id, { force: true, timeoutMs: 7000 });
+      if (fresh) {
+        nextRoom = fresh;
+        adopted = adoptIncomingRoom(nextRoom) || adopted;
+      }
+    }
+    if (!adopted || state.online.room?.status !== 'playing') {
+      throw new Error('Реваншът тръгна на сървър, но устройството още не го е синхронизирало. Опитай пак след секунда.');
+    }
     state.online.lastRematchAutoKey = null;
     resultModal.classList.add('hidden');
     syncFromOnlineRoom();
-    scheduleHardUiSync([0, 350, 900], { roomId: updated.id });
+    scheduleHardUiSync([0, 350, 900, 1700, 2800], { roomId: nextRoom.id || updated.id });
+    scheduleOnlineRefreshBurst([250, 700, 1400, 2600], { allowDuringPlaying: true });
     updateHud('Реваншът стартира. Успех!');
-    return updated;
+    return nextRoom;
   } catch (error) {
     state.online.lastRematchAutoKey = null;
     updateHud(error?.message || 'Не успях да стартирам реванша.');
@@ -5821,6 +5862,7 @@ async function requestOnlineRematch() {
     adoptIncomingRoom(updated);
     endOnlineGame();
     scheduleHardUiSync([200, 550, 1100, 2200], { roomId: updated.id });
+    scheduleOnlineRefreshBurst([220, 680, 1350, 2600], { allowDuringPlaying: false });
     const flags = getOnlineRematchFlags(updated);
     shouldAutoStart = slot === 1 && flags.hostReady && flags.guestReady;
     if (slot !== 1) updateHud('Реваншът е заявен. Изчаква се домакинът да стартира новата игра.');
@@ -7383,6 +7425,7 @@ async function startOnlineMatch() {
     syncFromOnlineRoom();
     updateAuthUi();
     scheduleHardUiSync([0, 400, 1100], { roomId: startedRoom.id });
+    scheduleOnlineRefreshBurst([300, 900, 1800, 3200], { allowDuringPlaying: true });
     showFeedback(onlineLobbyFeedback, 'Онлайн мачът стартира успешно.', 'success');
     updateHud('Онлайн мачът стартира. Играта започва.');
   } catch (error) {
@@ -8455,9 +8498,9 @@ player2NameInput.addEventListener('input', () => {
   updateHud();
 });
 
-startButton.addEventListener('click', startGame);
-newRoundButton.addEventListener('click', resetRoundState);
-playAgainButton.addEventListener('click', async () => {
+bindUiPress(startButton, startGame);
+bindUiPress(newRoundButton, resetRoundState);
+bindUiPress(playAgainButton, async () => {
   if (state.playMode === 'online' && state.online.room?.status === 'finished') {
     await requestOnlineRematch();
     return;
@@ -8466,7 +8509,7 @@ playAgainButton.addEventListener('click', async () => {
   startGame();
 });
 
-mainMenuButton?.addEventListener('click', async () => {
+bindUiPress(mainMenuButton, async () => {
   if (state.playMode === 'online' && state.online.room?.status === 'finished') {
     resultModal.classList.add('hidden');
     setResultRematchStatus('', '');
@@ -8533,16 +8576,16 @@ profileLogoutButton.addEventListener('click', logoutUser);
 refreshHistoryButton.addEventListener('click', loadMatchHistory);
 resumeRoomButton?.addEventListener('click', resumeOnlineSession);
 exitGameButton?.addEventListener('click', exitCurrentGame);
-createRoomButton.addEventListener('click', createRoom);
-joinRoomButton.addEventListener('click', joinRoom);
-leaveRoomButton.addEventListener('click', () => leaveRoom({ stayOnline: true }));
-startOnlineButton.addEventListener('click', async () => {
+bindUiPress(createRoomButton, createRoom);
+bindUiPress(joinRoomButton, joinRoom);
+bindUiPress(leaveRoomButton, () => leaveRoom({ stayOnline: true }));
+bindUiPress(startOnlineButton, async () => {
   if (state.online.room?.status === 'playing') await resumeOnlineSession();
   else await startOnlineMatch();
 });
-refreshRoomsButton.addEventListener('click', loadLobbyRooms);
-refreshRoomsButtonInline?.addEventListener('click', loadLobbyRooms);
-copyInviteButton.addEventListener('click', copyInviteLink);
+bindUiPress(refreshRoomsButton, loadLobbyRooms);
+bindUiPress(refreshRoomsButtonInline, loadLobbyRooms);
+bindUiPress(copyInviteButton, copyInviteLink);
 openProfileFromInviteButton.addEventListener('click', openProfileFromInvite);
 continueInviteGuestButton.addEventListener('click', continueInviteAsGuest);
 joinInviteButton.addEventListener('click', joinInviteFromToken);
@@ -8550,7 +8593,7 @@ inviteLandingLoginButton?.addEventListener('click', openProfileFromInvite);
 inviteLandingGuestButton?.addEventListener('click', continueInviteAsGuest);
 inviteLandingJoinButton?.addEventListener('click', joinInviteFromToken);
 closeInviteLandingButton?.addEventListener('click', () => { clearInviteContext(); updateHud('Поканата беше затворена.'); });
-joinPasswordConfirmButton.addEventListener('click', async () => {
+bindUiPress(joinPasswordConfirmButton, async () => {
   if (!state.ui.pendingProtectedRoomId) return;
   const room = state.online.publicRooms.find((item) => item.id === state.ui.pendingProtectedRoomId)
     || (state.online.room && state.online.room.id === state.ui.pendingProtectedRoomId ? state.online.room : null);
