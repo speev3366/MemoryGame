@@ -5498,6 +5498,13 @@ function antiAdjacentShuffle(cards, cardCount, maxAdjacentPairs = 1) {
   return bestDeck || shuffle([...cards]);
 }
 
+function getSerializedDeckSignature(deck) {
+  if (!Array.isArray(deck) || !deck.length) return '';
+  return deck
+    .map((card, index) => `${index}:${String(card?.pairId || '')}:${String(card?.uid || '')}`)
+    .join('|');
+}
+
 function buildBoard(themeKey, serializedDeck = null) {
   const assets = getThemeAssets(themeKey);
   const deck = (serializedDeck || createDeck(themeKey)).map((card) => {
@@ -5533,6 +5540,9 @@ function buildBoard(themeKey, serializedDeck = null) {
       }
     });
   });
+
+  gameBoard.dataset.deckSignature = getSerializedDeckSignature(deck);
+  gameBoard.dataset.deckTheme = String(themeKey || '');
 
   if (state.playMode === 'online' && state.online.room) {
     applyOnlineBoardState();
@@ -7545,7 +7555,14 @@ function syncFromOnlineRoom() {
     emptyState.classList.add('hidden');
     gameBoard.classList.add('active');
     setAppMode('game');
-    if (!gameBoard.children.length || Number(gameBoard.children.length) !== room.deck.length) {
+    const expectedDeckSignature = getSerializedDeckSignature(room.deck || []);
+    const currentDeckSignature = gameBoard.dataset.deckSignature || '';
+    const currentDeckTheme = gameBoard.dataset.deckTheme || '';
+    const shouldRebuildBoard = !gameBoard.children.length
+      || Number(gameBoard.children.length) !== room.deck.length
+      || currentDeckSignature !== expectedDeckSignature
+      || currentDeckTheme !== String(room.selected_theme || '');
+    if (shouldRebuildBoard) {
       buildBoard(room.selected_theme, room.deck);
     }
     applyOnlineBoardState();
