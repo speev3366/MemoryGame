@@ -1011,6 +1011,8 @@ const state = {
     rematchBusy: false,
     lastRematchAutoKey: null,
     lastRankRefreshKey: null,
+    recentlyClosedRoomId: null,
+    recentlyClosedRoomUntil: 0,
     roomFetchCache: new Map()
   },
   timers: {
@@ -1842,6 +1844,33 @@ function getCachedRoom(roomId, maxAgeMs = 0) {
   return cached.room || null;
 }
 
+function dropCachedRoom(roomId) {
+  if (!roomId || !(state.online.roomFetchCache instanceof Map)) return;
+  state.online.roomFetchCache.delete(roomId);
+  if (state.online.roomFetchInflightId === roomId) {
+    state.online.roomFetchInflight = null;
+    state.online.roomFetchInflightId = null;
+  }
+}
+
+function markRoomRecentlyClosed(roomId, ttlMs = 9000) {
+  if (!roomId) return;
+  state.online.recentlyClosedRoomId = roomId;
+  state.online.recentlyClosedRoomUntil = Date.now() + Math.max(1200, Number(ttlMs) || 0);
+}
+
+function isRecentlyClosedWaitingRoom(room) {
+  const closedId = state.online.recentlyClosedRoomId;
+  const closedUntil = state.online.recentlyClosedRoomUntil || 0;
+  if (!closedId) return false;
+  if (Date.now() > closedUntil) {
+    state.online.recentlyClosedRoomId = null;
+    state.online.recentlyClosedRoomUntil = 0;
+    return false;
+  }
+  return Boolean(room && room.status === 'waiting' && room.id === closedId);
+}
+
 async function copyTextValue(value, successMessage = 'Копирано.') {
   if (!value) return false;
   try {
@@ -1896,13 +1925,17 @@ function clearPreferredRoomId() {
   setPreferredRoomId(null);
 }
 
-function clearOnlineRoomLocalState() {
+function clearOnlineRoomLocalState(roomIdToPurge = null) {
+  const roomId = roomIdToPurge || state.online.room?.id || null;
   state.online.room = null;
   clearPreferredRoomId();
+  dropCachedRoom(roomId);
   if (state.online.channel && state.auth.client) {
     removeOnlineChannel(state.online.channel);
   }
   state.online.channel = null;
+  state.online.subscribedRoomId = null;
+  state.online.activeRoomInflight = null;
   if (state.online.pendingTimeout) {
     clearTimeout(state.online.pendingTimeout);
     state.online.pendingTimeout = null;
@@ -2087,7 +2120,11 @@ async function fetchRoomById(roomId, options = {}) {
         signal
       ), timeoutMs, 'Опресняването на стаята');
       if (error) return null;
-      return setCachedRoom(data || null);
+      if (!data) {
+        dropCachedRoom(roomId);
+        return null;
+      }
+      return setCachedRoom(data);
     } catch (error) {
       console.warn('fetchRoomById failed', error);
       return getCachedRoom(roomId, 2500) || null;
@@ -2183,6 +2220,14 @@ function shouldIgnoreIncomingRoom(current, incoming) {
 
 function adoptIncomingRoom(incoming) {
   if (!incoming) return false;
+  if (
+    isRecentlyClosedWaitingRoom(incoming)
+    && incoming.host_user_id
+    && incoming.host_user_id === state.auth.user?.id
+    && !incoming.guest_user_id
+  ) {
+    return false;
+  }
   const current = state.online.room;
   if (current && !hasMeaningfulRoomChange(current, incoming)) return false;
   if (shouldIgnoreIncomingRoom(current, incoming)) return false;
@@ -6732,6 +6777,14 @@ async function loadMyActiveRoom() {
   const validateRoom = async (room) => {
     if (!room) return null;
     if (room.status === 'finished') return null;
+    if (
+      isRecentlyClosedWaitingRoom(room)
+      && room.host_user_id
+      && room.host_user_id === state.auth.user?.id
+      && !room.guest_user_id
+    ) {
+      return null;
+    }
     if (false && isWaitingRoomExpired(room) && room.host_user_id === state.auth.user?.id) {
       try { await rpcCall('leave_room_safe', { p_room_id: room.id }, 10000, 'Затварянето на старата стая'); } catch (e) { console.warn(e); }
       return null;
@@ -7308,7 +7361,9 @@ async function leaveRoom(options = {}) {
   const roomId = room.id;
   const wasPlaying = room.status === 'playing';
   const wasHost = myRoomSlot() === 1;
-  clearOnlineRoomLocalState();
+  suppressBackgroundOnlineTraffic(5200);
+  dropCachedRoom(roomId);
+  clearOnlineRoomLocalState(roomId);
   if (stayOnline) {
     resetRoundState();
     state.playMode = 'online';
@@ -7331,6 +7386,8 @@ async function leaveRoom(options = {}) {
       const fresh = await fetchRoomById(roomId);
       return fresh ? null : { id: roomId, status: 'closed' };
     }, (fresh) => Boolean(fresh && fresh.status === 'closed'), 6000, 200);
+    dropCachedRoom(roomId);
+    if (wasHost) markRoomRecentlyClosed(roomId, 12000);
     if (stayOnline && canUseOnlineLobby()) await loadLobbyRooms();
     scheduleHardUiSync([0, 400, 1200]);
     updateHud(wasPlaying ? 'Излезе от онлайн играта.' : (wasHost ? 'Стаята беше затворена.' : 'Напусна стаята.'));
