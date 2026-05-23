@@ -1859,6 +1859,12 @@ function markRoomRecentlyClosed(roomId, ttlMs = 9000) {
   state.online.recentlyClosedRoomUntil = Date.now() + Math.max(1200, Number(ttlMs) || 0);
 }
 
+function clearRecentlyClosedMarker(roomId = null) {
+  if (roomId && state.online.recentlyClosedRoomId && state.online.recentlyClosedRoomId !== roomId) return;
+  state.online.recentlyClosedRoomId = null;
+  state.online.recentlyClosedRoomUntil = 0;
+}
+
 function isRecentlyClosedWaitingRoom(room) {
   const closedId = state.online.recentlyClosedRoomId;
   const closedUntil = state.online.recentlyClosedRoomUntil || 0;
@@ -6752,7 +6758,8 @@ async function loadInvitePreview() {
   Promise.resolve().then(() => attemptInviteAutoJoinLoggedUser()).catch((error) => console.warn('Invite auto join failed', error));
 }
 
-async function loadMyActiveRoom() {
+async function loadMyActiveRoom(options = {}) {
+  const ignoreRecentlyClosed = Boolean(options?.ignoreRecentlyClosed);
   if (!state.auth.client || !state.auth.user) {
     clearOnlineRoomLocalState();
     return null;
@@ -6778,7 +6785,8 @@ async function loadMyActiveRoom() {
     if (!room) return null;
     if (room.status === 'finished') return null;
     if (
-      isRecentlyClosedWaitingRoom(room)
+      !ignoreRecentlyClosed
+      && isRecentlyClosedWaitingRoom(room)
       && room.host_user_id
       && room.host_user_id === state.auth.user?.id
       && !room.guest_user_id
@@ -6880,6 +6888,14 @@ async function createRoom() {
     showFeedback(onlineLobbyFeedback, 'За създаване на стая трябва да си влязъл в профила си.', 'error');
     toggleProfilePanel(true);
     return;
+  }
+
+  if (!state.online.room) {
+    const recoveredRoom = await loadMyActiveRoom({ ignoreRecentlyClosed: true });
+    if (recoveredRoom) {
+      adoptIncomingRoom(recoveredRoom);
+      syncFromOnlineRoom();
+    }
   }
 
   if (hasActiveOnlineRoom() && !canReplaceOwnWaitingRoom()) {
@@ -7361,6 +7377,9 @@ async function leaveRoom(options = {}) {
   const roomId = room.id;
   const wasPlaying = room.status === 'playing';
   const wasHost = myRoomSlot() === 1;
+  if (wasHost && room.status === 'waiting' && !room.guest_user_id) {
+    markRoomRecentlyClosed(roomId, 22000);
+  }
   suppressBackgroundOnlineTraffic(5200);
   dropCachedRoom(roomId);
   clearOnlineRoomLocalState(roomId);
@@ -7382,16 +7401,28 @@ async function leaveRoom(options = {}) {
         return data;
       })
     );
-    await waitForTrackedRoom(leaveTracker, async () => {
-      const fresh = await fetchRoomById(roomId);
+    const closeProbe = await waitForTrackedRoom(leaveTracker, async () => {
+      const fresh = await fetchRoomById(roomId, { force: true, timeoutMs: 2500 });
       return fresh ? null : { id: roomId, status: 'closed' };
     }, (fresh) => Boolean(fresh && fresh.status === 'closed'), 6000, 200);
+    let closeConfirmed = Boolean(closeProbe && closeProbe.status === 'closed');
+    if (!closeConfirmed) {
+      const forcedCheck = await fetchRoomById(roomId, { force: true, timeoutMs: 3000 });
+      closeConfirmed = !forcedCheck;
+    }
+    if (!closeConfirmed) {
+      if (leaveTracker?.error) throw leaveTracker.error;
+      throw new Error('Не успях да затворя стаята. Провери връзката и опитай отново.');
+    }
     dropCachedRoom(roomId);
     if (wasHost) markRoomRecentlyClosed(roomId, 12000);
     if (stayOnline && canUseOnlineLobby()) await loadLobbyRooms();
     scheduleHardUiSync([0, 400, 1200]);
     updateHud(wasPlaying ? 'Излезе от онлайн играта.' : (wasHost ? 'Стаята беше затворена.' : 'Напусна стаята.'));
   } catch (error) {
+    if (wasHost) clearRecentlyClosedMarker(roomId);
+    const recovered = await loadMyActiveRoom({ ignoreRecentlyClosed: true });
+    if (recovered) syncFromOnlineRoom();
     updateHud(error?.message || 'Не успях да затворя/напусна стаята.');
   } finally {
     leaveRoomButton.disabled = false;
