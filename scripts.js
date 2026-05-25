@@ -2259,6 +2259,48 @@ function isWaitingRoomExpired(room) {
   );
 }
 
+function _keepNewestWaitingRoomPerHostLegacy(rooms) {
+  if (!Array.isArray(rooms) || !rooms.length) return [];
+  const latestByHost = new Map();
+  const hostless = [];
+  rooms.forEach((room) => {
+    if (!room || room.status !== 'waiting') return;
+    const hostId = room.host_user_id || null;
+    if (!hostId) {
+      hostless.push(room);
+      return;
+      }
+
+      /*
+      const recovered = null;
+      if (recovered) {
+        adoptIncomingRoom(recovered);
+        state.playMode = 'online';
+        if (recovered.status === 'waiting') {
+          setOnlineLobbyOpen(true);
+          if (canUseOnlineLobby()) loadLobbyRooms();
+          updateHud('Върна се в waiting room-а.');
+        } else {
+          syncFromOnlineRoom();
+          updateHud('Върна се в активната онлайн игра.');
+        }
+      } else {
+        state.playMode = 'online';
+        setOnlineLobbyOpen(true);
+        if (canUseOnlineLobby()) loadLobbyRooms();
+        updateHud('Онлайн лобито е отворено. Избери или създай стая.');
+      }
+      return;
+      */
+    const current = latestByHost.get(hostId);
+    const currentTime = getRoomFreshnessTime(current || {}) || 0;
+    const nextTime = getRoomFreshnessTime(room) || 0;
+    if (!current || nextTime >= currentTime) latestByHost.set(hostId, room);
+  });
+  return [...latestByHost.values(), ...hostless]
+    .sort((a, b) => (getRoomFreshnessTime(b || {}) || 0) - (getRoomFreshnessTime(a || {}) || 0));
+}
+
 function keepNewestWaitingRoomPerHost(rooms) {
   if (!Array.isArray(rooms) || !rooms.length) return [];
   const latestByHost = new Map();
@@ -2269,7 +2311,7 @@ function keepNewestWaitingRoomPerHost(rooms) {
     if (!hostId) {
       hostless.push(room);
       return;
-    }
+      }
     const current = latestByHost.get(hostId);
     const currentTime = getRoomFreshnessTime(current || {}) || 0;
     const nextTime = getRoomFreshnessTime(room) || 0;
@@ -6338,7 +6380,10 @@ function updateAuthUi() {
   guestBanner.classList.toggle('hidden', loggedIn);
   const inviteLobbyAllowed = Boolean(state.ui.inviteToken && state.ui.onlineLobbyOpen && !state.started);
   const guestWaiting = isWaitingGuestView(state.online.room);
-  const lobbyVisible = Boolean(isOnlineMode() && state.ui.onlineLobbyOpen && !state.started && (loggedIn || inviteLobbyAllowed || guestWaiting));
+  if (isOnlineMode() && !state.started && !state.ui.onlineLobbyOpen && (loggedIn || guestWaiting || state.ui.inviteToken)) {
+    state.ui.onlineLobbyOpen = true;
+  }
+  const lobbyVisible = Boolean(isOnlineMode() && state.ui.onlineLobbyOpen && !state.started && (loggedIn || inviteLobbyAllowed || guestWaiting || state.ui.inviteToken));
   onlineLobby.classList.toggle('hidden', !lobbyVisible);
   app.classList.toggle('online-lobby-mode', lobbyVisible);
   document.body.classList.toggle('lobby-open', lobbyVisible);
@@ -7434,10 +7479,33 @@ async function leaveRoom(options = {}) {
 async function exitCurrentGame() {
   if (exitGameButton) exitGameButton.disabled = true;
   try {
-    if (state.playMode === 'online' && state.online.room) {
-      await leaveRoom({ finishIfPlaying: true });
+    if (state.playMode === 'online') {
+      if (!state.online.room) {
+        const recovered = await loadMyActiveRoom({ ignoreRecentlyClosed: true });
+        if (recovered) {
+          adoptIncomingRoom(recovered);
+          state.playMode = 'online';
+          if (recovered.status === 'waiting') {
+            setOnlineLobbyOpen(true);
+            if (canUseOnlineLobby()) await loadLobbyRooms();
+            updateHud('Върна се в waiting room-а.');
+          } else {
+            syncFromOnlineRoom();
+            updateHud('Върна се в активната онлайн игра.');
+          }
+        } else {
+          state.playMode = 'online';
+          setOnlineLobbyOpen(true);
+          if (canUseOnlineLobby()) await loadLobbyRooms();
+          updateHud('Онлайн лобито е отворено. Избери или създай стая.');
+        }
+        return;
+      }
+      if (state.online.room) {
+        await leaveRoom({ finishIfPlaying: true });
       returnToMainMenu('Онлайн играта беше прекратена и стаята е приключена.');
       return;
+      }
     }
     resetRoundState();
     updateHud('Излезе от текущата игра.');
