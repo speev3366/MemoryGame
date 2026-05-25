@@ -7481,6 +7481,23 @@ async function exitCurrentGame() {
   try {
     if (state.playMode === 'online') {
       if (!state.online.room) {
+        state.playMode = 'online';
+        setOnlineLobbyOpen(true);
+        updateHud('Онлайн лобито е отворено. Избери или създай стая.');
+        Promise.resolve().then(async () => {
+          const recoveredFast = await loadMyActiveRoom({ ignoreRecentlyClosed: true });
+          if (recoveredFast) {
+            adoptIncomingRoom(recoveredFast);
+            if (recoveredFast.status === 'playing') {
+              syncFromOnlineRoom();
+            } else if (state.ui.onlineLobbyOpen && canUseOnlineLobby()) {
+              await loadLobbyRooms();
+            }
+          } else if (state.ui.onlineLobbyOpen && canUseOnlineLobby()) {
+            await loadLobbyRooms();
+          }
+        }).catch((error) => console.warn('exitCurrentGame lobby recovery failed', error));
+        return;
         const recovered = await loadMyActiveRoom({ ignoreRecentlyClosed: true });
         if (recovered) {
           adoptIncomingRoom(recovered);
